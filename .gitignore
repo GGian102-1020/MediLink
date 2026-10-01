@@ -1,0 +1,13 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Maven
+**/target/
+
+# Variables de entorno
+.env
+*.env
+
+# Logs
+*.log
