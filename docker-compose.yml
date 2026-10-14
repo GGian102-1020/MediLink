@@ -25,6 +25,38 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    profiles: ["api"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-medlink}
+      DB_USER: ${POSTGRES_USER:-medlink}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-medlink123}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-}
+      SERVER_PORT: 8081
+      MEDLINK_CORS_ALLOWED_ORIGINS: ${MEDLINK_CORS_ALLOWED_ORIGINS:-}
+    expose:
+      - "8081"
+
+  gateway:
+    profiles: ["api"]
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+
   adminer:
     image: adminer:4.8.1
     container_name: medlink-adminer
@@ -39,3 +71,5 @@ services:
 
 volumes:
   pgdata:
+  caddydata:
+  caddyconfig:

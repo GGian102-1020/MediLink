@@ -1,0 +1,7 @@
+# HTTPS for the local demonstrator. Trust the internal CA locally or use curl -k.
+# For production, configure a real hostname and a public CA certificate.
+https://localhost {
+    tls internal
+    encode gzip
+    reverse_proxy backend:8081
+}
