@@ -82,3 +82,14 @@ Spring Data JPA
 PostgreSQL
 
 
+
+
+Base de datos local
+
+PostgreSQL corre en Docker con el esquema y datos de prueba compartidos por todo el equipo. Desde la raíz del repo:
+
+```bash
+docker compose up -d
+```
+
+Conexión, cuentas de prueba y cómo resetear la base: ver [database/README.md](database/README.md).
