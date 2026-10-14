@@ -1,0 +1,4 @@
+# Forzar LF en scripts que corren dentro del contenedor Linux
+*.sql text eol=lf
+*.sh  text eol=lf
+*.yml text eol=lf
