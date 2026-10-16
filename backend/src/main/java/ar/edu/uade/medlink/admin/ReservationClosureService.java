@@ -114,7 +114,8 @@ public class ReservationClosureService {
     }
 
     // RN-31..36: materialize all historical intervals in one transaction.
-    void evaluateSuspensions(long userId, Instant t, HttpServletRequest request) {
+    @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void evaluateSuspensions(long userId, Instant t, HttpServletRequest request) {
         var events = db.query("SELECT id_reserva, fecha_hora_vencimiento FROM reserva WHERE id_usuario=? " +
             "AND fecha_hora_vencimiento<=? AND (estado_persistido='VENCIDA' OR estado_persistido='ACTIVA') " +
             "ORDER BY fecha_hora_vencimiento ASC, id_reserva ASC",

@@ -103,3 +103,9 @@ trazabilidad normativa y pruebas: [CUENTAS_AUTENTICACION.md](CUENTAS_AUTENTICACI
 El Docker Compose original para DB/Adminer se mantiene. Para ejecutar además la API
 con HTTPS se usa el perfil opcional `api` (`docker compose --profile api up --build -d`),
 una clave JWT local propia en `.env` y Caddy como reverse proxy.
+
+
+## Farmacia y Stock
+
+Implementación, contratos REST, locking, adopción de Flyway sobre bases existentes,
+pruebas y diferencias respecto del UML: [FARMACIA_STOCK.md](FARMACIA_STOCK.md).
