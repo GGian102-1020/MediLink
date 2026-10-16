@@ -82,3 +82,24 @@ Spring Data JPA
 PostgreSQL
 
 
+
+
+Base de datos local
+
+PostgreSQL corre en Docker con el esquema y datos de prueba compartidos por todo el equipo. Desde la raíz del repo:
+
+```bash
+docker compose up -d
+```
+
+Conexión, cuentas de prueba y cómo resetear la base: ver [database/README.md](database/README.md).
+
+## Cuentas y autenticación (backend)
+
+Se agregó el módulo backend de registro, login, JWT, perfil, cambio de contraseña,
+logout y administración de Operadores/Cuentas. Documentación técnica, comandos,
+trazabilidad normativa y pruebas: [CUENTAS_AUTENTICACION.md](CUENTAS_AUTENTICACION.md).
+
+El Docker Compose original para DB/Adminer se mantiene. Para ejecutar además la API
+con HTTPS se usa el perfil opcional `api` (`docker compose --profile api up --build -d`),
+una clave JWT local propia en `.env` y Caddy como reverse proxy.
