@@ -52,14 +52,13 @@ Base de datos
 - PostgreSQL
 
 
-Frontend
-- React
-- Vite
+Frontend previsto en el MVP (no incluido en este ZIP)
+- React + TypeScript
+- Herramienta de desarrollo frontend: por definir por el equipo
 
 Otras herramientas
 - Git
 - GitHub
-- Swagger / OpenAPI
 - JUnit
 - Mockito
 - Trello
@@ -100,12 +99,21 @@ Se agregó el módulo backend de registro, login, JWT, perfil, cambio de contras
 logout y administración de Operadores/Cuentas. Documentación técnica, comandos,
 trazabilidad normativa y pruebas: [CUENTAS_AUTENTICACION.md](CUENTAS_AUTENTICACION.md).
 
-El Docker Compose original para DB/Adminer se mantiene. Para ejecutar además la API
-con HTTPS se usa el perfil opcional `api` (`docker compose --profile api up --build -d`),
-una clave JWT local propia en `.env` y Caddy como reverse proxy.
+El Docker Compose de desarrollo carga el esquema/datos de prueba en el primer arranque.
+Para ejecutar además la API con HTTPS se usa el perfil opcional `api`, una clave JWT
+local propia en `.env` y Caddy como reverse proxy. **En el primer arranque de la API
+sobre esa base ya cargada, es necesario adoptar explícitamente el esquema compartido
+con Flyway** (`DB_FLYWAY_BASELINE_ON_MIGRATE=true` después de verificar que es v1.4.3).
+No habilitar baseline automáticamente en bases desconocidas ni eliminar el volumen
+para resolver errores de migración. Pasos detallados: [database/README.md](database/README.md).
 
 
 ## Farmacia y Stock
 
-Implementación, contratos REST, locking, adopción de Flyway sobre bases existentes,
-pruebas y diferencias respecto del UML: [FARMACIA_STOCK.md](FARMACIA_STOCK.md).
+Las rutas y servicios implementados están en `backend/src/main/java/ar/edu/uade/medlink/farmacia/`
+y `backend/src/main/java/ar/edu/uade/medlink/stock/`. Contratos, locking, pruebas y
+limitaciones de integración: [FARMACIA_STOCK.md](FARMACIA_STOCK.md).
+
+Los cambios de consistencia con la especificación v1.4.3 hechos en esta revisión están
+registrados en [REVISION_ALINEACION_V143.md](REVISION_ALINEACION_V143.md).
+El PDF maestro v1.4.3 sigue siendo la única autoridad funcional, no estos README.

@@ -11,3 +11,7 @@
 
 # Logs
 *.log
+
+# Respaldos locales: nunca versionar datos extraidos de PostgreSQL
+*.dump
+*.backup

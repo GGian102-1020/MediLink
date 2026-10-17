@@ -2,6 +2,8 @@ package ar.edu.uade.medlink.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +20,7 @@ import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private final ErrorResponses errors;
     public GlobalExceptionHandler(ErrorResponses errors) { this.errors = errors; }
 
@@ -44,11 +47,26 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String,Object>> integrity(DataIntegrityViolationException ex, HttpServletRequest request) {
-        return ResponseEntity.badRequest().body(errors.body(request, "VALIDATION_ERROR", "Los datos no cumplen una restricción de integridad."));
+        // La BD no determina por si sola el codigo funcional REST. Una
+        // violacion UNIQUE (SQLSTATE 23505), por ejemplo, puede significar
+        // EMAIL_ALREADY_EXISTS, PRESENTATION_DUPLICATE u otro conflicto.
+        // Los servicios deben traducir los casos conocidos a ApiException.
+        // Una excepcion no reconocida indica una falla de integracion; no
+        // inventar INVALID_STATE_TRANSITION ni reportarla como input invalido.
+        logUnexpected("Integridad inesperada", ex, request);
+        return ResponseEntity.internalServerError().body(errors.body(request,
+            "INTERNAL_ERROR", "No fue posible completar la operación."));
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String,Object>> unexpected(Exception ex, HttpServletRequest request) {
-        // Never expose SQL, hashes, tokens, stack traces or secrets to clients.
+        logUnexpected("Excepción inesperada", ex, request);
+        // No exponer SQL, contraseñas, tokens ni detalles internos al cliente.
         return ResponseEntity.internalServerError().body(errors.body(request, "INTERNAL_ERROR", "No fue posible completar la operación."));
+    }
+    private void logUnexpected(String context, Exception ex, HttpServletRequest request) {
+        // Solo metadatos diagnósticos: los mensajes de excepciones pueden contener
+        // valores SQL, JWT u otros datos sensibles y no deben copiarse al log.
+        log.error("{}: correlationId={} método={} tipo={}", context,
+            errors.correlationId(request),request.getMethod(),ex.getClass().getName());
     }
 }

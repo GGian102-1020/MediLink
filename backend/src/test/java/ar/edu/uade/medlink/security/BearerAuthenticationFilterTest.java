@@ -63,6 +63,17 @@ class BearerAuthenticationFilterTest {
         when(accounts.isRevoked("jti1")).thenReturn(true);
         assertEquals(401,getResponse().getStatus());
     }
+    @Test void downstreamFailureIsNotMisclassifiedAsJwtFailure() throws Exception {
+        when(tokens.verify("jwt")).thenReturn(validJwt());
+        when(accounts.byId(10L)).thenReturn(Optional.of(new Account(10,"user@t.test","h","USUARIO","ACTIVA",3)));
+        MockHttpServletRequest req=new MockHttpServletRequest("GET","/api/me");
+        req.addHeader("Authorization","Bearer jwt");
+        MockHttpServletResponse response=new MockHttpServletResponse();
+        assertThrows(IllegalStateException.class,
+            ()->filter.doFilter(req,response,(r,s)->{throw new IllegalStateException("simulated downstream failure");}));
+        assertNull(org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication());
+        assertFalse(response.getContentAsString().contains("INTERNAL_ERROR"));
+    }
     @Test void healthyAuthenticatedRequestPopulatesRoleAndAccountId() throws Exception {
         when(tokens.verify("jwt")).thenReturn(validJwt());
         when(accounts.byId(10L)).thenReturn(Optional.of(new Account(10,"user@t.test","h","USUARIO","ACTIVA",3)));

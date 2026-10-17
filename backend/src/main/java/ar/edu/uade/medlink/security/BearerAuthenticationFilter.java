@@ -14,11 +14,14 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class BearerAuthenticationFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(BearerAuthenticationFilter.class);
     private final JwtTokens tokens;
     private final AccountRepository accounts;
     private final ErrorResponses errors;
@@ -65,13 +68,22 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
             var auth = new UsernamePasswordAuthenticationToken(current, null,
                 List.of(new SimpleGrantedAuthority("ROLE_" + rol)));
             SecurityContextHolder.getContext().setAuthentication(auth);
-            chain.doFilter(request, response);
         } catch (ApiException ex) {
             SecurityContextHolder.clearContext();
             errors.write(request,response,ex.status().value(),ex.codigo(),ex.getMessage());
+            return;
         } catch (RuntimeException ex) {
             SecurityContextHolder.clearContext();
+            // No registrar el token ni los datos de la solicitud.
+            log.error("Fallo al autenticar: correlationId={} tipo={}",
+                errors.correlationId(request), ex.getClass().getName());
             errors.write(request,response,500,"INTERNAL_ERROR","No fue posible completar la operación.");
+            return;
+        }
+        // No interceptar excepciones de controladores/servicios como si fueran
+        // errores al validar JWT. Spring MVC/Security deben manejarlas.
+        try {
+            chain.doFilter(request, response);
         } finally {
             SecurityContextHolder.clearContext();
         }

@@ -213,14 +213,13 @@ FROM (VALUES
  -- CANCELADAS
  (4,  '5QN1ZRK7MN04', 2, 1, 10, NULL,         1, 'CANCELADA',  now() - interval '4 days',   interval '1 hour', NULL,
       'USUARIO',  'CANCELACION_USUARIO',           'Ya no lo necesito'),                                      -- cancelación oportuna
- (9,  '8VD3KSC2DE09', 4, 2, 10, NULL,         1, 'CANCELADA',  now() - interval '6 days',   interval '3 hours 30 minutes', NULL,
-      'USUARIO',  'CANCELACION_USUARIO',           'No llego a retirarlo'),                                   -- cancelación tardía (30 min antes)
  (10, '4JW7YTF3GH10', 2, 4, 2,  NULL,         1, 'CANCELADA',  now() - interval '7 days',   interval '3 hours', NULL,
       'OPERADOR', 'PRODUCTO_NO_APTO_PARA_ENTREGA', 'Unidad dañada detectada en el control de la farmacia'),   -- no penaliza
  -- VENCIDAS
  (6,  '6PB2NHS9TV06', 3, 2, 1,  NULL,         1, 'VENCIDA',    now() - interval '10 days',  NULL, NULL, NULL, NULL, NULL),
  (7,  '1CG5XEW0XY07', 4, 1, 15, NULL,         1, 'VENCIDA',    now() - interval '20 days',  NULL, NULL, NULL, NULL, NULL),
- (8,  '3ZM9QAZ1AB08', 4, 3, 4,  NULL,         2, 'VENCIDA',    now() - interval '12 days',  NULL, NULL, NULL, NULL, NULL)
+ (8,  '3ZM9QAZ1AB08', 4, 3, 4,  NULL,         2, 'VENCIDA',    now() - interval '12 days',  NULL, NULL, NULL, NULL, NULL),
+ (9,  '8VD3KSC2DE09', 4, 2, 10, NULL,         1, 'VENCIDA',    now() - interval '6 days',   NULL, NULL, NULL, NULL, NULL)
 ) AS r(id, codigo, id_usuario, id_farmacia, id_presentacion, id_item, cantidad, estado, creacion,
        cancelacion, retiro, origen, causa, motivo)
 JOIN farmacia                 f ON f.id_farmacia     = r.id_farmacia
@@ -248,20 +247,34 @@ FROM (VALUES
  -- Reserva 4 cancelada por María (F1, Omeprazol)
  (1, 10, 4,            'RESERVA_CONFIRMADA',      12, 11, now() - interval '4 days',   9,    NULL),
  (1, 10, 4,            'CANCELACION_RESTITUCION', 11, 12, now() - interval '4 days' + interval '1 hour', 9, NULL),
+ -- Reserva 5 completada (Lucas, F4, Atorvastatina): al retirar no cambia stock
+ (4, 14, 5,            'RESERVA_CONFIRMADA',       7,  6, now() - interval '15 days', 10, NULL),
  -- Reserva 6 vencida (Lucas, F2, Ibuprofeno 400)
- (2, 1,  6,            'RESERVA_CONFIRMADA',      10,  9, now() - interval '10 days',  10,   NULL),
- (2, 1,  6,            'VENCIMIENTO',              9, 10, now() - interval '10 days' + interval '4 hours', NULL, NULL)
+ (2, 1,  6,            'RESERVA_CONFIRMADA',      10,  9, now() - interval '10 days', 10, NULL),
+ (2, 1,  6,            'VENCIMIENTO',              9, 10, now() - interval '10 days' + interval '4 hours', NULL, NULL),
+ -- Reserva 7 vencida (Sofía, F1, Loratadina)
+ (1, 15, 7,            'RESERVA_CONFIRMADA',       9,  8, now() - interval '20 days', 11, NULL),
+ (1, 15, 7,            'VENCIMIENTO',              8,  9, now() - interval '20 days' + interval '4 hours', NULL, NULL),
+ -- Reserva 8 vencida (Sofía, F3, Paracetamol x2)
+ (3, 4,  8,            'RESERVA_CONFIRMADA',      12, 10, now() - interval '12 days', 11, NULL),
+ (3, 4,  8,            'VENCIMIENTO',             10, 12, now() - interval '12 days' + interval '4 hours', NULL, NULL),
+ -- Reserva 9 vencida (Sofía, F2, Omeprazol): tercera expiración, dispara suspensión
+ (2, 10, 9,            'RESERVA_CONFIRMADA',       8,  7, now() - interval '6 days',  11, NULL),
+ (2, 10, 9,            'VENCIMIENTO',              7,  8, now() - interval '6 days' + interval '4 hours', NULL, NULL),
+ -- Reserva 10 cancelada por el Operador (F4, Ibuprofeno 600): sin restitución
+ (4, 2, 10,            'RESERVA_CONFIRMADA',       8,  7, now() - interval '7 days',  9, NULL)
 ) AS v(id_farmacia, id_presentacion, id_reserva, tipo, anterior, nueva, fecha_hora, actor, motivo)
 JOIN stock s ON s.id_farmacia = v.id_farmacia AND s.id_presentacion = v.id_presentacion
 ORDER BY v.fecha_hora;
 
 -- ---------------------------------------------------------------------
 --  Suspensiones (duración normativa: 7 días exactos = 168 h)
---  Valores de prueba: vencida = 3 pts, cancelación tardía = 1 pt.
---  Sofía: reservas 7 y 8 vencidas + reserva 9 cancelada tarde = 7 pts.
+--  RN-31..36: 3 vencimientos computables dentro de 30 días; cancelar no penaliza.
+--  Sofía: reservas 7, 8 y 9 vencidas; el tercer vencimiento inicia la suspensión.
 -- ---------------------------------------------------------------------
 INSERT INTO suspension (id_suspension, id_usuario, fecha_hora_inicio, fecha_hora_fin, motivo) VALUES
- (1, 4, now() - interval '5 days', now() - interval '5 days' + interval '168 hours', 'INCUMPLIMIENTOS_REITERADOS');
+ (1, 4, now() - interval '6 days' + interval '4 hours',
+        now() - interval '6 days' + interval '4 hours' + interval '168 hours', 'INCUMPLIMIENTOS_REITERADOS');
 
 -- ---------------------------------------------------------------------
 --  Auditoría (resumen_posterior obligatorio, RN-44)
@@ -279,16 +292,27 @@ INSERT INTO auditoria (fecha_hora, actor_cuenta_id, actor_rol, accion, tipo_enti
   '{"estado": "ACTIVA"}', '{"estado": "ANULADA"}'),
  (now() - interval '10 days', 1, 'ADMINISTRADOR', 'DESHABILITAR_CUENTA', 'CUENTA', 12, 5, 'Solicitud del titular',
   '{"estado": "ACTIVA"}', '{"estado": "DESHABILITADA"}'),
+ (now() - interval '3 days' + interval '2 hours', 5, 'OPERADOR', 'CONFIRMAR_RETIRO', 'RESERVA', 3, 2, NULL,
+  '{"estado": "ACTIVA"}', '{"estado": "COMPLETADA"}'),
+ (now() - interval '15 days' + interval '3 hours', 6, 'OPERADOR', 'CONFIRMAR_RETIRO', 'RESERVA', 5, 3, NULL,
+  '{"estado": "ACTIVA"}', '{"estado": "COMPLETADA"}'),
  (now() - interval '8 days' + interval '1 hour', 5, 'OPERADOR', 'CONFIRMAR_RETIRO', 'RESERVA', 11, 1, NULL,
   '{"estado": "ACTIVA"}', '{"estado": "COMPLETADA"}'),
  (now() - interval '7 days' + interval '3 hours', 6, 'OPERADOR', 'CANCELAR_RESERVA_OPERATIVA', 'RESERVA', 10, 2,
   'Unidad dañada detectada en el control de la farmacia',
   '{"estado": "ACTIVA"}', '{"estado": "CANCELADA", "causa": "PRODUCTO_NO_APTO_PARA_ENTREGA"}'),
- (now() - interval '5 days', NULL, 'SISTEMA', 'CREAR_SUSPENSION', 'SUSPENSION', 1, 4,
-  'Umbral de penalizaciones alcanzado (7 pts)', NULL, '{"dias": 7}'),
  (now() - interval '1 day', 2, 'OPERADOR', 'AJUSTAR_STOCK', 'STOCK',
   (SELECT id_stock FROM stock WHERE id_farmacia = 1 AND id_presentacion = 1), NULL, 'Reposición',
   '{"cantidad_disponible": 10}', '{"cantidad_disponible": 15}');
+
+-- Auditoria del sistema: tomar las fechas ya persistidas evita divergencias
+-- de precision (TIMESTAMPTZ(3)) entre la Suspension y su snapshot.
+INSERT INTO auditoria (fecha_hora, actor_cuenta_id, actor_rol, accion, tipo_entidad, entidad_id,
+                      usuario_relacionado_id, motivo, resumen_anterior, resumen_posterior)
+SELECT s.fecha_hora_inicio, NULL, 'SISTEMA', 'CREAR_SUSPENSION', 'SUSPENSION', s.id_suspension,
+       s.id_usuario, NULL, NULL,
+       jsonb_build_object('fechaHoraInicio', s.fecha_hora_inicio, 'fechaHoraFin', s.fecha_hora_fin)
+FROM suspension s WHERE s.id_suspension = 1 AND s.id_usuario = 4;
 
 -- ---------------------------------------------------------------------
 --  Sincronizar secuencias IDENTITY con los ids cargados a mano

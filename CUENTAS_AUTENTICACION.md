@@ -1,6 +1,6 @@
 # Cuentas y autenticación - MediLink v1.4.3
 
-Implementación del backend a partir de la **Especificación Maestra del MVP v1.4.3**. No se creó un segundo modelo de Cuenta: el código usa las tablas y los enum PostgreSQL existentes en `database/01_medlink_esquema.sql` mediante `JdbcTemplate`, con transacciones Spring. El ZIP original **solo tenía un endpoint de salud**: no hay frontend React en este repositorio. La interfaz web de login/registro puede conectarse a estos endpoints al integrarse el frontend del equipo.
+Implementación del backend a partir de la **Especificación Maestra del MVP v1.4.3**. No se creó un segundo modelo de Cuenta: el código usa las tablas y los enum PostgreSQL existentes en `database/01_medlink_esquema.sql` mediante `JdbcTemplate`, con transacciones Spring. El repositorio actual incluye además Farmacias/Stock, pero no contiene frontend React. La interfaz web de login/registro puede conectarse a estos endpoints al integrarse el frontend del equipo.
 
 ## Requisitos
 
@@ -17,7 +17,10 @@ python3 -c 'import secrets,base64; print(base64.b64encode(secrets.token_bytes(32
 # Base de datos y Adminer (como antes):
 docker compose up -d
 # Backend y reverse proxy con TLS, además de la base:
-docker compose --profile api up --build -d
+# Primer arranque de la API sobre el esquema compartido YA inicializado por Docker:
+# Verificá que es el esquema de database/01_medlink_esquema.sql antes de adoptar Flyway.
+DB_FLYWAY_BASELINE_ON_MIGRATE=true docker compose --profile api up --build -d
+# En arranques posteriores, Flyway ya registra el esquema y el baseline no es necesario.
 # HTTPS con CA local de Caddy (es normal que no esté instalada como confiable):
 curl -k https://localhost:8443/api/health
 python3 scripts/smoke_cuentas.py --insecure
@@ -112,7 +115,7 @@ Errores (400/401/403/404/409, según contrato) usan:
 - JWT HS256 de 30 minutos, sin refresh, con `sub`, `rol`, `jti`, `tokenVersion`, `iat`, `exp`. Firma, vencimiento, `jti`, `tokenVersion`, estado ACTIVA y rol se validan en **cada petición autenticada**.
 - Logout persiste `sesion_revocada` por jti; cambiar contraseña o deshabilitar cuenta invalida globalmente por `tokenVersion`. Reactivar no restaura sesiones anteriores.
 - Registro público crea **Cuenta + Usuario** en una transacción; no permite elegir otro rol. Administrador solamente por seed/configuración. Un Operador está permanentemente asociado a una única Farmacia y se crea Cuenta + Operador de forma atómica.
-- ADMINISTRADOR no puede cambiar el estado de otra Cuenta ADMINISTRADOR por API. No se permite deshabilitar al último Operador ACTIVO de una Farmacia ACTIVA. Operador de Farmacia INACTIVA puede iniciar sesión (operaciones funcionales bloqueadas por el módulo de farmacias/reservas que aún debe implementarse).
+- ADMINISTRADOR no puede cambiar el estado de otra Cuenta ADMINISTRADOR por API. No se permite deshabilitar al último Operador ACTIVO de una Farmacia ACTIVA. Operador de Farmacia INACTIVA puede iniciar sesión y consultar datos históricos; el módulo actual de Stock bloquea sus modificaciones, y el módulo de Reserva futuro deberá respetar la misma regla.
 - RN-40: deshabilitación de Usuario bloquea cuenta, perfil y recursos; materializa primero reservas funcionalmente vencidas y sus efectos, cancela las restantes con causa `CUENTA_DESHABILITADA`, restituye Stock/libera Rx con MovimientoStock y evalúa Suspensiones históricas, todo en la misma transacción; registra la auditoría. El módulo de Reservas futuro **debe respetar el orden de locks de 10.2** para preservar este comportamiento bajo concurrencia.
 - La auditoría de cambios de contraseña y administración registra solamente metadatos permitidos: **sin hashes, contraseñas, JWT ni secretos**.
 - No hay endpoint de recuperación de contraseña, MFA, creación de admin, eliminación física, cambio de rol ni cambio de Farmacia de operador: todos fuera de alcance normativo.
@@ -126,8 +129,8 @@ Errores (400/401/403/404/409, según contrato) usan:
 | SEC-03, AC-24 | Revocación logout | Smoke HTTP |
 | SEC-04, AC-23 | Cambio de contraseña, invalidación global | Pruebas de servicio, smoke HTTP |
 | CU-14, RN-38/39 | Alta, edición, consulta Operadores | Smoke HTTP; prueba de contrato PostgreSQL pendiente |
-| RN-40, AC-10/12/27/31/32 | Estado de Cuentas y reglas de Farmacia/Reservas | Unit test de último operador; **integración concurrente pendiente** |
-| RN-31..36 | Evaluación determinista de suspensiones durante deshabilitación | `SuspensionPlannerTest`; integración con BD pendiente |
+| RN-40, AC-10/12/27/31/32 | Estado de Cuentas y reglas de Farmacia/Reservas | Unit tests y pruebas PostgreSQL parciales (ajuste vs. deshabilitación); concurrencia integral de Reserva pendiente |
+| RN-31..36 | Evaluación determinista de suspensiones durante deshabilitación | `SuspensionPlannerTest` y escenarios PostgreSQL en FarmaciaStockPostgresTest; ejecución real pendiente de verificar |
 | SEC-06 | Restricción de rol en backend | Smoke HTTP con Usuario y Operador |
 | SEC-07/08 | Secretos externos, HTTPS proxy | Prueba manual y `curl -k` local |
 | RN-44 | Auditoría administrativa | Verificación BD tras smoke pendiente |
@@ -136,7 +139,7 @@ Errores (400/401/403/404/409, según contrato) usan:
 
 **Desviación técnica pendiente:** la sección 13 de la especificación prescribe Spring Data JPA/Hibernate para persistencia. Este módulo utiliza `JdbcTemplate` para interoperar directamente con los tipos `ENUM`, triggers y locks del esquema PostgreSQL existente. Es una decisión de implementación de este entregable que **debe revisarse e integrarse con Spring Data JPA/Hibernate** para cerrar la conformidad arquitectónica completa del MVP. No se declara esa conformidad como terminada.
 
-Este repositorio no contiene todavía el módulo de Reservas, Farmacias/Stock, Prescripciones, Auditoría de lectura ni frontend; no se declara el MVP completo. Falta ejecutar pruebas **reales** con PostgreSQL/Docker y concurrencia de operaciones cruzadas (especialmente AC-12/31/32) una vez que las otras tarjetas se integren. La lógica `ReservationClosureService` implementa sus movimientos según el esquema actual, pero deberá coordinarse con los servicios de Reservas y el scheduler cuando existan. La política completa de expiración/suspensiones para `POST /api/reservas` todavía pertenece a esas tarjetas.
+Este repositorio sí contiene módulos de Farmacias y Stock, con pruebas PostgreSQL/concurrencia preparadas. No contiene todavía el módulo completo de Reservas, catálogo de medicamentos/presentaciones, Prescripciones, Auditoría de lectura ni frontend; no se declara el MVP completo. Quedan pruebas cruzadas que dependen del módulo de Reserva (especialmente AC-31/32). Para acreditar la suite de PostgreSQL hay que ejecutarla realmente, sin tests omitidos. La lógica `ReservationClosureService` implementa sus movimientos según el esquema actual, pero deberá coordinarse con los servicios de Reservas y el scheduler cuando existan. La política completa de expiración/suspensiones para `POST /api/reservas` todavía pertenece a esas tarjetas.
 
 ## Pruebas
 

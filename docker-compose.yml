@@ -11,7 +11,7 @@ services:
       TZ: America/Argentina/Buenos_Aires
       PGTZ: America/Argentina/Buenos_Aires
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # Se ejecutan en orden alfabético SOLO la primera vez (volumen vacío):
@@ -68,7 +68,7 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: db
     ports:
-      - "${ADMINER_PORT:-8080}:8080"
+      - "127.0.0.1:${ADMINER_PORT:-8080}:8080"
 
 volumes:
   pgdata:
