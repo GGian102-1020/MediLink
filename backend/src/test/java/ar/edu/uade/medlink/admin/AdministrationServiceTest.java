@@ -44,5 +44,7 @@ class AdministrationServiceTest {
                 java.util.Map.of("correo","c.correo","id","c.id"),"c.id ASC")).codigo());
         assertEquals("c.correo DESC,c.id ASC",AdministrationService.sortClause(List.of("correo,desc"),
             java.util.Map.of("correo","c.correo","id","c.id"),"c.id ASC"));
+        assertEquals("c.id DESC",AdministrationService.sortClause(List.of("id,desc"),
+            java.util.Map.of("correo","c.correo","id","c.id"),"c.id ASC"));
     }
 }

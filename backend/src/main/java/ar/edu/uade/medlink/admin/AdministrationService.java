@@ -130,7 +130,7 @@ public class AdministrationService {
             checkState(state); where.append(" AND c.estado=?::estado_cuenta");values.add(state);
         }
         if (email!=null&&!email.isBlank()) {
-            where.append(" AND lower(c.correo) LIKE ?");values.add("%"+email.strip().toLowerCase(java.util.Locale.ROOT)+"%");
+            where.append(" AND lower(c.correo) LIKE ? ESCAPE '!'");values.add(emailPattern(email));
         }
         long count=db.queryForObject("SELECT COUNT(*) FROM operador o JOIN cuenta c ON c.id_cuenta=o.id_cuenta"+where,
             Long.class,values.toArray());
@@ -145,7 +145,7 @@ public class AdministrationService {
         checkPage(page,size);
         StringBuilder where=new StringBuilder(" WHERE 1=1");List<Object> args=new ArrayList<>();
         if (email!=null&&!email.isBlank()) {
-            where.append(" AND lower(c.correo) LIKE ?");args.add("%"+email.strip().toLowerCase(java.util.Locale.ROOT)+"%");
+            where.append(" AND lower(c.correo) LIKE ? ESCAPE '!'");args.add(emailPattern(email));
         }
         if (state!=null&&!state.isBlank()) {
             checkState(state);where.append(" AND c.estado=?::estado_cuenta");args.add(state);
@@ -167,6 +167,10 @@ public class AdministrationService {
         if (page<0||size<1||size>100) throw ApiException.validation("Paginación inválida. page>=0 y 1<=size<=100.");
         if ((long) page*size>Integer.MAX_VALUE) throw ApiException.validation("Página fuera de rango.");
     }
+    private static String emailPattern(String email) {
+        return "%" + email.strip().toLowerCase(java.util.Locale.ROOT)
+            .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
     static String sortClause(List<String> specifications, Map<String,String> columns, String defaultSort) {
         if (specifications==null||specifications.isEmpty()) return defaultSort;
         List<String> validated=new ArrayList<>();
@@ -177,7 +181,8 @@ public class AdministrationService {
                 throw ApiException.validation("Ordenamiento inválido.");
             validated.add(columns.get(parts[0])+" "+parts[1].toUpperCase(java.util.Locale.ROOT));
         }
-        validated.add(columns.get("id")+" ASC");
+        if (specifications.stream().noneMatch(spec -> spec.startsWith("id,")))
+            validated.add(columns.get("id")+" ASC");
         return String.join(",",validated);
     }
 }

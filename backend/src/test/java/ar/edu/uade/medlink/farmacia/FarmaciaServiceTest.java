@@ -14,6 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -29,6 +31,21 @@ class FarmaciaServiceTest {
     Farmacia farmacia() {
         var f=new Farmacia("Central","Calle 1",null,null);
         ReflectionTestUtils.setField(f,"id",4L); return f;
+    }
+    @Test void listingLoadsOperationalStateInOneBatch() {
+        var active=farmacia();
+        var inactive=new Farmacia("Sur", "Calle 2", null, null);
+        ReflectionTestUtils.setField(inactive,"id",5L);
+        inactive.cambiarEstado(EstadoFarmacia.INACTIVA);
+        when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class),any(org.springframework.data.domain.Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(active,inactive),PageRequest.of(0,20),2));
+        when(integration.farmaciasConOperadorActivo(Set.of(4L,5L))).thenReturn(Set.of(4L,5L));
+        var response=service.listar(null,null,0,20,null,admin);
+        assertEquals(2,response.content().size());
+        assertTrue(response.content().get(0).operativa());
+        assertFalse(response.content().get(1).operativa());
+        verify(integration,never()).tieneOperadorActivo(anyLong());
+        verify(integration).farmaciasConOperadorActivo(Set.of(4L,5L));
     }
     @Test void createsActiveButNonOperationalWithoutOperatorsAndAudits() {
         when(repository.saveAndFlush(any())).thenAnswer(call->{

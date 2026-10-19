@@ -52,6 +52,20 @@ baseline de forma indiscriminada para bases de procedencia desconocida.
 No usar `docker compose down -v` para intentar resolver un error de Flyway: ese comando
 elimina los datos. Para el detalle normativo ver secciones 10, 13 y 16 del PDF v1.4.3.
 
+### Búsqueda de catálogo en bases ya existentes
+
+El catálogo utiliza la extensión oficial de PostgreSQL `unaccent` para buscar
+medicamentos sin distinguir acentos (CV-07). Los volúmenes nuevos la instalan
+al ejecutar `01_medlink_esquema.sql`; en volúmenes **ya existentes** la instala
+Flyway mediante `V2__extension_busqueda_catalogo.sql` al iniciar la API.
+No borres el volumen ni edites la migración V1 que ya fue aplicada.
+Si la extensión aún no está instalada y se usa una base sin iniciar Flyway, la
+búsqueda de medicamentos requerirá ejecutar V2 primero. Se puede verificar con:
+
+```sql
+SELECT extname FROM pg_extension WHERE extname='unaccent';
+```
+
 ### Backup y restauración (RNF-12 / AC-59)
 
 Con la base ejecutándose, desde la raíz del proyecto. El backup se guarda

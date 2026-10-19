@@ -48,7 +48,11 @@ public class FarmaciaService {
             if (filter!=null) predicates.add(cb.equal(root.get("estado"),filter));
             return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
-        return PageRequests.dto(farmacias.findAll(spec,pageable).map(this::dto));
+        var result=farmacias.findAll(spec,pageable);
+        Set<Long> ids=new HashSet<>();
+        result.getContent().forEach(f->ids.add(f.getId()));
+        Set<Long> operativas=integration.farmaciasConOperadorActivo(ids);
+        return PageRequests.dto(result.map(f->dto(f,operativas.contains(f.getId()))));
     }
     @Transactional
     public FarmaciaDTO crear(@Valid FarmaciaRequest req, CurrentAccount actor, HttpServletRequest request) {
@@ -83,8 +87,11 @@ public class FarmaciaService {
         return dto(f);
     }
     private FarmaciaDTO dto(Farmacia f) {
+        return dto(f,f.getEstado()==EstadoFarmacia.ACTIVA && integration.tieneOperadorActivo(f.getId()));
+    }
+    private static FarmaciaDTO dto(Farmacia f,boolean operativa) {
         return new FarmaciaDTO(f.getId(),f.getNombre(),f.getDireccion(),f.getTelefono(),f.getEmailContacto(),
-            f.getEstado(),f.getEstado()==EstadoFarmacia.ACTIVA && integration.tieneOperadorActivo(f.getId()));
+            f.getEstado(),f.getEstado()==EstadoFarmacia.ACTIVA && operativa);
     }
     private static Map<String,Object> summary(Farmacia f) {
         Map<String,Object> data=new LinkedHashMap<>();
