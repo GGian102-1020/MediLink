@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import presentacion.enums.CondicionDipensa;
 @Entity
 @Table
+@Getter
 public class PresentacionMedicamento{
     @Id
     @ConstructValue(strategy = GenerationType.IDENTITY)
