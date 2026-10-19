@@ -32,12 +32,8 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
         if (uri.equals("/api/auth/register") || uri.equals("/api/auth/login")) return true;
-        if (!"GET".equalsIgnoreCase(request.getMethod())) return false;
         // A malformed or expired Bearer header must not prevent public browsing.
-        return uri.equals("/api/health") || uri.equals("/api/medicamentos")
-            || uri.matches("/api/medicamentos/[^/]+/presentaciones")
-            || uri.matches("/api/presentaciones/[^/]+")
-            || uri.matches("/api/presentaciones/[^/]+/disponibilidad");
+        return PublicApiRoutes.publicGet(request.getMethod(), uri);
     }
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,

@@ -1,16 +1,13 @@
 package ar.edu.uade.medlink.auth;
 
 import ar.edu.uade.medlink.auth.AuthDtos.*;
-import ar.edu.uade.medlink.common.ApiClock;
 import ar.edu.uade.medlink.common.AuditService;
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.security.CurrentAccount;
 import ar.edu.uade.medlink.security.JwtTokens;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.Clock;
-import java.time.OffsetDateTime;
 import java.util.Map;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -123,14 +120,6 @@ public class AuthService {
         CuentaPerfilDTO perfil=repository.perfil(current.id());
         if (!"USUARIO".equals(current.rol())) return new MeDTO(perfil,null);
         long userId = perfil.perfilId();
-        java.time.Instant t=clock.instant();
-        var suspensions = repository.jdbc().query(
-            "SELECT id_suspension, fecha_hora_inicio, fecha_hora_fin FROM suspension WHERE id_usuario=? " +
-            "AND fecha_hora_inicio <= ? AND fecha_hora_fin > ? ORDER BY fecha_hora_inicio DESC LIMIT 1",
-            (r,n)->new SuspensionDTO(r.getLong(1),
-                ApiClock.argentina(r.getObject(2,OffsetDateTime.class).toInstant()),
-                ApiClock.argentina(r.getObject(3,OffsetDateTime.class).toInstant()),true,"INCUMPLIMIENTOS_REITERADOS"),
-            userId,Timestamp.from(t),Timestamp.from(t));
-        return new MeDTO(perfil,suspensions.stream().findFirst().orElse(null));
+        return new MeDTO(perfil, repository.activeSuspension(userId, clock.instant()).orElse(null));
     }
 }

@@ -1,6 +1,6 @@
 package ar.edu.uade.medlink.medicamento.controller;
 
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.medicamento.dto.MedicamentoDTO;
 import ar.edu.uade.medlink.medicamento.service.MedicamentoService;
 import org.springframework.util.MultiValueMap;

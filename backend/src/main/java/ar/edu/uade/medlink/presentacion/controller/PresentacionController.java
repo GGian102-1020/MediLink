@@ -1,6 +1,6 @@
 package ar.edu.uade.medlink.presentacion.controller;
 
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.presentacion.dto.PresentacionDTO;
 import ar.edu.uade.medlink.presentacion.service.PresentacionService;
 import org.springframework.util.MultiValueMap;

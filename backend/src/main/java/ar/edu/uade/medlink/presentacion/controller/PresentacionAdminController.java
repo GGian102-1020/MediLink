@@ -1,7 +1,7 @@
 package ar.edu.uade.medlink.presentacion.controller;
 
 import ar.edu.uade.medlink.admin.AdminDtos.CambioEstadoRequest;
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.presentacion.dto.*;
 import ar.edu.uade.medlink.presentacion.service.PresentacionService;
 import ar.edu.uade.medlink.security.CurrentAccount;

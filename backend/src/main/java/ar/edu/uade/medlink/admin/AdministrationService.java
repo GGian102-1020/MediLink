@@ -1,11 +1,14 @@
 package ar.edu.uade.medlink.admin;
 
 import ar.edu.uade.medlink.admin.AdminDtos.*;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.auth.AccountRepository;
 import ar.edu.uade.medlink.auth.AuthDtos.CuentaPerfilDTO;
 import ar.edu.uade.medlink.auth.AuthDtos.UsuarioPerfilDTO;
 import ar.edu.uade.medlink.auth.AuthService;
 import ar.edu.uade.medlink.common.AuditService;
+import ar.edu.uade.medlink.common.PageRequests;
+import static ar.edu.uade.medlink.common.RequestValidation.requiredReason;
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.security.CurrentAccount;
 import jakarta.servlet.http.HttpServletRequest;
@@ -113,16 +116,10 @@ public class AdministrationService {
             Map.of("estado",target,"tokenVersion",account.tokenVersion()+(enabled?0:1)),request);
         return accounts.perfil(accountId);
     }
-    public static String requiredReason(String raw) {
-        if (raw==null || raw.strip().isEmpty() || raw.strip().length()>500)
-            throw ApiException.validation("El motivo es obligatorio (1 a 500 caracteres).");
-        return raw.strip();
-    }
-
     @Transactional(readOnly=true)
     public PageDTO<OperadorDTO> operators(Long pharmacy, String state, String email,
         int page, int size, List<String> sort) {
-        checkPage(page,size);
+        PageRequests.validate(page,size);
         StringBuilder where=new StringBuilder(" WHERE 1=1");
         List<Object> values=new ArrayList<>();
         if (pharmacy!=null) { where.append(" AND o.id_farmacia=?"); values.add(pharmacy); }
@@ -142,7 +139,7 @@ public class AdministrationService {
     }
     @Transactional(readOnly=true)
     public PageDTO<UsuarioPerfilDTO> users(String email, String state, int page, int size, List<String> sort) {
-        checkPage(page,size);
+        PageRequests.validate(page,size);
         StringBuilder where=new StringBuilder(" WHERE 1=1");List<Object> args=new ArrayList<>();
         if (email!=null&&!email.isBlank()) {
             where.append(" AND lower(c.correo) LIKE ? ESCAPE '!'");args.add(emailPattern(email));
@@ -162,10 +159,6 @@ public class AdministrationService {
     }
     private static void checkState(String status) {
         if (!status.equals("ACTIVA")&&!status.equals("DESHABILITADA")) throw ApiException.validation("Estado inválido.");
-    }
-    private static void checkPage(int page,int size) {
-        if (page<0||size<1||size>100) throw ApiException.validation("Paginación inválida. page>=0 y 1<=size<=100.");
-        if ((long) page*size>Integer.MAX_VALUE) throw ApiException.validation("Página fuera de rango.");
     }
     private static String emailPattern(String email) {
         return "%" + email.strip().toLowerCase(java.util.Locale.ROOT)

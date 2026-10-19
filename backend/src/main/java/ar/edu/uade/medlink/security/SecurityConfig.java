@@ -40,12 +40,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
-                // CU-03: catalog and availability remain public even before
-                // their controllers are implemented by the other modules.
-                .requestMatchers(HttpMethod.GET, "/api/medicamentos",
-                    "/api/medicamentos/*/presentaciones", "/api/presentaciones/*",
-                    "/api/presentaciones/*/disponibilidad").permitAll()
+                .requestMatchers(HttpMethod.GET, PublicApiRoutes.GET_PATTERNS).permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((request, response, exception) ->

@@ -1,8 +1,9 @@
 # Farmacias y Stock — módulo implementado (MediLink v1.4.3)
 
 Este archivo describe el código del módulo en el ZIP y **no sustituye** la
-Especificación Maestra v1.4.3 (PDF). Las funciones de Reservas/Catálogo aún no
-implementadas como módulos no se dan por terminadas por la mera existencia de tablas.
+Especificación Maestra v1.4.3 (PDF). El catálogo de Medicamentos/Presentaciones
+se incorporó posteriormente; su estado vigente figura en [CHANGELOG.md](CHANGELOG.md).
+Las operaciones pendientes de Reservas no se dan por terminadas por la mera existencia de tablas.
 
 ## Implementación
 

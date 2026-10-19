@@ -1,6 +1,6 @@
 # Cuentas y autenticación - MediLink v1.4.3
 
-Implementación del backend a partir de la **Especificación Maestra del MVP v1.4.3**. No se creó un segundo modelo de Cuenta: el código usa las tablas y los enum PostgreSQL existentes en `database/01_medlink_esquema.sql` mediante `JdbcTemplate`, con transacciones Spring. El repositorio actual incluye además Farmacias/Stock, pero no contiene frontend React. La interfaz web de login/registro puede conectarse a estos endpoints al integrarse el frontend del equipo.
+Implementación del backend a partir de la **Especificación Maestra del MVP v1.4.3**. No se creó un segundo modelo de Cuenta: el código usa las tablas y los enum PostgreSQL existentes en `database/01_medlink_esquema.sql` mediante `JdbcTemplate`, con transacciones Spring. El repositorio también incluye Catálogo, Farmacias/Stock, pero no contiene frontend React. La interfaz web de login/registro puede conectarse a estos endpoints al integrarse el frontend del equipo.
 
 ## Requisitos
 

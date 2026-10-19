@@ -54,6 +54,7 @@ class FarmaciaServiceTest {
         var dto=service.crear(new FarmaciaRequest(" Nueva "," Calle 3 "," ",null),admin,null);
         assertEquals(EstadoFarmacia.ACTIVA,dto.estado()); assertFalse(dto.operativa());
         assertEquals("Nueva",dto.nombre()); assertNull(dto.telefono());
+        verify(integration, never()).tieneOperadorActivo(anyLong());
         verify(audit).record(eq(1L),eq("ADMINISTRADOR"),eq("CREAR_FARMACIA"),eq("FARMACIA"),eq(4L),
             isNull(),isNull(),isNull(),argThat(m->m.get("nombre").equals("Nueva")),isNull());
     }

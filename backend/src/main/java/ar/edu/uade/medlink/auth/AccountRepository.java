@@ -2,9 +2,12 @@ package ar.edu.uade.medlink.auth;
 
 import ar.edu.uade.medlink.auth.AuthDtos.CuentaPerfilDTO;
 import ar.edu.uade.medlink.auth.AuthDtos.UsuarioPerfilDTO;
+import ar.edu.uade.medlink.auth.AuthDtos.SuspensionDTO;
+import ar.edu.uade.medlink.common.ApiClock;
 import ar.edu.uade.medlink.common.error.ApiException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -76,5 +79,15 @@ public class AccountRepository {
         db.update("INSERT INTO sesion_revocada (jti,id_cuenta,fecha_hora_expiracion) " +
             "VALUES (?,?,?) ON CONFLICT (jti) DO NOTHING", jti, id, Timestamp.from(expires));
     }
-    public JdbcTemplate jdbc() { return db; }
+    public Optional<SuspensionDTO> activeSuspension(long userId, Instant instant) {
+        var matches = db.query(
+            "SELECT id_suspension, fecha_hora_inicio, fecha_hora_fin FROM suspension WHERE id_usuario=? " +
+            "AND fecha_hora_inicio <= ? AND fecha_hora_fin > ? ORDER BY fecha_hora_inicio DESC LIMIT 1",
+            (r,n) -> new SuspensionDTO(r.getLong(1),
+                ApiClock.argentina(r.getObject(2, OffsetDateTime.class).toInstant()),
+                ApiClock.argentina(r.getObject(3, OffsetDateTime.class).toInstant()),
+                true, "INCUMPLIMIENTOS_REITERADOS"),
+            userId, Timestamp.from(instant), Timestamp.from(instant));
+        return matches.stream().findFirst();
+    }
 }

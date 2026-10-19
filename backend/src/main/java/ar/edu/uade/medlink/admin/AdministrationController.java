@@ -1,6 +1,7 @@
 package ar.edu.uade.medlink.admin;
 
 import ar.edu.uade.medlink.admin.AdminDtos.*;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.auth.AuthDtos.CuentaPerfilDTO;
 import ar.edu.uade.medlink.auth.AuthDtos.UsuarioPerfilDTO;
 import ar.edu.uade.medlink.security.CurrentAccount;

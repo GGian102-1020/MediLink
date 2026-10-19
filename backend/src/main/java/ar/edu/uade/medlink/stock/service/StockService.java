@@ -1,7 +1,5 @@
 package ar.edu.uade.medlink.stock.service;
 
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
-import ar.edu.uade.medlink.admin.AdministrationService;
 import ar.edu.uade.medlink.common.*;
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.farmacia.entity.EstadoFarmacia;
@@ -71,7 +69,7 @@ public class StockService {
         integration.autorizar(farmacia,actor);
         if (req.cantidadDisponible()==null || req.cantidadDisponible()<0)
             throw ApiException.validation("La cantidad disponible debe ser un entero no negativo.");
-        String reason=AdministrationService.requiredReason(req.motivo());
+        String reason=RequestValidation.requiredReason(req.motivo());
         // 10.2: Cuenta Usuario -> Usuario -> Farmacia -> Medicamento -> Presentación -> Stock
         // -> Prescripción -> ItemPrescripción -> Reserva. T remains fixed across lock waits.
         var pending=integration.bloquearUsuariosVencidos(farmacia,presentacion,t);
