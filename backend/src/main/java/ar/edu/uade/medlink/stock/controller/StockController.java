@@ -1,6 +1,6 @@
 package ar.edu.uade.medlink.stock.controller;
 
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.security.CurrentAccount;
 import ar.edu.uade.medlink.stock.dto.*;
 import ar.edu.uade.medlink.stock.service.StockService;

@@ -1,7 +1,5 @@
 package ar.edu.uade.medlink.farmacia.service;
 
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
-import ar.edu.uade.medlink.admin.AdministrationService;
 import ar.edu.uade.medlink.common.*;
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.farmacia.dto.*;
@@ -59,7 +57,8 @@ public class FarmaciaService {
         requireAdmin(actor);
         Farmacia f=farmacias.saveAndFlush(new Farmacia(req.nombre(),req.direccion(),req.telefono(),req.emailContacto()));
         audit.record(actor.id(),actor.rol(),"CREAR_FARMACIA","FARMACIA",f.getId(),null,null,null,summary(f),request);
-        return dto(f);
+        // The new pharmacy cannot have any operators until their separate creation.
+        return dto(f, false);
     }
     @Transactional
     public FarmaciaDTO editar(long id, @Valid FarmaciaRequest req, CurrentAccount actor, HttpServletRequest request) {
@@ -74,7 +73,7 @@ public class FarmaciaService {
     public FarmaciaDTO cambiarEstado(long id, boolean activa, String motivo, CurrentAccount actor, HttpServletRequest request) {
         var t=clock.instant();
         requireAdmin(actor);
-        String reason=AdministrationService.requiredReason(motivo);
+        String reason=RequestValidation.requiredReason(motivo);
         Farmacia f=farmacias.findLocked(id).orElseThrow(ApiException::notFound);
         EstadoFarmacia next=activa?EstadoFarmacia.ACTIVA:EstadoFarmacia.INACTIVA;
         if (f.getEstado()==next) throw ApiException.conflict("INVALID_STATE_TRANSITION","La farmacia ya está en ese estado.");

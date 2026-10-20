@@ -15,3 +15,10 @@
 # Respaldos locales: nunca versionar datos extraidos de PostgreSQL
 *.dump
 *.backup
+
+# Preferencias y archivos locales (no son parte del proyecto)
+.vscode/
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc

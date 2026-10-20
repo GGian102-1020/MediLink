@@ -1,6 +1,7 @@
 package ar.edu.uade.medlink.farmacia.controller;
 
 import ar.edu.uade.medlink.admin.AdminDtos.*;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.farmacia.dto.*;
 import ar.edu.uade.medlink.farmacia.service.FarmaciaService;
 import ar.edu.uade.medlink.security.CurrentAccount;

@@ -23,6 +23,17 @@ class AuthServiceTest {
     AuthService service;
     @BeforeEach void before() { service=new AuthService(accounts,encoder,tokens,audit,Clock.systemUTC()); }
 
+    @Test void meRetrievesSuspensionThroughAccountRepositoryWithoutExposingJdbc() {
+        var actor = new CurrentAccount(21, "USUARIO", "jti", 0);
+        var profile = new CuentaPerfilDTO(21, 7, "USUARIO", "ana@t.test", "ACTIVA", "Ana", "Paz", null);
+        when(accounts.perfil(21)).thenReturn(profile);
+        when(accounts.activeSuspension(eq(7L), any())).thenReturn(Optional.empty());
+        var result = service.me(actor);
+        assertEquals(profile, result.perfil());
+        assertNull(result.suspensionVigente());
+        verify(accounts).activeSuspension(eq(7L), any());
+    }
+
     @Test void registrationNormalizesEmailAndCreatesOnlyUsuarioWithAtomicServiceContract() {
         when(accounts.byEmail("User@Example.test")).thenReturn(Optional.empty());
         when(encoder.encode("Password123!")).thenReturn("$2a$valid");

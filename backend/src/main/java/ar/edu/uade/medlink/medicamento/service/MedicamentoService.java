@@ -1,8 +1,8 @@
 package ar.edu.uade.medlink.medicamento.service;
 
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
+import ar.edu.uade.medlink.common.RequestValidation;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.admin.AdminDtos.CambioEstadoRequest;
-import ar.edu.uade.medlink.admin.AdministrationService;
 import ar.edu.uade.medlink.common.AuditService;
 import ar.edu.uade.medlink.common.PageRequests;
 import ar.edu.uade.medlink.common.error.ApiException;
@@ -77,7 +77,7 @@ public class MedicamentoService {
     @Transactional
     public MedicamentoDTO cambiarEstado(long id,boolean activo,String motivo,CurrentAccount actor,HttpServletRequest request) {
         admin(actor);
-        String reason=AdministrationService.requiredReason(motivo);
+        String reason=RequestValidation.requiredReason(motivo);
         var m=medicamentos.findLocked(id).orElseThrow(ApiException::notFound);
         var next=activo?EstadoMedicamento.ACTIVO:EstadoMedicamento.INACTIVO;
         if(m.getEstado()==next) throw ApiException.conflict("INVALID_STATE_TRANSITION","El medicamento ya está en ese estado.");

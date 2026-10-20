@@ -1,7 +1,7 @@
 package ar.edu.uade.medlink.presentacion.service;
 
-import ar.edu.uade.medlink.admin.AdminDtos.PageDTO;
-import ar.edu.uade.medlink.admin.AdministrationService;
+import ar.edu.uade.medlink.common.RequestValidation;
+import ar.edu.uade.medlink.common.PageDTO;
 import ar.edu.uade.medlink.common.AuditService;
 import ar.edu.uade.medlink.common.PageRequests;
 import ar.edu.uade.medlink.common.error.ApiException;
@@ -83,7 +83,8 @@ public class PresentacionService {
     @Transactional
     public PresentacionDTO crear(@Valid PresentacionCreateRequest req,CurrentAccount actor,HttpServletRequest request) {
         MedicamentoService.admin(actor);
-        validate(req);
+        if (req.medicamentoId()==null || req.cantidadEnvase()==null || req.cantidadEnvase()<1
+            || req.condicionDispensa()==null) throw ApiException.validation("Datos de presentación inválidos.");
         // Lock the parent before checking the active unique index. A new
         // presentation may belong to an inactive medication: public searches
         // still hide both until the parent is active (RN-06, RN-10, RN-45).
@@ -104,7 +105,7 @@ public class PresentacionService {
     @Transactional
     public PresentacionDTO cambiarEstado(long id,boolean activa,String motivo,CurrentAccount actor,HttpServletRequest request) {
         MedicamentoService.admin(actor);
-        String reason=AdministrationService.requiredReason(motivo);
+        String reason=RequestValidation.requiredReason(motivo);
         // Find only the parent identifier without locking the child first (10.2).
         @SuppressWarnings("unchecked")
         List<Number> ids=em.createNativeQuery("SELECT id_medicamento FROM presentacion_medicamento WHERE id_presentacion=:id")
@@ -134,11 +135,6 @@ public class PresentacionService {
         var m=medicamentos.findById(id).orElseThrow(ApiException::notFound);
         if(m.getEstado()!=EstadoMedicamento.ACTIVO) throw ApiException.notFound();
         return m;
-    }
-    private static void validate(PresentacionCreateRequest req) {
-        if(req.medicamentoId()==null || req.cantidadEnvase()==null || req.cantidadEnvase()<1
-            || req.condicionDispensa()==null) throw ApiException.validation("Datos de presentación inválidos.");
-        normalize(req.concentracionTexto()); normalize(req.formaFarmaceutica()); normalize(req.unidadExpendio());
     }
     public static String normalize(String text) {
         if (text==null) throw ApiException.validation("Texto estructural de presentación inválido.");
