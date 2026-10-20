@@ -1,0 +1,96 @@
+name: MediLink - Integracion PostgreSQL
+
+on:
+  push:
+    branches:
+      - 'refactor/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-integration:
+    name: Maven + PostgreSQL 16 (20 integration tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Database dedicated to this disposable CI job, never the team's database.
+      MEDLINK_TEST_DB_URL: jdbc:postgresql://127.0.0.1:5432/medlink_ci
+      MEDLINK_TEST_DB_USER: postgres
+      MEDLINK_TEST_DB_PASSWORD: medlink_ci_only
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: medlink_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: medlink_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d medlink_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Run the full Maven test suite against PostgreSQL
+        working-directory: backend
+        run: bash ./mvnw -B clean test
+
+      - name: Assert all 20 PostgreSQL tests actually ran and passed
+        working-directory: backend
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          reports = Path('target/surefire-reports')
+          expected = {
+              'ar.edu.uade.medlink.presentacion.CatalogoPostgresTest': 2,
+              'ar.edu.uade.medlink.stock.FarmaciaStockPostgresTest': 18,
+          }
+          total = 0
+          for classname, count in expected.items():
+              report = reports / f'TEST-{classname}.xml'
+              if not report.is_file():
+                  raise SystemExit(f'MISSING REPORT: {report}')
+              suite = ElementTree.parse(report).getroot()
+              values = {key: int(suite.get(key, '0')) for key in
+                        ('tests', 'skipped', 'failures', 'errors')}
+              print(f'{classname}: {values}')
+              if values != {'tests': count, 'skipped': 0, 'failures': 0, 'errors': 0}:
+                  raise SystemExit(f'POSTGRESQL INTEGRATION FAILED OR SKIPPED: {classname}')
+              total += values['tests']
+          if total != 20:
+              raise SystemExit(f'Expected 20 PostgreSQL tests, saw {total}')
+          print('PASS: all 20 PostgreSQL integration tests executed successfully')
+          PY
+
+      - name: Preserve test results for diagnosis
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: medlink-postgres-surefire-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 7
