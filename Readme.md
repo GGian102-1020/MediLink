@@ -1,8 +1,18 @@
 # MediLink
 
-> **Estado de esta copia (19/10/2026):** Catálogo de medicamentos/presentaciones, Cuentas/Autenticación y Farmacias/Stock tienen código implementado. Los informes Maven Surefire incluidos en la copia del proyecto recibida el **19/10/2026** registran **99 pruebas: 79 aprobadas, 0 fallos, 0 errores y 20 omitidas** (integración PostgreSQL). Los resultados son del entorno del equipo y no de una nueva ejecución independiente. Ni PostgreSQL real, ni las migraciones, ni backup/restauración están certificados por esa evidencia. No se declaran terminadas funcionalidades fuera de estas tarjetas.
+> **Verificación local (26/10/2026):** se integró Auditoría sobre los componentes existentes. `mvnw.cmd clean verify`: **124 pruebas aprobadas, 0 fallos, 0 errores y 0 omitidas**, incluidas **35 pruebas PostgreSQL reales** de Auditoría, Catálogo y Farmacia/Stock. Se probaron instalación/adopción Flyway V1..V3 y restauraciones completas en bases separadas. Evidencia, alcance e integraciones pendientes: [AUDITORIA_INFRAESTRUCTURA.md](AUDITORIA_INFRAESTRUCTURA.md). Esto no certifica funcionalidades aún pendientes del MVP ni una ejecución del workflow remoto.
 
 **Documentos vigentes:** [CHANGELOG.md](CHANGELOG.md) · [CORRECCIONES_TRELLO_SQL.md](CORRECCIONES_TRELLO_SQL.md) · [REFACTORIZACION_TRELLO_SQL.md](REFACTORIZACION_TRELLO_SQL.md) · [database/README.md](database/README.md). Los informes obsoletos del 14/10/2026 se retiraron de la copia activa; el historial de Git permite recuperarlos si estaban versionados.
+
+## Auditoría e infraestructura
+
+`GET /api/admin/auditoria` permite al Administrador consultar registros de todos
+los módulos con filtros, paginación y snapshots seguros. Se reutilizan
+`AuditService`, JWT, errores REST, correlación y los triggers append-only.
+Contrato, pruebas, backup/restauración y revisión del UML:
+[AUDITORIA_INFRAESTRUCTURA.md](AUDITORIA_INFRAESTRUCTURA.md).
+Los cambios están preparados para revisión grupal en `auditoria-infraestructura`;
+no se realizaron commits ni publicaciones automáticas.
 
 MediLink es un proyecto desarrollado para la materia **Seminario de Integración Profesional** de la carrera de Ingeniería en Informática de UADE.
 

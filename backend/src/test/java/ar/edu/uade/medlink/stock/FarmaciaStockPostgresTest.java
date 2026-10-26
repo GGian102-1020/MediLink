@@ -222,7 +222,9 @@ class FarmaciaStockPostgresTest {
     }
     @Test void auditFailureRollsBackBalanceMovementAndExpirationTogether() {
         adjust(0);long reservation=reserve(T,f.presentation(),null);
-        doThrow(new IllegalStateException("Simulated audit failure")).when(audit).record(eq(f.admin()),eq("ADMINISTRADOR"),eq("AJUSTAR_STOCK"),eq("STOCK"),anyLong(),isNull(),anyString(),any(),anyMap(),isNull());
+        // Stub the spy behind the transactional proxy: setup itself is not a business transaction.
+        AuditService auditTarget=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit);
+        doThrow(new IllegalStateException("Simulated audit failure")).when(auditTarget).record(eq(f.admin()),eq("ADMINISTRADOR"),eq("AJUSTAR_STOCK"),eq("STOCK"),anyLong(),isNull(),anyString(),any(),anyMap(),isNull());
         assertThrows(IllegalStateException.class,()->adjust(5));
         assertEquals(0,balance());assertEquals("ACTIVA",db.queryForObject("SELECT estado_persistido::text FROM reserva WHERE id_reserva=?",String.class,reservation));
         assertEquals(0,count("SELECT count(*) FROM movimiento_stock WHERE id_reserva=?",reservation));

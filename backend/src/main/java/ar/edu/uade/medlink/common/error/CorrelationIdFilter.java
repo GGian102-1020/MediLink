@@ -20,7 +20,10 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String provided = request.getHeader("X-Correlation-Id");
         String id;
-        try { id = UUID.fromString(provided).toString(); }
+        try {
+            id = UUID.fromString(provided).toString();
+            if (!id.equalsIgnoreCase(provided)) throw new IllegalArgumentException("UUID no canónico");
+        }
         catch (Exception ignored) { id = UUID.randomUUID().toString(); }
         request.setAttribute("correlationId", id);
         response.setHeader("X-Correlation-Id", id);

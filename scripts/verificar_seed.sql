@@ -142,8 +142,9 @@ BEGIN
          AND a.accion='CREAR_SUSPENSION' AND a.actor_rol='SISTEMA'
          AND a.usuario_relacionado_id=s.id_usuario
         WHERE s.id_usuario=4 AND a.fecha_hora=s.fecha_hora_inicio
-          AND a.resumen_posterior->'fechaHoraInicio'=to_jsonb(s.fecha_hora_inicio)
-          AND a.resumen_posterior->'fechaHoraFin'=to_jsonb(s.fecha_hora_fin)
+          -- Same instant may be serialized with a different session timezone.
+          AND (a.resumen_posterior->>'fechaHoraInicio')::timestamptz=s.fecha_hora_inicio
+          AND (a.resumen_posterior->>'fechaHoraFin')::timestamptz=s.fecha_hora_fin
     ) THEN
         RAISE EXCEPTION 'RN-44/CV-02: fechas de auditoría de suspensión incoherentes';
     END IF;
