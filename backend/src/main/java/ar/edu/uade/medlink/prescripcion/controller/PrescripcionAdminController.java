@@ -21,10 +21,10 @@ public class PrescripcionAdminController {
     public PrescripcionAdminController(PrescripcionService service) { this.service=service; }
     @GetMapping
     public PageDTO<PrescripcionDTO> listar(@RequestParam(required=false) Long usuarioId,
-            @RequestParam(required=false) String estado,@RequestParam(required=false) String codigo,
+            @RequestParam(required=false) String estado,@RequestParam(required=false) String codigoExterno,
             @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,
             @RequestParam MultiValueMap<String,String> params,@AuthenticationPrincipal CurrentAccount actor) {
-        return service.listarAdmin(usuarioId,estado,codigo,page,size,params.get("sort"),actor);
+        return service.listarAdmin(usuarioId,estado,codigoExterno,page,size,params.get("sort"),actor);
     }
     @GetMapping("/{id}")
     public PrescripcionDTO detalle(@PathVariable long id,@AuthenticationPrincipal CurrentAccount actor) {

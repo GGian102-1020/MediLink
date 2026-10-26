@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-/** Administration and patient queries of the simulated prescription service (RN-11, RN-19). */
+/** Administrative management of simulated prescriptions (RN-25, RN-30). */
 @Service @Validated
 @Transactional(readOnly=true)
 public class PrescripcionService {
@@ -37,16 +37,16 @@ public class PrescripcionService {
         this.prescripciones=prescripciones; this.presentaciones=presentaciones;
         this.audit=audit; this.clock=clock;
     }
-    private static Specification<Prescripcion> filter(Long usuarioId, EstadoPrescripcion estado, String codigo) {
+    private static Specification<Prescripcion> filter(Long usuarioId, EstadoPrescripcion estado, String codigoExterno) {
         return (root,query,cb)-> {
             var predicates=new ArrayList<jakarta.persistence.criteria.Predicate>();
             if (usuarioId!=null) predicates.add(cb.equal(root.get("usuarioId"),usuarioId));
             if (estado!=null) predicates.add(cb.equal(root.get("estado"),estado));
-            if (codigo!=null && !codigo.isBlank()) predicates.add(cb.equal(root.get("codigoExterno"),codigo.strip()));
+            if (codigoExterno!=null && !codigoExterno.isBlank()) predicates.add(cb.equal(root.get("codigoExterno"),codigoExterno.strip()));
             return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
     }
-    public PageDTO<PrescripcionDTO> listarAdmin(Long usuarioId, String estado, String codigo, int page, int size,
+    public PageDTO<PrescripcionDTO> listarAdmin(Long usuarioId, String estado, String codigoExterno, int page, int size,
                                                 List<String> sort, CurrentAccount actor) {
         MedicamentoService.admin(actor);
         EstadoPrescripcion parsed=null;
@@ -54,26 +54,12 @@ public class PrescripcionService {
             try { parsed=EstadoPrescripcion.valueOf(estado); }
             catch (IllegalArgumentException ex) { throw ApiException.validation("Estado de prescripción inválido."); }
         }
-        LocalDate hoy=hoy();
-        return PageRequests.dto(prescripciones.findAll(filter(usuarioId,parsed,codigo),
-            PageRequests.of(page,size,sort,SORTABLE,DEFAULT_SORT)).map(p->dto(p,hoy)));
+        return PageRequests.dto(prescripciones.findAll(filter(usuarioId,parsed,codigoExterno),
+            PageRequests.of(page,size,sort,SORTABLE,DEFAULT_SORT)).map(PrescripcionService::dto));
     }
     public PrescripcionDTO detalleAdmin(long id, CurrentAccount actor) {
         MedicamentoService.admin(actor);
-        return dto(prescripciones.findById(id).orElseThrow(ApiException::notFound),hoy());
-    }
-    // A patient only sees their own prescriptions; foreign ids are indistinguishable from missing ones.
-    public PageDTO<PrescripcionDTO> listarPropias(int page, int size, List<String> sort, CurrentAccount actor) {
-        long usuario=usuario(actor);
-        LocalDate hoy=hoy();
-        return PageRequests.dto(prescripciones.findAll(filter(usuario,null,null),
-            PageRequests.of(page,size,sort,SORTABLE,DEFAULT_SORT)).map(p->dto(p,hoy)));
-    }
-    public PrescripcionDTO detallePropio(long id, CurrentAccount actor) {
-        long usuario=usuario(actor);
-        var p=prescripciones.findById(id).orElseThrow(ApiException::notFound);
-        if (p.getUsuarioId()!=usuario) throw ApiException.notFound();
-        return dto(p,hoy());
+        return dto(prescripciones.findById(id).orElseThrow(ApiException::notFound));
     }
     @Transactional
     public PrescripcionDTO crear(@Valid PrescripcionCreateRequest req, CurrentAccount actor, HttpServletRequest request) {
@@ -109,7 +95,7 @@ public class PrescripcionService {
         }
         audit.record(actor.id(),actor.rol(),"CREAR_PRESCRIPCION","PRESCRIPCION",p.getId(),p.getUsuarioId(),
             null,null,summary(p),request);
-        return dto(p,hoy());
+        return dto(p);
     }
     // Annulment does not invalidate reservations created earlier (schema section 11).
     @Transactional
@@ -123,32 +109,26 @@ public class PrescripcionService {
         p.anular();
         audit.record(actor.id(),actor.rol(),"ANULAR_PRESCRIPCION","PRESCRIPCION",id,p.getUsuarioId(),
             reason,before,summary(p),request);
-        return dto(p,hoy());
+        return dto(p);
     }
-    private long usuario(CurrentAccount actor) {
-        if (actor==null || !"USUARIO".equals(actor.rol())) throw ApiException.forbidden();
-        return prescripciones.usuarioDeCuenta(actor.id()).orElseThrow(ApiException::forbidden);
-    }
-    private LocalDate hoy() { return LocalDate.now(clock.withZone(ApiClock.ZONE)); }
     private static ApiException duplicate() {
-        return ApiException.conflict("PRESCRIPTION_DUPLICATE","Ya existe una prescripción con ese código externo.");
+        return ApiException.conflict("PRESCRIPTION_CODE_ALREADY_EXISTS","Ya existe una prescripción con ese código externo.");
     }
     private static RuntimeException translatedDuplicate(DataIntegrityViolationException ex) {
-        // Only the unique external code maps to PRESCRIPTION_DUPLICATE; other violations stay visible.
+        // Only the unique external code maps to PRESCRIPTION_CODE_ALREADY_EXISTS; other violations stay visible.
         for (Throwable current=ex; current!=null; current=current.getCause()) {
             if (current.getMessage()!=null && current.getMessage().contains("prescripcion_codigo_externo_key"))
                 return duplicate();
         }
         return ex;
     }
-    public static PrescripcionDTO dto(Prescripcion p, LocalDate hoy) {
+    public static PrescripcionDTO dto(Prescripcion p) {
         return new PrescripcionDTO(p.getId(),p.getCodigoExterno(),p.getUsuarioId(),p.getFechaEmision(),
-            p.getFechaVencimiento(),p.getEstado(),p.vigente(hoy),ApiClock.timestamp(p.getFechaHoraCreacion()),
-            p.getItems().stream().map(PrescripcionService::dto).toList());
+            p.getFechaVencimiento(),p.getEstado(),p.getItems().stream().map(PrescripcionService::dto).toList());
     }
     public static ItemPrescripcionDTO dto(ItemPrescripcion i) {
         var pr=i.getPresentacion();
-        return new ItemPrescripcionDTO(i.getId(),pr.getId(),pr.getMedicamento().getNombre(),
+        return new ItemPrescripcionDTO(i.getId(),pr.getId(),
             pr.getConcentracionTexto()+" - "+pr.getFormaFarmaceutica()+" - "+pr.getUnidadExpendio()+" x "+pr.getCantidadEnvase(),
             i.getCantidadAutorizada(),i.getCantidadComprometida(),i.getCantidadUtilizada(),i.getCantidadDisponible());
     }

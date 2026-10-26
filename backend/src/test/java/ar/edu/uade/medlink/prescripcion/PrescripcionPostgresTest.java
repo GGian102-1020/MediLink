@@ -82,20 +82,20 @@ class PrescripcionPostgresTest {
         String code="RX-IT-"+UUID.randomUUID();
         LocalDate today=LocalDate.now(ZoneId.of("America/Argentina/Buenos_Aires"));
         var created=service.crear(request(code,f,today.minusDays(1),today.plusDays(10),f.rxPresentation(),2),f.admin(),null);
-        assertTrue(created.vigente());
+        assertEquals("ACTIVA",created.estado().name());
         assertEquals(2,created.items().getFirst().cantidadDisponible());
         assertEquals(1,db.queryForObject("SELECT count(*) FROM item_prescripcion WHERE id_prescripcion=?",Integer.class,created.id()));
 
-        assertEquals("PRESCRIPTION_DUPLICATE",assertThrows(ApiException.class,
+        assertEquals("PRESCRIPTION_CODE_ALREADY_EXISTS",assertThrows(ApiException.class,
             ()->service.crear(request(code,f,today,today,f.rxPresentation(),1),f.admin(),null)).codigo());
         assertEquals("VALIDATION_ERROR",assertThrows(ApiException.class,
             ()->service.crear(request(code+"-otc",f,today,today,f.otcPresentation(),1),f.admin(),null)).codigo());
 
-        assertEquals(1,service.listarPropias(0,20,null,f.patient()).totalElements());
-        assertEquals(created.id(),service.detallePropio(created.id(),f.patient()).id());
+        assertEquals(1,service.listarAdmin(f.user(),null,code,0,20,null,f.admin()).totalElements());
+        assertEquals(created.id(),service.detalleAdmin(created.id(),f.admin()).id());
 
         var annulled=service.anular(created.id(),"Emitida con error",f.admin(),null);
-        assertFalse(annulled.vigente());
+        assertEquals("ANULADA",annulled.estado().name());
         assertEquals("ANULADA",db.queryForObject("SELECT estado::text FROM prescripcion WHERE id_prescripcion=?",String.class,created.id()));
         assertEquals(2,db.queryForObject("SELECT count(*) FROM auditoria WHERE tipo_entidad='PRESCRIPCION' AND entidad_id=? " +
             "AND usuario_relacionado_id=?",Integer.class,created.id(),f.user()));
@@ -111,15 +111,15 @@ class PrescripcionPostgresTest {
         long itemId=created.items().getFirst().id();
         var tx=new TransactionTemplate(transactions);
 
-        tx.executeWithoutResult(status->validation.validar(f.user(),code,f.rxPresentation(),1).comprometer(1));
+        tx.executeWithoutResult(status->validation.validarYComprometer(f.user(),code,f.rxPresentation(),1,Instant.now()));
         assertEquals(1,db.queryForObject("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_item_prescripcion=?",Integer.class,itemId));
         // RN-13: the single authorized unit is already committed.
-        assertEquals("PRESCRIPTION_QUANTITY_EXCEEDED",assertThrows(ApiException.class,
-            ()->tx.executeWithoutResult(status->validation.validar(f.user(),code,f.rxPresentation(),1))).codigo());
-        assertEquals("PRESCRIPTION_NOT_FOUND",assertThrows(ApiException.class,
-            ()->tx.executeWithoutResult(status->validation.validar(f.user()+100000,code,f.rxPresentation(),1))).codigo());
+        assertEquals("PRESCRIPTION_QUANTITY_INSUFFICIENT",assertThrows(ApiException.class,
+            ()->tx.executeWithoutResult(status->validation.validarYComprometer(f.user(),code,f.rxPresentation(),1,Instant.now()))).codigo());
+        assertEquals("PRESCRIPTION_INVALID",assertThrows(ApiException.class,
+            ()->tx.executeWithoutResult(status->validation.validarYComprometer(f.user()+100000,code,f.rxPresentation(),1,Instant.now()))).codigo());
         // Must never run outside a transaction: the row lock would be released immediately.
-        assertThrows(Exception.class,()->validation.validar(f.user(),code,f.rxPresentation(),1));
+        assertThrows(Exception.class,()->validation.validarYComprometer(f.user(),code,f.rxPresentation(),1,Instant.now()));
 
         tx.executeWithoutResult(status->items.findById(itemId).orElseThrow().utilizar(1));
         assertEquals(List.of(0,1),db.queryForObject("SELECT ARRAY[cantidad_comprometida,cantidad_utilizada] FROM item_prescripcion " +

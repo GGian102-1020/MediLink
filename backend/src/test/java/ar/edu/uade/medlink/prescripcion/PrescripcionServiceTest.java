@@ -87,7 +87,7 @@ class PrescripcionServiceTest {
     @Test void duplicateExternalCodeReturns409() {
         when(prescriptions.existeUsuario(1L)).thenReturn(true);
         when(prescriptions.existsByCodigoExterno("RX-2026-1")).thenReturn(true);
-        assertEquals("PRESCRIPTION_DUPLICATE",assertThrows(ApiException.class,()->service.crear(request(),admin,null)).codigo());
+        assertEquals("PRESCRIPTION_CODE_ALREADY_EXISTS",assertThrows(ApiException.class,()->service.crear(request(),admin,null)).codigo());
         verify(prescriptions,never()).saveAndFlush(any());
         verifyNoInteractions(audit);
     }
@@ -105,9 +105,9 @@ class PrescripcionServiceTest {
         });
         var dto=service.crear(request(),admin,null);
         assertEquals(30L,dto.id()); assertEquals("RX-2026-1",dto.codigoExterno());
-        assertEquals(EstadoPrescripcion.ACTIVA,dto.estado()); assertTrue(dto.vigente());
+        assertEquals(EstadoPrescripcion.ACTIVA,dto.estado());
         assertEquals(1,dto.items().size()); assertEquals(2,dto.items().getFirst().cantidadDisponible());
-        assertEquals("500 mg - Comprimidos - Caja x 16",dto.items().getFirst().presentacionDescripcion());
+        assertEquals("500 mg - Comprimidos - Caja x 16",dto.items().getFirst().descripcionPresentacion());
         verify(audit).record(eq(4L),eq("ADMINISTRADOR"),eq("CREAR_PRESCRIPCION"),eq("PRESCRIPCION"),
             eq(30L),eq(1L),isNull(),isNull(),anyMap(),isNull());
     }
@@ -120,21 +120,12 @@ class PrescripcionServiceTest {
         var p=prescription(5,1);
         when(prescriptions.findLocked(5)).thenReturn(Optional.of(p));
         var dto=service.anular(5," Emitida con error ",admin,null);
-        assertEquals(EstadoPrescripcion.ANULADA,dto.estado()); assertFalse(dto.vigente());
+        assertEquals(EstadoPrescripcion.ANULADA,dto.estado());
         verify(audit).record(eq(4L),eq("ADMINISTRADOR"),eq("ANULAR_PRESCRIPCION"),eq("PRESCRIPCION"),
             eq(5L),eq(1L),eq("Emitida con error"),anyMap(),anyMap(),isNull());
         assertEquals("INVALID_STATE_TRANSITION",assertThrows(ApiException.class,
             ()->service.anular(5,"Otra vez",admin,null)).codigo());
         verifyNoMoreInteractions(audit);
-    }
-    @Test void patientOnlySeesOwnPrescriptions() {
-        when(prescriptions.usuarioDeCuenta(20)).thenReturn(Optional.of(1L));
-        when(prescriptions.findById(5L)).thenReturn(Optional.of(prescription(5,1)));
-        when(prescriptions.findById(6L)).thenReturn(Optional.of(prescription(6,2)));
-        assertEquals(5L,service.detallePropio(5,patient).id());
-        assertEquals("RESOURCE_NOT_FOUND",assertThrows(ApiException.class,()->service.detallePropio(6,patient)).codigo());
-        var operator=new CurrentAccount(9,"OPERADOR","t",0);
-        assertEquals("FORBIDDEN",assertThrows(ApiException.class,()->service.detallePropio(5,operator)).codigo());
     }
     @Test void invalidAdminStateFilterIsRejected() {
         assertEquals("VALIDATION_ERROR",assertThrows(ApiException.class,

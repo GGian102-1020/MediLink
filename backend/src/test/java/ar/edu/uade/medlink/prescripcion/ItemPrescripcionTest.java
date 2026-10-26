@@ -20,7 +20,7 @@ class ItemPrescripcionTest {
         var i=item(1);
         i.comprometer(1);
         assertEquals(0,i.getCantidadDisponible());
-        assertEquals("PRESCRIPTION_QUANTITY_EXCEEDED",assertThrows(ApiException.class,()->i.comprometer(1)).codigo());
+        assertEquals("PRESCRIPTION_QUANTITY_INSUFFICIENT",assertThrows(ApiException.class,()->i.comprometer(1)).codigo());
     }
     // Cancelled/expired reservations free the commitment for reuse.
     @Test void releaseRestoresAvailability() {

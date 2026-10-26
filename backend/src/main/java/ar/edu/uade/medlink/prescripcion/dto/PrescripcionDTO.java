@@ -5,5 +5,4 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record PrescripcionDTO(long id,String codigoExterno,long usuarioId,LocalDate fechaEmision,
-    LocalDate fechaVencimiento,EstadoPrescripcion estado,boolean vigente,String fechaHoraCreacion,
-    List<ItemPrescripcionDTO> items) { }
+    LocalDate fechaVencimiento,EstadoPrescripcion estado,List<ItemPrescripcionDTO> items) { }

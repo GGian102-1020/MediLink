@@ -79,7 +79,7 @@ class PrescripcionConcurrencyTest {
                 start.await();
                 try {
                     tx.executeWithoutResult(status->{
-                        validation.validar(f.user(),code,f.presentation(),1).comprometer(1);
+                        validation.validarYComprometer(f.user(),code,f.presentation(),1,Instant.now());
                         // Keep the row locks a moment so the other attempts really queue behind them.
                         try { Thread.sleep(50); } catch(InterruptedException e) { Thread.currentThread().interrupt(); }
                     });
@@ -109,7 +109,7 @@ class PrescripcionConcurrencyTest {
         long itemId=create(f,code,1);
         var outcomes=commitConcurrently(f,code,2);
         assertEquals(1,Collections.frequency(outcomes,"OK"),outcomes.toString());
-        assertEquals(1,Collections.frequency(outcomes,"PRESCRIPTION_QUANTITY_EXCEEDED"),outcomes.toString());
+        assertEquals(1,Collections.frequency(outcomes,"PRESCRIPTION_QUANTITY_INSUFFICIENT"),outcomes.toString());
         assertEquals(1,committed(itemId));
     }
 
@@ -119,7 +119,7 @@ class PrescripcionConcurrencyTest {
         long itemId=create(f,code,3);
         var outcomes=commitConcurrently(f,code,6);
         assertEquals(3,Collections.frequency(outcomes,"OK"),outcomes.toString());
-        assertEquals(3,Collections.frequency(outcomes,"PRESCRIPTION_QUANTITY_EXCEEDED"),outcomes.toString());
+        assertEquals(3,Collections.frequency(outcomes,"PRESCRIPTION_QUANTITY_INSUFFICIENT"),outcomes.toString());
         assertEquals(3,committed(itemId));
     }
 }

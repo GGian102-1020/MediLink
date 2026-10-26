@@ -21,6 +21,4 @@ public interface PrescripcionRepository extends JpaRepository<Prescripcion,Long>
     @Query(value="SELECT EXISTS (SELECT 1 FROM usuario WHERE id_usuario=:id)",nativeQuery=true)
     boolean existeUsuario(@Param("id") long id);
 
-    @Query(value="SELECT id_usuario FROM usuario WHERE id_cuenta=:cuenta",nativeQuery=true)
-    Optional<Long> usuarioDeCuenta(@Param("cuenta") long cuentaId);
 }

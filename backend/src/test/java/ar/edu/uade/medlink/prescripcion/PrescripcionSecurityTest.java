@@ -3,7 +3,7 @@ package ar.edu.uade.medlink.prescripcion;
 import ar.edu.uade.medlink.auth.AccountRepository;
 import ar.edu.uade.medlink.common.ApiClock;
 import ar.edu.uade.medlink.common.error.*;
-import ar.edu.uade.medlink.prescripcion.controller.*;
+import ar.edu.uade.medlink.prescripcion.controller.PrescripcionAdminController;
 import ar.edu.uade.medlink.prescripcion.service.PrescripcionService;
 import ar.edu.uade.medlink.security.*;
 import java.util.List;
@@ -22,7 +22,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({PrescripcionAdminController.class,PrescripcionController.class})
+@WebMvcTest(PrescripcionAdminController.class)
 @Import({SecurityConfig.class,BearerAuthenticationFilter.class,ErrorResponses.class,ApiClock.class})
 class PrescripcionSecurityTest {
     static final String VALID="{\"codigoExterno\":\"RX-1\",\"usuarioId\":1,\"fechaEmision\":\"2026-10-01\","+
@@ -56,12 +56,14 @@ class PrescripcionSecurityTest {
         }
         verifyNoInteractions(service);
     }
-    @Test void onlyPatientsReadTheirOwnList() throws Exception {
-        for (String role:List.of("OPERADOR","ADMINISTRADOR"))
-            mvc.perform(get("/api/me/prescripciones").with(as(role))).andExpect(status().isForbidden());
-        mvc.perform(get("/api/me/prescripciones").with(as("USUARIO"))).andExpect(status().isOk());
-        verify(service).listarPropias(eq(0),eq(20),isNull(),any());
-        verifyNoMoreInteractions(service);
+    @Test void patientPrescriptionListingIsNotPartOfTheMvp() throws Exception {
+        mvc.perform(get("/api/me/prescripciones").with(as("USUARIO"))).andExpect(status().isNotFound());
+        verifyNoInteractions(service);
+    }
+    @Test void adminListUsesCodigoExternoFilter() throws Exception {
+        mvc.perform(get("/api/admin/prescripciones?codigoExterno=RX-1").with(as("ADMINISTRADOR")))
+            .andExpect(status().isOk());
+        verify(service).listarAdmin(isNull(),isNull(),eq("RX-1"),eq(0),eq(20),isNull(),any());
     }
     @Test void adminRoutesReachTheService() throws Exception {
         mvc.perform(post("/api/admin/prescripciones").with(as("ADMINISTRADOR"))

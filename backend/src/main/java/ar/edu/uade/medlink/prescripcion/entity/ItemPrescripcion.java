@@ -43,7 +43,7 @@ public class ItemPrescripcion {
     public void comprometer(int cantidad) {
         positive(cantidad);
         if (cantidad>getCantidadDisponible())
-            throw ApiException.conflict("PRESCRIPTION_QUANTITY_EXCEEDED","La receta no autoriza la cantidad solicitada.");
+            throw ApiException.conflict("PRESCRIPTION_QUANTITY_INSUFFICIENT","La receta no autoriza la cantidad solicitada.");
         cantidadComprometida+=cantidad;
     }
     // Reservation cancelled or expired.
