@@ -98,6 +98,13 @@ backup/evidencia. Compara esquema, conteos y checksums de todas las tablas,
 conserva el dump y elimina únicamente los recursos temporales que creó.
 En una base con actividad, ejecutar la comparación durante una ventana sin
 escrituras. Se requiere permiso SQL para crear la base temporal.
+El script espera al servidor PostgreSQL definitivo por TCP dentro del contenedor
+y comprueba la conexión SQL local antes de copiar SQL o generar el backup.
+Así evita aceptar el servidor temporal de inicialización, cuyo socket se elimina
+antes del arranque definitivo. Timeout predeterminado: 60 s; se puede ajustar
+con `-ReadyTimeoutSeconds`. No se publican puertos nuevos ni se cambian claves.
+Regresión y diagnóstico de GitHub Actions:
+[BACKUP_WORKFLOW_FIX.md](../docs/BACKUP_WORKFLOW_FIX.md).
 Detalle y evidencia real de las restauraciones del 26/10/2026 (16 tablas de
 fixture y 17 de una base con historial Flyway):
 [AUDITORIA_INFRAESTRUCTURA.md](../AUDITORIA_INFRAESTRUCTURA.md).

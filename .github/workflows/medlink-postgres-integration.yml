@@ -37,7 +37,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d medlink_ci"
+          --health-cmd "pg_isready -h 127.0.0.1 -p 5432 -U postgres -d medlink_ci"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 15
@@ -63,6 +63,12 @@ jobs:
       - name: Assert PostgreSQL and full suite tests actually ran and passed
         run: python3 scripts/verificar_tests_postgres.py
 
+      - name: Regress PostgreSQL temporary-server readiness and real restoration
+        shell: pwsh
+        run: >-
+          ./scripts/tests/backup_restore_regression.ps1
+          -OutputDirectory '${{ runner.temp }}/backup-regression'
+
       - name: Verify complete backup and isolated restoration
         shell: pwsh
         run: >-
@@ -87,5 +93,6 @@ jobs:
           path: |
             backend/target/surefire-reports/
             evidencias/backup_ci*.md
+            ${{ runner.temp }}/backup-regression/*.md
           if-no-files-found: warn
           retention-days: 7

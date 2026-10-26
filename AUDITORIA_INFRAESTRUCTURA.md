@@ -183,6 +183,21 @@ SQL de V2/V3 y verifica el seed. Prueba las 16 tablas de la instalación por
 scripts antes de la adopción Flyway. El contenedor y su volumen descartable se
 eliminan en finally; el backup queda conservado fuera del repositorio.
 
+Antes de acceder a la base, ambos modos esperan al servidor definitivo mediante
+`pg_isready -h 127.0.0.1 -p 5432`, y verifican `SELECT 1` por la conexión local
+usada por el backup. Una sonda solo por socket puede aceptar el servidor temporal
+de inicialización de la imagen, cuyo socket desaparece durante el siguiente
+reinicio. La espera tiene un límite de 60 segundos (ajustable con
+`-ReadyTimeoutSeconds`, 1..300) y falla si no se cumplen ambas condiciones.
+El backup conserva autenticación local por socket; no se cambian credenciales
+ni se requiere exponer puertos TCP al host.
+
+La regresión reproducible `scripts/tests/backup_restore_regression.ps1` pausa
+el entrypoint en esa fase temporal, verifica que no se cree ningún backup/base
+de restauración antes del arranque definitivo, reproduce el socket ausente y
+completa una restauración real después. Diagnóstico del fallo de Actions y
+resultados en Windows/Ubuntu: [BACKUP_WORKFLOW_FIX.md](docs/BACKUP_WORKFLOW_FIX.md).
+
 Backup de una base local indicada explícitamente, con restauración separada:
 
 ```powershell
@@ -234,7 +249,12 @@ Resultados reales de la verificación final, versiones y desglose por suite:
 con Docker apagado omitió 20 tests y no se tomó como aprobación. Una ejecución
 intermedia detectó el problema de preparación del spy de Stock; se corrigió,
 sin omitir ni quitar sus comprobaciones. El workflow modificado todavía no se
-ejecutó en GitHub porque no se hicieron push ni PR.
+ejecutó en GitHub porque no se hicieron push ni PR durante esa implementación.
+Posteriormente, el equipo publicó `4fbcf44`: Actions aprobó Maven y el gate de
+124 tests, pero falló en la espera de arranque de la fixture de backup. La
+corrección y su comprobación por plataforma se documentan en
+[BACKUP_WORKFLOW_FIX.md](docs/BACKUP_WORKFLOW_FIX.md); la nueva revisión del
+workflow necesita una ejecución después del próximo push manual del equipo.
 
 ## UML, integraciones pendientes y revisión del equipo
 
