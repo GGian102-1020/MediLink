@@ -1,0 +1,115 @@
+@startuml AuditoriaClases
+title MediLink - Auditoria e infraestructura real
+hide empty members
+skinparam classAttributeIconSize 0
+package auditoria {
+  class AuditoriaController {
+    -audit: AuditService
+    +listar(...): PageDTO<AuditoriaDTO>
+  }
+  class AuditoriaFiltro <<record>> {
+    usuarioId: Long?
+    actorCuentaId: Long?
+    rol: String?
+    accion: String?
+    tipoEntidad: String?
+    entidadId: Long?
+    desde: OffsetDateTime?
+    hasta: OffsetDateTime?
+  }
+  class AuditoriaDTO <<record>> {
+    id: long
+    fechaHora: String
+    actorCuentaId: Long?
+    actorNombre: String?
+    rol: String
+    accion: String
+    tipoEntidad: String
+    entidadId: long
+    usuarioRelacionadoId: Long?
+    motivo: String?
+    correlationId: String?
+    resumenAnterior: Map?
+    resumenPosterior: Map?
+  }
+}
+package common {
+  class AuditService {
+    -db: JdbcTemplate
+    -clock: Clock
+    +record(...): void
+    +listar(filter, page, size, sort, actor): PageDTO<AuditoriaDTO>
+  }
+  class PageRequests
+  class PageDTO<T> <<record>>
+  class ApiClock
+  class CorrelationIdFilter
+  class GlobalExceptionHandler
+  class ErrorResponses
+  class ApiException
+}
+class JdbcTemplate <<Spring JDBC>>
+class Clock <<java.time>>
+class CurrentAccount <<record>>
+class SecurityConfig
+class BearerAuthenticationFilter
+AuditoriaController --> AuditService
+AuditoriaController ..> AuditoriaFiltro
+AuditoriaController ..> CurrentAccount
+AuditoriaController ..> PageDTO
+AuditService --> JdbcTemplate
+AuditService --> Clock
+AuditService ..> AuditoriaFiltro
+AuditService ..> AuditoriaDTO
+AuditService ..> PageRequests
+GlobalExceptionHandler --> ErrorResponses
+GlobalExceptionHandler ..> ApiException
+SecurityConfig --> ErrorResponses
+SecurityConfig --> BearerAuthenticationFilter
+BearerAuthenticationFilter --> ErrorResponses
+ErrorResponses --> Clock
+ApiClock ..> Clock : configura
+note right of AuditService
+  INSERT dentro de transaccion existente (MANDATORY).
+  SELECT JDBC en snapshot REPEATABLE_READ.
+  Tabla auditoria protegida por triggers UPDATE/DELETE.
+  Resumenes con lista explicita de campos escalares.
+end note
+note right of AuditoriaController
+  GET /api/admin/auditoria
+  Solo ADMINISTRADOR.
+  usuarioId filtra usuarioRelacionadoId.
+  [desde,hasta); sort fechaHora,id.
+  Default fechaHora DESC,id DESC.
+end note
+note bottom of CorrelationIdFilter
+  X-Correlation-Id -> UUID canonico -> atributo HTTP + respuesta + MDC.
+  AuditService lee el atributo; los errores usan ErrorResponses.
+end note
+@enduml
+
+@startuml AuditoriaDespliegue
+title MediLink - Infraestructura (no entidades de dominio)
+node "Docker Compose" {
+  node "gateway / Caddy HTTPS" as gateway
+  node "backend / Spring Boot" as backend {
+    component "AuditoriaController" as controller
+    component "AuditService / JdbcTemplate" as audit
+    component Flyway
+  }
+  database "PostgreSQL 16" as pg {
+    artifact "auditoria / triggers append-only" as tabla
+    artifact "flyway_schema_history" as history
+  }
+  artifact "Volumen pgdata" as volume
+}
+gateway --> controller
+controller --> audit
+audit --> tabla
+Flyway --> history : V1, V2, V3
+pg --> volume
+note bottom of Flyway
+  Base vacia: migrar V1..V3.
+  Scripts existentes verificados: baseline 1 explicito; luego V2/V3.
+end note
+@enduml

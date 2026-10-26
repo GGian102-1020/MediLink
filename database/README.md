@@ -66,7 +66,43 @@ búsqueda de medicamentos requerirá ejecutar V2 primero. Se puede verificar con
 SELECT extname FROM pg_extension WHERE extname='unaccent';
 ```
 
+### Consulta administrativa de Auditoría (V3)
+
+Flyway aplica `V3__indice_consulta_auditoria.sql` después de V1/V2 para crear
+el índice de historial global por `fecha_hora DESC,id_auditoria DESC`.
+Los índices por actor, usuario relacionado y entidad ya existen en V1.
+No modificar migraciones aplicadas ni borrar el volumen para incorporar V3.
+La instalación nueva y la adopción explícita del esquema con seed fueron
+verificadas en PostgreSQL 16 real. El endpoint y sus permisos están documentados
+en [AUDITORIA_INFRAESTRUCTURA.md](../AUDITORIA_INFRAESTRUCTURA.md).
+
 ### Backup y restauración (RNF-12 / AC-59)
+
+Procedimiento automatizado para **PowerShell 7+ y Docker**, desde la raíz:
+
+```powershell
+# Prueba completamente aislada: crea su propio contenedor y restaura en otra base.
+pwsh -File ./scripts/backup_restore.ps1 -Fixture `
+  -BackupPath ../medlink-fixture-20261026.dump `
+  -EvidencePath ./evidencias/backup-local-20261026.md
+
+# Backup del servicio indicado y verificación en una base temporal con UUID propio.
+pwsh -File ./scripts/backup_restore.ps1 `
+  -SourceContainer medlink-db -Database medlink -User medlink `
+  -BackupPath ../medlink-20261026.dump `
+  -EvidencePath ./evidencias/backup-desarrollo-20261026.md
+```
+
+Elegir nombres nuevos para cada ejecución: el script rechaza sobrescribir
+backup/evidencia. Compara esquema, conteos y checksums de todas las tablas,
+conserva el dump y elimina únicamente los recursos temporales que creó.
+En una base con actividad, ejecutar la comparación durante una ventana sin
+escrituras. Se requiere permiso SQL para crear la base temporal.
+Detalle y evidencia real de las restauraciones del 26/10/2026 (16 tablas de
+fixture y 17 de una base con historial Flyway):
+[AUDITORIA_INFRAESTRUCTURA.md](../AUDITORIA_INFRAESTRUCTURA.md).
+
+### Comandos manuales de backup/restauración
 
 Con la base ejecutándose, desde la raíz del proyecto. El backup se guarda
 **fuera de la carpeta del repositorio** (`../medlink.backup.dump`) para evitar

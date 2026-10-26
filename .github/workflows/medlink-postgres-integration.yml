@@ -5,9 +5,12 @@ on:
     branches:
       - 'refactor/**'
       - 'fix/**'
+      - 'feature/**'
+      - 'auditoria-infraestructura'
   pull_request:
     branches:
       - main
+      - develop
   workflow_dispatch:
 
 permissions:
@@ -15,7 +18,7 @@ permissions:
 
 jobs:
   postgres-integration:
-    name: Maven + PostgreSQL 16 (20 integration tests)
+    name: Maven + PostgreSQL 16 + Auditoria + Backup
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -55,42 +58,34 @@ jobs:
 
       - name: Run the full Maven test suite against PostgreSQL
         working-directory: backend
-        run: bash ./mvnw -B clean test
+        run: bash ./mvnw -B clean verify
 
-      - name: Assert all 20 PostgreSQL tests actually ran and passed
-        working-directory: backend
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          from xml.etree import ElementTree
+      - name: Assert PostgreSQL and full suite tests actually ran and passed
+        run: python3 scripts/verificar_tests_postgres.py
 
-          reports = Path('target/surefire-reports')
-          expected = {
-              'ar.edu.uade.medlink.presentacion.CatalogoPostgresTest': 2,
-              'ar.edu.uade.medlink.stock.FarmaciaStockPostgresTest': 18,
-          }
-          total = 0
-          for classname, count in expected.items():
-              report = reports / f'TEST-{classname}.xml'
-              if not report.is_file():
-                  raise SystemExit(f'MISSING REPORT: {report}')
-              suite = ElementTree.parse(report).getroot()
-              values = {key: int(suite.get(key, '0')) for key in
-                        ('tests', 'skipped', 'failures', 'errors')}
-              print(f'{classname}: {values}')
-              if values != {'tests': count, 'skipped': 0, 'failures': 0, 'errors': 0}:
-                  raise SystemExit(f'POSTGRESQL INTEGRATION FAILED OR SKIPPED: {classname}')
-              total += values['tests']
-          if total != 20:
-              raise SystemExit(f'Expected 20 PostgreSQL tests, saw {total}')
-          print('PASS: all 20 PostgreSQL integration tests executed successfully')
-          PY
+      - name: Verify complete backup and isolated restoration
+        shell: pwsh
+        run: >-
+          ./scripts/backup_restore.ps1 -Fixture
+          -BackupPath '${{ runner.temp }}/medlink-ci.dump'
+          -EvidencePath './evidencias/backup_ci.md'
+
+      - name: Verify backup including Flyway history from the disposable CI database
+        shell: pwsh
+        run: >-
+          ./scripts/backup_restore.ps1
+          -SourceContainer '${{ job.services.postgres.id }}'
+          -Database medlink_ci -User postgres
+          -BackupPath '${{ runner.temp }}/medlink-ci-flyway.dump'
+          -EvidencePath './evidencias/backup_ci_flyway.md'
 
       - name: Preserve test results for diagnosis
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: medlink-postgres-surefire-reports
-          path: backend/target/surefire-reports/
+          path: |
+            backend/target/surefire-reports/
+            evidencias/backup_ci*.md
           if-no-files-found: warn
           retention-days: 7
