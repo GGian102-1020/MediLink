@@ -30,7 +30,8 @@ public class AuditService {
         "estado","tokenVersion","direccion","telefono","emailContacto","medicamentoId",
         "concentracionTexto","formaFarmaceutica","cantidadEnvase","unidadExpendio","condicionDispensa",
         "presentacionId","cantidadDisponible","fechaHoraInicio","fechaHoraFin",
-        "id_farmacia","cantidad_disponible","causa"); // Existing seed summaries use these physical names.
+        "id_farmacia","cantidad_disponible","causa",
+        "fechaEmision","fechaVencimiento","cantidadItems"); // Existing seed summaries use these physical names.
 
     // Only whitelisted public operational fields may be added to audit summaries.
     @Transactional(propagation=Propagation.MANDATORY)

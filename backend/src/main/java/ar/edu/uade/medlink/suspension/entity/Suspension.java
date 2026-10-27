@@ -1,70 +1,45 @@
 package ar.edu.uade.medlink.suspension.entity;
 
-import ar.edu.uade.medlink.usuario.entity.Paciente;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
+import jakarta.persistence.*;
+import java.time.Instant;
+import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+/** Historical interval. Its dates determine vigencia; no editable status exists (RN-31..36). */
 @Entity
-@Table(name = "suspension")
-@Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Immutable
+@Table(name="suspension")
 public class Suspension {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idSuspension;
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
+    @Column(name="id_suspension")
+    private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "id_paciente", nullable = false)
-    private Paciente paciente;
+    // Usuario does not have a JPA entity; the schema already enforces its foreign key.
+    @Column(name="id_usuario", nullable=false, updatable=false)
+    private long usuarioId;
 
-    @Column(nullable = false)
-    private LocalDateTime fechaInicio;
+    @Column(name="fecha_hora_inicio", nullable=false, updatable=false, columnDefinition="timestamptz(3)")
+    private Instant fechaHoraInicio;
 
-    @Column(nullable = false)
-    private LocalDateTime fechaFin;
-
-    @Column(nullable = false)
-    private String motivo;
+    @Column(name="fecha_hora_fin", nullable=false, updatable=false, columnDefinition="timestamptz(3)")
+    private Instant fechaHoraFin;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private EstadoSuspension estado;
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name="motivo", nullable=false, updatable=false, columnDefinition="motivo_suspension")
+    private MotivoSuspension motivo;
 
-    public Suspension(
-        Paciente paciente,
-        LocalDateTime fechaInicio,
-        LocalDateTime fechaFin,
-        String motivo) {
-        this.paciente = paciente;
-        this.fechaInicio = fechaInicio;
-        this.fechaFin = fechaFin;
-        this.motivo = motivo;
-        this.estado = EstadoSuspension.ACTIVA;
-    }
+    protected Suspension() { } // Only Hibernate reads these immutable historical records.
 
-    public boolean estaActiva() {
-        return this.estado == EstadoSuspension.ACTIVA
-            && LocalDateTime.now().isBefore(this.fechaFin);
-    }
+    public Long getId() { return id; }
+    public long getUsuarioId() { return usuarioId; }
+    public Instant getFechaHoraInicio() { return fechaHoraInicio; }
+    public Instant getFechaHoraFin() { return fechaHoraFin; }
+    public MotivoSuspension getMotivo() { return motivo; }
 
-    public void levantar() {
-        this.estado = EstadoSuspension.LEVANTADA;
-    }
-
-    public void vencer() {
-        this.estado = EstadoSuspension.VENCIDA;
+    public boolean estaVigente(Instant instante) {
+        return !instante.isBefore(fechaHoraInicio) && instante.isBefore(fechaHoraFin);
     }
 }
