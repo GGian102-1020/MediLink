@@ -44,6 +44,24 @@ class AuditServiceTest {
         assertThrows(ApiException.class,()->audit.listar(empty(),0,20,null,null));
         verifyNoInteractions(db);
     }
+    @Test void prescriptionSummariesRetainSafeOperationalFields() {
+        Map<String,Object> values=new LinkedHashMap<>();
+        values.put("codigoExterno","RX-2026-TEST");
+        values.put("usuarioId",12L);
+        values.put("fechaEmision","2026-10-01");
+        values.put("fechaVencimiento","2026-11-01");
+        values.put("cantidadItems",2);
+        values.put("estado","ACTIVA");
+        values.put("passwordHash","NEVER_STORE_ME");
+        audit.record(1L,"ADMINISTRADOR","CREAR_PRESCRIPCION","PRESCRIPCION",7,12L,
+            null,null,values,null);
+        Object[] args=mockingDetails(db).getInvocations().iterator().next().getArguments();
+        String json=(String)args[args.length-1];
+        for (String expected : List.of("codigoExterno","usuarioId","fechaEmision", "fechaVencimiento","cantidadItems"))
+            assertTrue(json.contains(expected),expected);
+        assertFalse(json.contains("NEVER_STORE_ME"));
+    }
+
     @Test void summariesWhitelistScalarsAndNeverSerializeCredentialsOrNestedObjects() {
         Map<String,Object> values=new LinkedHashMap<>();
         values.put("nombre","Texto\"\n\u0001"); values.put("estado",Map.of("jwt","secreto"));
