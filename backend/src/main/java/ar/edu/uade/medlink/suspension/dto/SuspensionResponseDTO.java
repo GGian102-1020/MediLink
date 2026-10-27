@@ -1,14 +1,5 @@
 package ar.edu.uade.medlink.suspension.dto;
 
-import ar.edu.uade.medlink.suspension.entity.EstadoSuspension;
-import java.time.LocalDateTime;
-
-public record SuspensionResponseDTO(
-    Long idSuspension,
-    Long idPaciente,
-    String nombrePaciente,
-    LocalDateTime fechaInicio,
-    LocalDateTime fechaFin,
-    String motivo,
-    EstadoSuspension estado
-) {}
+/** REST SuspensionDTO in section 11.3: no user identity or persisted status exposed. */
+public record SuspensionResponseDTO(long id, String fechaHoraInicio, String fechaHoraFin,
+                                    boolean vigente, String motivo) { }

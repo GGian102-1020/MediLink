@@ -60,4 +60,25 @@ class AuditServiceTest {
         assertThrows(IllegalArgumentException.class,()->audit.record(null,"SISTEMA","CREAR_SUSPENSION",
             "SUSPENSION",1,1L,null,null,null,null));
     }
+    @Test void prescriptionAuditKeepsUsefulMetadataWithoutExternalCodesOrSecrets() {
+        Map<String,Object> summary=new LinkedHashMap<>();
+        summary.put("codigoExterno","RX-PRIVADO");
+        summary.put("usuarioId",5L);
+        summary.put("fechaEmision","2026-10-01");
+        summary.put("fechaVencimiento","2026-11-01");
+        summary.put("cantidadItems",2);
+        summary.put("estado","ACTIVA");
+        summary.put("jwt","secreto");
+        audit.record(1L,"ADMINISTRADOR","CREAR_PRESCRIPCION","PRESCRIPCION",17,5L,null,
+            null,summary,new MockHttpServletRequest());
+        var call=mockingDetails(db).getInvocations().iterator().next();
+        String json=(String)call.getArguments()[call.getArguments().length-1];
+        assertTrue(json.contains("fechaEmision"));
+        assertTrue(json.contains("fechaVencimiento"));
+        assertTrue(json.contains("cantidadItems"));
+        assertTrue(json.contains("ACTIVA"));
+        assertFalse(json.contains("RX-PRIVADO"));
+        assertFalse(json.contains("secreto"));
+    }
+
 }
