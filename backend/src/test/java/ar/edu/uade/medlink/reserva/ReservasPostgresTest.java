@@ -272,7 +272,7 @@ class ReservasPostgresTest {
                 INSERT INTO presentacion_medicamento(id_medicamento,concentracion_texto,forma_farmaceutica,
                     cantidad_envase,unidad_expendio,condicion_dispensa)
                 VALUES (?,?,'comprimidos',10,'caja','VENTA_LIBRE') RETURNING id_presentacion
-                """,f.medicine(),(i+10)+" mg");
+                """,f.medicine(),(i+11)+" mg");
             db.update("INSERT INTO stock(id_farmacia,id_presentacion,cantidad_disponible,fecha_hora_actualizacion) VALUES (?,?,10,?)",f.pharmacy(),p,ts(T));
             var dto=reservations.crear(new CrearReservaRequest(f.pharmacy(),p,1,null),key(),f.userActor(),null).dto();
             assertEquals("ACTIVA",dto.estado());
