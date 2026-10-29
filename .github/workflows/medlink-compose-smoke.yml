@@ -69,6 +69,7 @@ jobs:
       - name: Probar generador de indice de evidencias AC
         run: python3 -m unittest discover -s scripts/tests -p 'test_reportar_evidencia_ac.py' -v
       - name: Recorridos reales por rol, stock, receta e idempotencia
+        id: api_smoke
         env:
           MEDLINK_SMOKE_EPHEMERAL: '1'
           # Credencial EXCLUSIVAMENTE del seed ficticio de la base descartable.
@@ -81,6 +82,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Probar la espera de sesiones en Playwright
+        run: node --test frontend/scripts/tests/esperar_sesion_ui.test.mjs
       - name: Instalar Playwright para navegador real (Chromium y Firefox)
         run: |
           npm ci --prefix frontend --no-audit --no-fund
@@ -96,8 +99,10 @@ jobs:
           cd frontend
           MEDLINK_UI_EVIDENCE_DIR="$GITHUB_WORKSPACE/evidencias/ui_ci" node scripts/validar_ui.mjs --demo-ack
       - name: Probar el calculo p95 antes de medir carga
+        if: ${{ !cancelled() && steps.api_smoke.outcome == 'success' }}
         run: python3 -m unittest discover -s scripts/tests -p 'test_medir_p95.py' -v
       - name: Medir RNF-11 en base efimera y conservar hardware y dataset
+        if: ${{ !cancelled() && steps.api_smoke.outcome == 'success' }}
         env:
           MEDLINK_PERF_EPHEMERAL: '1'
           MEDLINK_DEMO_PASSWORD: Password123!
@@ -105,6 +110,7 @@ jobs:
           python3 -m scripts.medir_p95 --demo-ack SEED_DEMO_EFIMERO --iterations 25 --workers 4 \
             --out evidencias/perf_ci/resultado_p95.json
       - name: Registrar evidencias AC de los recorridos
+        if: ${{ !cancelled() && steps.api_smoke.outcome == 'success' }}
         shell: bash
         run: |
           python3 scripts/reportar_evidencia_ac.py \

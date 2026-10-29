@@ -3,6 +3,7 @@ import { chromium, firefox } from 'playwright';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { waitForAuthenticatedApp } from './esperar_sesion_ui.mjs';
 
 // Caddy terminates TLS for the localhost hostname (gateway/Caddyfile).
 const URL = 'https://localhost:8443';
@@ -52,24 +53,41 @@ const roles = [
 const visitRoles = async (browser, name) => {
   for (const [rol, correo, own, forbidden] of roles) {
     const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 390, height: 900}});
+    const page = await context.newPage();
+    const meStatuses = [];
+    page.on('response', response => {
+      if (new URL(response.url()).pathname === '/api/me') meStatuses.push(response.status());
+    });
     try {
-      const page = await context.newPage();
       await page.goto(`${URL}/ingresar`);
       await page.getByRole('textbox', {name: 'Correo electrónico'}).fill(correo);
       await page.locator('input[type=password]').fill(process.env.MEDLINK_DEMO_PASSWORD);
       await page.getByRole('button', {name: /Ingresar a mi cuenta/}).click();
       await page.waitForURL(/\/panel$/, {timeout: 15000});
+      await waitForAuthenticatedApp(page, rol, 'login', meStatuses);
       await page.goto(`${URL}${own}`);
-      await page.waitForURL(new RegExp(own.replaceAll('/', '\\/')+'$'));
+      await waitForAuthenticatedApp(page, rol, 'navegacion-propia', meStatuses);
+      assert(new URL(page.url()).pathname === own, `${rol}: no ingreso en su ruta ${own}`);
       await noHorizontalOverflow(page, `${name}/${rol}/panel`);
       await page.reload();
-      await page.waitForURL(new RegExp(own.replaceAll('/', '\\/')+'$'));
-      assert(await page.locator('.app-main').count() === 1, `${rol}: se perdio sesion tras refresh`);
+      // La URL ya coincide al iniciar la recarga. Esperar a que /api/me restaure React.
+      await waitForAuthenticatedApp(page, rol, 'refresh', meStatuses);
+      assert(new URL(page.url()).pathname === own, `${rol}: ruta inesperada tras refresh`);
+      const expectedRoleName = { USUARIO: 'Usuario', OPERADOR: 'Operador de farmacia',
+        ADMINISTRADOR: 'Administrador' }[rol];
+      assert((await page.locator('.user-info small').innerText()) === expectedRoleName,
+        `${rol}: la sesion recuperada no muestra el rol esperado`);
       await page.goto(`${URL}${forbidden}`);
-      await page.waitForURL(/\/panel$/);
+      await page.waitForURL(/\/panel$/, {timeout: 15000});
+      await waitForAuthenticatedApp(page, rol, 'acceso-prohibido', meStatuses);
       await page.getByRole('button', {name: 'Abrir menú'}).click();
       await page.getByRole('button', {name:/Cerrar sesión/i}).click();
-      await page.waitForURL(`${URL}/`);
+      await page.waitForURL(`${URL}/`, {timeout: 15000});
+    } catch (error) {
+      // Las cuentas son exclusivamente las ficticias del seed efimero.
+      try { await page.screenshot({path: path.join(reportDir, `${name}-${rol.toLowerCase()}-fallo.png`), fullPage: true}); }
+      catch { /* no ocultar el error original si el navegador se cerro */ }
+      throw error;
     } finally {await context.close();}
   }
 };
