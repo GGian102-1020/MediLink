@@ -1,56 +1,59 @@
 # Base de datos local (PostgreSQL + Docker)
 
-Todo el equipo levanta **la misma base**: al iniciar por primera vez se crean las tablas de `database/01_medlink_esquema.sql` (v1.4.3) y se cargan los datos de `database/02_datos_prueba.sql`.
+En una instalación nueva, **Flyway es la única fuente de instalación del esquema**. El backend ejecuta `V1__esquema_compartido.sql`, `V2__extension_busqueda_catalogo.sql` y `V3__indice_consulta_auditoria.sql` sobre un PostgreSQL vacío. El Compose **ya no** monta `01_medlink_esquema.sql` en `/docker-entrypoint-initdb.d` y **no** carga contraseñas ficticias automáticamente.
 
 ## Requisitos
-- Docker Desktop abierto (o Docker Engine + Compose v2)
 
-## Levantar
-```bash
-docker compose up -d   # desde la raíz del repo
-```
-Los puertos de PostgreSQL y Adminer se publican **solo en 127.0.0.1**.
+- Docker Desktop abierto (o Docker Engine + Compose v2).
+- `.env` creado a partir de `.env.example` con **JWT_SECRET_BASE64 aleatorio** y contraseñas locales únicas si corresponde.
+- No mezclar bases nuevas con un volumen que ya contiene un esquema histórico no registrado en Flyway.
 
-- **PostgreSQL**: `localhost:5432` · base `medlink` · usuario `medlink` · clave `medlink123`
-- **Adminer** (ver tablas desde el navegador): http://localhost:8080
-  - Sistema: *PostgreSQL* · Servidor: `db` · Usuario: `medlink` · Clave: `medlink123` · Base: `medlink`
-- Cadena JDBC (Spring): `jdbc:postgresql://localhost:5432/medlink`
+## Instalación nueva (volumen sin datos)
 
-
-### Ejecutar además la API por HTTPS con Flyway
-La base compartida creada por los scripts **ya está poblada antes de iniciar Spring**.
-Como Flyway no debe asumir la versión de cualquier esquema no vacío, su baseline
-viene desactivado por defecto. En el primer arranque de la API sobre esta base:
-
-1. Verificá que la base proviene de `01_medlink_esquema.sql` v1.4.3 (no de un
-   esquema arbitrario). Por ejemplo, inspeccioná las tablas y sus triggers en Adminer.
-2. Generá una clave JWT local y agregala a `.env` (ver `.env.example`).
-3. **Solo para adoptar ese esquema existente**, ejecutá:
+Desde la raíz:
 
 ```bash
-DB_FLYWAY_BASELINE_ON_MIGRATE=true docker compose --profile api up --build -d
-curl -k https://localhost:8443/api/health   # solo HTTPS local con CA Caddy
+docker compose --profile api up -d --build
 ```
 
-En **PowerShell de Windows**, el equivalente para ese primer arranque es:
+- Web React: **https://localhost:8443** (`tls internal`, CA local de Caddy).
+- API por mismo origen: **https://localhost:8443/api/medicamentos**.
+- PostgreSQL: `127.0.0.1:5432` · base `medlink` · usuario `medlink` · contraseña definida en `.env` (el valor de ejemplo **solo** sirve para demo local).
+- Adminer: http://localhost:8080, restringido a loopback (servidor `db`).
+- Si hay conflictos de puertos, editar `POSTGRES_PORT`, `ADMINER_PORT` o `HTTPS_PORT` en `.env`.
+
+Para comprobar, en PowerShell:
 
 ```powershell
-$env:DB_FLYWAY_BASELINE_ON_MIGRATE = "true"
-docker compose --profile api up --build -d
-Remove-Item Env:DB_FLYWAY_BASELINE_ON_MIGRATE
-curl.exe -k https://localhost:8443/api/health
+docker compose --profile api ps
+curl.exe -k https://localhost:8443/api/medicamentos
+curl.exe -k https://localhost:8443/ingresar
 ```
 
-El baseline de Flyway registra la migración 1 como ya aplicada; no vuelve a crear
-las tablas ni borra los datos. En los reinicios posteriores se usa el modo normal
-(`DB_FLYWAY_BASELINE_ON_MIGRATE=false`). Si la base es nueva y se crea únicamente
-mediante Flyway, dejá el baseline desactivado desde el inicio. Nunca actives
-baseline de forma indiscriminada para bases de procedencia desconocida.
+`curl -k` omite validación de la CA **solo para la demostración local**; en un despliegue real usá un certificado confiable. Los puertos de base de datos, Adminer y HTTPS están ligados a `127.0.0.1`. Por diseño, este Compose no es un despliegue público.
 
-**Si el proyecto ya estaba desplegado**, verificar primero si existe
-`flyway_schema_history`: si existe, Flyway no necesita volver a adoptar esa versión.
-No usar `docker compose down -v` para intentar resolver un error de Flyway: ese comando
-elimina los datos. Para el detalle normativo ver secciones 10, 13 y 16 del PDF v1.4.3.
+### Datos de prueba OPCIONALES y explícitos
+
+Si querés usar las cuentas de `database/02_datos_prueba.sql`, esperá a que el backend haya completado Flyway, comprobá la instalación anterior y ejecutá **una sola vez en una base descartable**:
+
+```bash
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/medlink/02_datos_prueba.sql'
+```
+
+En Windows **PowerShell**, la misma línea funciona desde la raíz del repositorio. Si se vuelve a correr sobre una base ya poblada, se producirán conflictos de unicidad; **no es un script idempotente**. Las credenciales conocidas del seed (`Password123!`) **solo** son aceptables en un entorno local restringido; nunca publiques esa instancia.
+
+La carga de cuentas administrativas para un entorno que no sea demo debe prepararse por un procedimiento de aprovisionamiento seguro propio; el MVP no permite crear Administradores desde la API.
+
+### Volúmenes existentes: adoptar sin borrar datos
+
+Si anteriormente iniciabas `docker compose up -d` y PostgreSQL ya ejecutó `01_medlink_esquema.sql` / `02_datos_prueba.sql` automáticamente, **no se debe ejecutar Flyway V1 encima de esas tablas** sin revisar el caso. Primero:
+
+1. Realizá backup y probá restauración separada (procedimiento más abajo); no uses `down -v`.
+2. Verificá que el esquema existente es **exactamente** el esquema compartido v1.4.3 y que todavía no existe `flyway_schema_history`.
+3. Solo si se confirmó la identidad del esquema, en `.env` configurá `DB_FLYWAY_BASELINE_ON_MIGRATE=true`, iniciá `docker compose --profile api up -d --build` y comprobá que Flyway registra V1 como baseline y ejecuta V2/V3.
+4. Volvé a `DB_FLYWAY_BASELINE_ON_MIGRATE=false` para reinicios normales y conservá el backup.
+
+Si `flyway_schema_history` ya existe, **no cambies baseline**: conservá la configuración false. No uses esta adopción para bases externas o esquemas parcialmente creados.
 
 ### Búsqueda de catálogo en bases ya existentes
 
@@ -147,7 +150,7 @@ docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d medlink_restore -c 
 
 ### Verificar la fixture normativa
 
-Luego de inicializar una base de **pruebas** con los scripts 01 y 02, ejecutá:
+Luego de completar las migraciones con **Flyway** y cargar explícitamente el script 02 en una base **de prueba**, ejecutá:
 
 ```bash
 docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < scripts/verificar_seed.sql
@@ -165,12 +168,16 @@ Get-Content scripts/verificar_seed.sql -Raw | docker compose exec -T db sh -c 'p
 
 Si el puerto 5432 u 8080 ya está ocupado (por ejemplo, un Postgres instalado en la PC), copiá `.env.example` a `.env` y cambiá `POSTGRES_PORT` / `ADMINER_PORT`.
 
-## Resetear la base (borra todo y vuelve a cargar los scripts)
+## Reinicio descartable (DESTRUYE TODOS LOS DATOS)
+
+Solo en una **base de demostración sin datos valiosos** y después de asegurarte de que tenés un respaldo si lo necesitás:
+
 ```bash
-docker compose down -v
-docker compose up -d   # desde la raíz del repo
+docker compose --profile api down -v
+docker compose --profile api up -d --build
 ```
-> Los scripts se ejecutan **solo cuando el volumen está vacío**. `down -v` elimina todos los datos: usalo exclusivamente en una base descartable y después de verificar que no necesitás conservarla. Nunca es una solución para una migración fallida en datos existentes.
+
+Esto recrea el esquema mediante Flyway, pero **NO** carga las cuentas demo: si las necesitás, ejecutá una sola vez el comando de carga opcional indicado arriba. **Jamás uses `down -v` como solución a fallos de migración.**
 
 ## Consola SQL
 ```bash
@@ -179,9 +186,11 @@ docker exec -it medlink-db psql -U medlink -d medlink
 
 ## Archivos
 ```
-docker-compose.yml                   -> Postgres 16 + Adminer (raíz del repo)
-database/01_medlink_esquema.sql      -> enums, tablas, índices y triggers (se monta como 01)
-database/02_datos_prueba.sql         -> datos de prueba (se monta como 02)
+docker-compose.yml                   -> PostgreSQL 16 + API + gateway + Adminer
+backend/src/main/resources/db/migration/ -> fuente de migraciones Flyway V1..V3
+database/01_medlink_esquema.sql      -> esquema SQL LEGACY, NO se ejecuta automáticamente
+database/02_datos_prueba.sql         -> seed DEMO manual, montado en /opt/medlink (no auto)
+gateway/Dockerfile                   -> build React + Caddy
 .env.example                         -> puertos y credenciales por defecto
 ```
 
@@ -212,4 +221,4 @@ Contraseña de **todas** las cuentas: `Password123!` (bcrypt `$2a$`).
 - `movimiento_stock` con confirmaciones, restitución, vencimiento y ajuste manual, coherentes con el stock actual.
 - `idempotency_record` y `sesion_revocada` arrancan vacías (las llena la API).
 
-Las fechas son relativas al momento en que se crea la base, así las reservas ACTIVAS arrancan vigentes.
+Las fechas son relativas al momento **de cargar el seed**, por lo que las Reservas marcadas ACTIVAS nacen vigentes para la demo.

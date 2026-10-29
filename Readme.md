@@ -1,6 +1,6 @@
 # MediLink
 
-> **Verificación local (26/10/2026):** se integró Auditoría sobre los componentes existentes. `mvnw.cmd clean verify`: **124 pruebas aprobadas, 0 fallos, 0 errores y 0 omitidas**, incluidas **35 pruebas PostgreSQL reales** de Auditoría, Catálogo y Farmacia/Stock. Se probaron instalación/adopción Flyway V1..V3 y restauraciones completas en bases separadas. Evidencia, alcance e integraciones pendientes: [AUDITORIA_INFRAESTRUCTURA.md](AUDITORIA_INFRAESTRUCTURA.md). Esto no certifica funcionalidades aún pendientes del MVP ni una ejecución del workflow remoto.
+> **Evidencia histórica (26/10/2026; no valida el código posterior):** se integró Auditoría sobre los componentes existentes. `mvnw.cmd clean verify`: **124 pruebas aprobadas, 0 fallos, 0 errores y 0 omitidas**, incluidas **35 pruebas PostgreSQL reales** de Auditoría, Catálogo y Farmacia/Stock. Se probaron instalación/adopción Flyway V1..V3 y restauraciones completas en bases separadas. Evidencia, alcance e integraciones pendientes: [AUDITORIA_INFRAESTRUCTURA.md](AUDITORIA_INFRAESTRUCTURA.md). Esto no certifica funcionalidades aún pendientes del MVP ni una ejecución del workflow remoto.
 
 **Documentos vigentes:** [CHANGELOG.md](CHANGELOG.md) · [CORRECCIONES_TRELLO_SQL.md](CORRECCIONES_TRELLO_SQL.md) · [REFACTORIZACION_TRELLO_SQL.md](REFACTORIZACION_TRELLO_SQL.md) · [database/README.md](database/README.md). Los informes obsoletos del 14/10/2026 se retiraron de la copia activa; el historial de Git permite recuperarlos si estaban versionados.
 
@@ -66,9 +66,9 @@ Base de datos
 - PostgreSQL
 
 
-Frontend previsto en el MVP (no incluido en este ZIP)
-- React + TypeScript
-- Herramienta de desarrollo frontend: por definir por el equipo
+Frontend implementado en `frontend/`
+- React + TypeScript + Vite
+- Compilación de producción incorporada en `gateway/Dockerfile` (Caddy HTTPS)
 
 Otras herramientas
 - Git
@@ -99,13 +99,23 @@ PostgreSQL
 
 Base de datos local
 
-La configuración incluida permite levantar PostgreSQL mediante Docker Compose. Docker no es requisito para usar GitHub Desktop ni para revisar el código; las pruebas con Testcontainers sí requieren Docker u otra base de pruebas configurada. Desde la raíz del repo:
+La configuración incluida levanta PostgreSQL, el backend Java y **React bajo un único origen HTTPS**. Docker no es requisito para GitHub Desktop, pero sí para esta instalación y las pruebas Testcontainers. En una instalación nueva (base vacía):
+
+1. Copiá `.env.example` a `.env` y completá **una clave JWT aleatoria de 32 bytes o más, codificada en Base64** (`JWT_SECRET_BASE64`). No la subas a Git.
+2. Iniciá desde la raíz:
 
 ```bash
-docker compose up -d
+docker compose --profile api up -d --build
 ```
 
-Conexión, cuentas de prueba y cómo resetear la base: ver [database/README.md](database/README.md).
+3. Abrí `https://localhost:8443` y comprobá la API en `https://localhost:8443/api/medicamentos`. Caddy usa una CA local: el navegador puede advertir que no confía todavía en ella. El puerto HTTPS se publica **solo en 127.0.0.1**.
+4. **Solo para una demo local descartable**, cargá las cuentas ficticias una vez, después de las migraciones de Flyway:
+
+```bash
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/medlink/02_datos_prueba.sql'
+```
+
+**IMPORTANTE:** el arranque nuevo no carga automáticamente cuentas con contraseñas de demostración. Si el volumen ya tiene el esquema anterior a Flyway, **no ejecutes este procedimiento como instalación nueva**: seguí la adopción controlada en [database/README.md](database/README.md). Nunca uses `down -v` en una base con datos que necesites conservar.
 
 ## Cuentas y autenticación (backend)
 
@@ -113,13 +123,7 @@ Se agregó el módulo backend de registro, login, JWT, perfil, cambio de contras
 logout y administración de Operadores/Cuentas. Documentación técnica, comandos,
 trazabilidad normativa y pruebas: [CUENTAS_AUTENTICACION.md](CUENTAS_AUTENTICACION.md).
 
-El Docker Compose de desarrollo carga el esquema/datos de prueba en el primer arranque.
-Para ejecutar además la API con HTTPS se usa el perfil opcional `api`, una clave JWT
-local propia en `.env` y Caddy como reverse proxy. **En el primer arranque de la API
-sobre esa base ya cargada, es necesario adoptar explícitamente el esquema compartido
-con Flyway** (`DB_FLYWAY_BASELINE_ON_MIGRATE=true` después de verificar que es v1.4.3).
-No habilitar baseline automáticamente en bases desconocidas ni eliminar el volumen
-para resolver errores de migración. Pasos detallados: [database/README.md](database/README.md).
+Flyway **crea las tablas desde cero** en un volumen nuevo; las cuentas demo se cargan solamente si el equipo ejecuta el comando explícito. En bases históricas no gestionadas por Flyway, la adopción con `DB_FLYWAY_BASELINE_ON_MIGRATE=true` requiere verificar primero estructura, respaldar y coordinar con el equipo. Pasos: [database/README.md](database/README.md).
 
 
 ## Farmacia y Stock
@@ -134,13 +138,8 @@ en [REFACTORIZACION_TRELLO_SQL.md](REFACTORIZACION_TRELLO_SQL.md).
 El PDF maestro v1.4.3 sigue siendo la única autoridad funcional, no estos README.
 
 
-## Sustitución completa de una copia local (GitHub Desktop)
+## Parches, rama y entrega en GitHub Desktop
 
-Este ZIP incluye **todos los archivos versionables de esta copia**, no únicamente los modificados, y **no incluye `.git` ni secretos `.env`**. Antes de sustituir la carpeta de trabajo:
+Para integrar los cambios de cierre, trabajá en **`fix/cierre-mvp-v1.4.3` creada desde `feature/frontend-mvp-v1.4.3`** y aplicá los parches en el orden documentado en [docs/GUIA_GITHUB_DESKTOP_PARCHES.md](docs/GUIA_GITHUB_DESKTOP_PARCHES.md). **No sustituyas un repositorio existente por un ZIP completo** y no elimines `.git`.
 
-1. Creá una copia de seguridad de la carpeta del repositorio, incluidos los archivos ocultos; guardá y revisá cualquier cambio local de tus compañeros.
-2. En GitHub Desktop, trabajá en una rama nueva. **No borres `.git`**: contiene el historial y permite que GitHub Desktop siga reconociendo el repositorio. **No sobrescribas ni compartas `.env`**: contiene configuración/secretos locales y no forma parte del ZIP.
-3. Si querés borrar archivos obsoletos que ya no vienen en el ZIP, quitá solamente los archivos de trabajo, **conservando `.git`, `.env` y cualquier dato local que necesites**. Copiá el contenido de la carpeta `MediLink/` extraída a la raíz del repositorio. Si tu rama evolucionó desde la copia utilizada, compará las diferencias antes de sustituirla.
-4. Revisá eliminaciones y modificaciones en GitHub Desktop. Desde `backend/` ejecutá `mvnw.cmd -B clean test` en Windows; verificá por separado los tests de PostgreSQL que pueden estar omitidos. Después hacé commit.
-
-**Esta distribución no incluye frontend, base de datos física, volumen Docker, archivos compilados, backups ni secretos.** No ejecutes `docker compose down -v` para actualizar código o migraciones: borra el volumen de PostgreSQL.
+Las pruebas deben aprobar en el commit candidato (Java con PostgreSQL real, frontend y smoke Docker Compose). La matriz de [AC-01..AC-60](docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md) es un registro de verificaciones: un test escrito no equivale a un PASS si no se ha ejecutado. **No se ha certificado el cierre funcional del MVP en este parche.**

@@ -71,18 +71,18 @@ JWT Bearer se mantiene en **memoria y `sessionStorage` de la pestaña**, nunca e
 
 `sessionStorage` mejora la experiencia al refrescar una pestaña, pero es accesible a JavaScript de ese origen. Evitar XSS, scripts de terceros y contenido HTML no confiable; agregar Content Security Policy en el reverse proxy para el entorno real. En entornos de alto riesgo, preferir un BFF y cookies seguras.
 
-## 6. Producción / demostración
+## 6. Despliegue integrado para demostración local
 
-El servidor de Vite es **solo para desarrollo**. Para mostrarlo al equipo localmente, cada uno debe ejecutar el backend y el frontend o acceder a un despliegue de prueba compartido.
+El servidor Vite es **solo para desarrollo**. El perfil `api` de Docker Compose construye el frontend con `npm ci && npm run build` mediante `gateway/Dockerfile`, lo sirve con Caddy y reenvía `/api/*` a Spring Boot por el mismo origen HTTPS.
 
-Para un despliegue HTTPS se requiere:
+```bash
+# Desde la raíz, con JWT_SECRET_BASE64 configurada en .env:
+docker compose --profile api up -d --build
+```
 
-1. Compilar con `npm run build`.
-2. Servir los archivos de `dist/` como SPA, con fallback de rutas a `/index.html`.
-3. Reenviar `/api/**` al backend desde el **mismo dominio HTTPS** (reverse proxy). No apuntar navegadores de producción a `localhost:8081`.
-4. Habilitar HTTPS conforme SEC-08, restringir CORS y proteger secretos en el servidor.
+Abrí `https://localhost:8443`. El gateway soporta refresh directo de `/ingresar`, `/mis-reservas` y `/admin/usuarios` mediante fallback SPA. Caddy usa `tls internal` y HTTPS solo en loopback para el MVP local. **No** publiques las cuentas demo ni reutilices el certificado interno como si fuese un despliegue de producción.
 
-El proyecto ya dispone de infraestructura de backend; este parche **no altera sus configuraciones de despliegue**.
+El esquema lo instala Flyway. El seed opcional de cuentas ficticias se ejecuta manualmente **después del primer arranque**; instrucciones en [`../database/README.md`](../database/README.md).
 
 ## 7. Restricciones y verificación pendiente
 
