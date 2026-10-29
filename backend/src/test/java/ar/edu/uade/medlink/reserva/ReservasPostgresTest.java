@@ -2,9 +2,12 @@ package ar.edu.uade.medlink.reserva;
 
 import ar.edu.uade.medlink.auth.AccountRepository;
 import ar.edu.uade.medlink.admin.AdministrationService;
+import ar.edu.uade.medlink.admin.ReservationClosureService;
 import ar.edu.uade.medlink.farmacia.service.FarmaciaService;
 import ar.edu.uade.medlink.medicamento.service.MedicamentoService;
 import ar.edu.uade.medlink.presentacion.service.PresentacionService;
+import ar.edu.uade.medlink.presentacion.dto.PresentacionCreateRequest;
+import ar.edu.uade.medlink.presentacion.entity.CondicionDispensa;
 import ar.edu.uade.medlink.prescripcion.service.PrescripcionService;
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.reserva.dto.*;
@@ -58,6 +61,7 @@ class ReservasPostgresTest {
         @Bean @Primary Clock clockForReservations() { return Clock.fixed(T,ZoneOffset.UTC); }
     }
     @Autowired AdministrationService administration;
+    @Autowired ReservationClosureService closure;
     @Autowired FarmaciaService pharmacies;
     @Autowired MedicamentoService medicines;
     @Autowired PresentacionService presentations;
@@ -524,4 +528,247 @@ class ReservasPostgresTest {
         assertEquals("OK".equals(results.get(0)) ? 1 : 0, active);
         assertEquals(10 - active, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", f.stock()));
     }
+
+
+    record PendingHistoricalReservation(long id,String code) { }
+    /** Historical ACTIVE fixture inserted atomically; reservation immutable columns may NEVER be backdated with UPDATE. */
+    private PendingHistoricalReservation historicalActive(Instant expires) {
+        return tx().execute(status->{
+            String code=UUID.randomUUID().toString().replace("-","").substring(0,12).toUpperCase(Locale.ROOT);
+            long id=create("""
+                INSERT INTO reserva(codigo_visible,id_usuario,id_farmacia,id_presentacion,cantidad,
+                    fecha_hora_creacion,fecha_hora_vencimiento,farmacia_nombre_snapshot,farmacia_direccion_snapshot,
+                    medicamento_nombre_snapshot,presentacion_descripcion_snapshot)
+                VALUES (?,?,?,?,1,?,?,'Farmacia','Direccion','Medicamento','Presentacion') RETURNING id_reserva
+                """,code,f.user(),f.pharmacy(),f.presentation(),ts(expires.minus(Duration.ofHours(4))),ts(expires));
+            int before=count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock());
+            int after=before-1;
+            assertTrue(after>=0);
+            db.update("UPDATE stock SET cantidad_disponible=?,fecha_hora_actualizacion=? WHERE id_stock=?",
+                after,ts(expires.minus(Duration.ofHours(4))),f.stock());
+            db.update("INSERT INTO movimiento_stock(id_stock,id_reserva,tipo,cantidad_anterior,cantidad_nueva,delta,fecha_hora) " +
+                "VALUES (?,?,'RESERVA_CONFIRMADA',?,?,-1,?)",
+                f.stock(),id,before,after,ts(expires.minus(Duration.ofHours(4))));
+            return new PendingHistoricalReservation(id,code);
+        });
+    }
+
+    // AC-05: exactly T is expired, not a cancellable active reservation.
+    @Test void ac05CancellationAtExactExpiryMaterializesWithoutDoubleRelease() {
+        var dto=historicalActive(T);
+        var outcome=reservations.cancelarPropia(dto.code(),f.userActor(),null);
+        assertTrue(outcome.expired());
+        assertEquals("VENCIDA",outcome.dto().estado());
+        assertEquals(0,outcome.dto().segundosRestantes());
+        assertEquals(10,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+        assertEquals(1,count("SELECT count(*) FROM movimiento_stock m JOIN reserva r ON r.id_reserva=m.id_reserva " +
+            "WHERE r.codigo_visible=? AND m.tipo='VENCIMIENTO'",dto.code()));
+        assertEquals(0,count("SELECT count(*) FROM reserva WHERE codigo_visible=? AND estado_persistido='CANCELADA'",dto.code()));
+    }
+
+    // AC-07: call the actual scheduler worker twice, not just the service method.
+    @Test void ac07ActualExpirySchedulerIsIdempotent() {
+        var dto=historicalActive(T.minus(Duration.ofHours(1)));
+        var scheduler=new ar.edu.uade.medlink.reserva.service.ReservaExpiryScheduler(db,reservations,Clock.fixed(T,ZoneOffset.UTC));
+        scheduler.process();
+        scheduler.process();
+        assertEquals("VENCIDA",db.queryForObject("SELECT estado_persistido::text FROM reserva WHERE codigo_visible=?",String.class,dto.code()));
+        assertEquals(10,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+        assertEquals(1,count("SELECT count(*) FROM movimiento_stock m JOIN reserva r ON r.id_reserva=m.id_reserva " +
+            "WHERE r.codigo_visible=? AND m.tipo='VENCIMIENTO'",dto.code()));
+    }
+
+    // AC-16: independent PostgreSQL transactions materialize two expirations at once.
+    @Test void ac16TwoConcurrentExpiriesCreateExactlyOneSuspension() throws Exception {
+        var first=historicalActive(T.minus(Duration.ofHours(3)));
+        var second=historicalActive(T.minus(Duration.ofHours(2)));
+        var third=historicalActive(T.minus(Duration.ofHours(1)));
+        var result=concurrent(
+            ()->attempt(()->{reservations.materializar(first.id(),null);return null;}),
+            ()->attempt(()->{reservations.materializar(second.id(),null);return null;}));
+        assertEquals(List.of("OK","OK"),result);
+        reservations.materializar(third.id(),null);
+        assertEquals(1,count("SELECT count(*) FROM suspension WHERE id_usuario=?",f.user()));
+        assertEquals(1,count("SELECT count(*) FROM suspension WHERE id_usuario=? AND fecha_hora_inicio=? AND fecha_hora_fin=?",
+            f.user(),ts(T.minus(Duration.ofHours(1))),ts(T.minus(Duration.ofHours(1)).plus(Duration.ofDays(7)))));
+        assertEquals(3,count("SELECT count(*) FROM reserva WHERE id_usuario=? AND estado_persistido='VENCIDA'",f.user()));
+        assertEquals(3,count("SELECT count(*) FROM movimiento_stock m JOIN reserva r ON m.id_reserva=r.id_reserva " +
+            "WHERE r.id_usuario=? AND m.tipo='VENCIMIENTO'",f.user()));
+        assertEquals(10,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+    }
+
+    // AC-29: the persisted database relationship must point to the exact authorized Item.
+    @Test void ac29PrescriptionItemLinkAndOtcNullArePersisted() {
+        RxFixture authorized=rx(2);
+        var rxReservation=reservations.crear(rxCmd(authorized,1),key(),f.userActor(),null).dto();
+        var otcReservation=created(1);
+        assertEquals(Long.valueOf(authorized.item()),db.queryForObject("SELECT id_item_prescripcion FROM reserva WHERE codigo_visible=?",
+            Long.class,rxReservation.codigoVisible()));
+        assertEquals(1,count("SELECT count(*) FROM reserva r JOIN item_prescripcion ip ON ip.id_item_prescripcion=r.id_item_prescripcion " +
+            "JOIN prescripcion p ON p.id_prescripcion=ip.id_prescripcion " +
+            "WHERE r.codigo_visible=? AND p.id_usuario=r.id_usuario AND ip.id_presentacion=r.id_presentacion",rxReservation.codigoVisible()));
+        assertEquals(1,count("SELECT count(*) FROM reserva WHERE codigo_visible=? AND id_item_prescripcion IS NULL",otcReservation.codigoVisible()));
+    }
+
+    // AC-52: active remaining seconds and effective expiry in the DTO boundary.
+    @Test void ac52EffectiveExpiryAndSecondsInUserDTO() {
+        ReservaDTO active=created(1);
+        assertEquals("ACTIVA",reservations.propia(active.codigoVisible(),f.userActor()).estado());
+        assertEquals(Duration.ofHours(4).toSeconds(),reservations.propia(active.codigoVisible(),f.userActor()).segundosRestantes());
+        var overdue=historicalActive(T);
+        var effective=reservations.propia(overdue.code(),f.userActor());
+        assertEquals("VENCIDA",effective.estado());
+        assertEquals(0,effective.segundosRestantes());
+        assertEquals(1,reservations.propias(0,20,"VENCIDA",List.of(),f.userActor()).totalElements());
+        assertEquals(1,reservations.propias(0,20,"ACTIVA",List.of(),f.userActor()).totalElements());
+    }
+
+    // AC-57/58: forbidden causes have no effects, accepted causes keep mandatory metadata.
+    @Test void ac57AndAc58OperationalCancellationAuthorityAndMetadata() {
+        ReservaDTO reservation=created(1);
+        for (String forbidden:List.of("ERROR_ADMINISTRATIVO","CUENTA_DESHABILITADA")) {
+            var error=assertThrows(ApiException.class,()->reservations.cancelarOperativa(f.pharmacy(),reservation.codigoVisible(),
+                new CancelacionOperativaRequest(forbidden,"No autorizado","RESTITUIR",null),f.operatorActor(),null));
+            assertEquals("FORBIDDEN",error.codigo());
+        }
+        assertEquals("ACTIVA",db.queryForObject("SELECT estado_persistido::text FROM reserva WHERE codigo_visible=?",
+            String.class,reservation.codigoVisible()));
+        assertEquals(9,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+        var cancelled=reservations.cancelarOperativa(f.pharmacy(),reservation.codigoVisible(),
+            new CancelacionOperativaRequest("IMPEDIMENTO_OPERATIVO_FARMACIA","Motivo comprobado",null,null),f.operatorActor(),null);
+        assertFalse(cancelled.expired());
+        assertEquals("CANCELADA",cancelled.dto().estado());
+        assertEquals("OPERADOR",cancelled.dto().origenCancelacion());
+        assertEquals("IMPEDIMENTO_OPERATIVO_FARMACIA",cancelled.dto().causaCancelacion());
+        assertEquals("Motivo comprobado",cancelled.dto().motivoCancelacion());
+        assertEquals(1,count("SELECT count(*) FROM reserva WHERE codigo_visible=? AND fecha_hora_cancelacion=?",
+            reservation.codigoVisible(),ts(T)));
+        assertEquals(10,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+    }
+
+
+
+    // AC-25: renaming mutable catalogue descriptions never rewrites a reservation snapshot.
+    @Test void ac25SnapshotsStayConstantAfterAdminRenames() {
+        ReservaDTO original=created(1);
+        String pharmacySnapshot=original.farmaciaNombreSnapshot();
+        String medicationSnapshot=original.medicamentoNombreSnapshot();
+        db.update("UPDATE farmacia SET nombre='Farmacia renombrada' WHERE id_farmacia=?",f.pharmacy());
+        medicines.editar(f.medicine(),new ar.edu.uade.medlink.medicamento.dto.MedicamentoRequest("Medicamento renombrado"),f.adminActor(),null);
+        var history=reservations.propia(original.codigoVisible(),f.userActor());
+        assertEquals(pharmacySnapshot,history.farmaciaNombreSnapshot());
+        assertEquals(medicationSnapshot,history.medicamentoNombreSnapshot());
+        assertEquals(original.farmaciaId(),history.farmaciaId());
+        assertEquals(original.presentacionId(),history.presentacionId());
+        assertEquals("Farmacia renombrada",db.queryForObject("SELECT nombre FROM farmacia WHERE id_farmacia=?",String.class,f.pharmacy()));
+    }
+
+    // AC-30: the API's default sort is backed by immutable and identifiable movements.
+    @Test void ac30ReservationAndRestitutionMovementsAreTraceableAndOrdered() {
+        var dto=created(1);
+        reservations.cancelarPropia(dto.codigoVisible(),f.userActor(),null);
+        var movement=db.query("SELECT m.tipo::text, m.cantidad_anterior, m.cantidad_nueva, m.delta " +
+            "FROM movimiento_stock m JOIN reserva r ON r.id_reserva=m.id_reserva " +
+            "WHERE r.codigo_visible=? ORDER BY m.fecha_hora DESC,m.id_movimiento DESC",
+            (rs,n)->List.of(rs.getString(1),String.valueOf(rs.getInt(2)),
+                    String.valueOf(rs.getInt(3)),String.valueOf(rs.getInt(4))),dto.codigoVisible());
+        assertEquals(List.of("CANCELACION_RESTITUCION","9","10","1"),movement.getFirst());
+        assertEquals(List.of("RESERVA_CONFIRMADA","10","9","-1"),movement.getLast());
+        assertEquals(2,movement.size());
+        assertEquals(10,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+    }
+
+    // AC-35: duplicate matching is exact text after normalization, not unit equivalence.
+    @Test void ac35NormalizedDuplicateRejectedButPharmacologicalEquivalenceNotInferred() {
+        var duplicate=assertThrows(ApiException.class,()->presentations.crear(
+            new PresentacionCreateRequest(f.medicine(),"   10    MG  "," COMPRIMIDOS ",10," CAJA ",CondicionDispensa.VENTA_LIBRE),
+            f.adminActor(),null));
+        assertEquals("PRESENTATION_DUPLICATE",duplicate.codigo());
+        var first=presentations.crear(new PresentacionCreateRequest(f.medicine(),"500 mg","comprimidos",10,"caja",CondicionDispensa.VENTA_LIBRE),
+            f.adminActor(),null);
+        var alternative=presentations.crear(new PresentacionCreateRequest(f.medicine(),"0,5 g","comprimidos",10,"caja",CondicionDispensa.VENTA_LIBRE),
+            f.adminActor(),null);
+        assertNotEquals(first.id(),alternative.id());
+        assertEquals(3,count("SELECT count(*) FROM presentacion_medicamento WHERE id_medicamento=? AND estado='ACTIVA'",f.medicine()));
+    }
+
+    // AC-50: inactivation preserves stock; reactivation restores reservability.
+    @Test void ac50StockSurvivesPharmacyAndPresentationInactivation() {
+        pharmacies.cambiarEstado(f.pharmacy(),false,"Inactivar AC50",f.adminActor(),null);
+        assertEquals(10,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+        assertEquals("PHARMACY_INACTIVE",assertThrows(ApiException.class,
+            ()->reservations.crear(cmd(1),key(),f.userActor(),null)).codigo());
+        pharmacies.cambiarEstado(f.pharmacy(),true,"Reactivar AC50",f.adminActor(),null);
+        var first=created(1);
+        assertEquals("ACTIVA",first.estado());
+        assertEquals(9,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+        presentations.cambiarEstado(f.presentation(),false,"Inactivar presentación AC50",f.adminActor(),null);
+        assertEquals("PRESENTATION_INACTIVE",assertThrows(ApiException.class,
+            ()->reservations.crear(cmd(1),key(),f.userActor(),null)).codigo());
+        assertEquals(9,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+        presentations.cambiarEstado(f.presentation(),true,"Reactivar presentación AC50",f.adminActor(),null);
+        var second=created(1);
+        assertEquals("ACTIVA",second.estado());
+        assertEquals(8,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+    }
+
+    private long createHistoricUser() {
+        return tx().execute(status->{
+            long account=accounts.newAccount("history-"+UUID.randomUUID()+"@test.org","hash","USUARIO",T.minus(Duration.ofDays(100)));
+            return accounts.newUser(account,"Historial","Prueba");
+        });
+    }
+
+    private void historicBreach(long user,Instant expires) {
+        String code=UUID.randomUUID().toString().replace("-","").substring(0,12).toUpperCase(Locale.ROOT);
+        db.update("""
+            INSERT INTO reserva(codigo_visible,id_usuario,id_farmacia,id_presentacion,cantidad,
+                estado_persistido,fecha_hora_creacion,fecha_hora_vencimiento,
+                farmacia_nombre_snapshot,farmacia_direccion_snapshot,medicamento_nombre_snapshot,presentacion_descripcion_snapshot)
+            VALUES (?,?,?,?,1,'VENCIDA',?,?,'Historial','Dirección','Medicamento','Presentación')
+            """,code,user,f.pharmacy(),f.presentation(),ts(expires.minus(Duration.ofHours(4))),ts(expires));
+    }
+
+    private void evaluateHistoric(long user) {
+        tx().execute(status->{
+            long account=create("SELECT id_cuenta FROM usuario WHERE id_usuario=?",user);
+            create("SELECT id_cuenta FROM cuenta WHERE id_cuenta=? FOR UPDATE",account);
+            create("SELECT id_usuario FROM usuario WHERE id_usuario=? FOR UPDATE",user);
+            closure.evaluateSuspensions(user,T,null);
+            return null;
+        });
+    }
+
+    private List<List<Instant>> intervals(long user) {
+        return db.query("SELECT fecha_hora_inicio,fecha_hora_fin FROM suspension WHERE id_usuario=? " +
+            "ORDER BY fecha_hora_inicio ASC, id_suspension ASC",
+            (r,n)->List.of(r.getObject(1,OffsetDateTime.class).toInstant(),
+                            r.getObject(2,OffsetDateTime.class).toInstant()),user);
+    }
+
+    // AC-37/54/60: persist a backlog older than the current window and compare actual
+    // PostgreSQL histories with identical times inserted in opposite technical orders.
+    @Test void ac37Ac54Ac60HistoricalBacklogPersistsDeterministically() {
+        long userB=createHistoricUser();
+        List<Instant> expiries=List.of(
+            T.minus(Duration.ofDays(90)),T.minus(Duration.ofDays(89)),T.minus(Duration.ofDays(88)),
+            T.minus(Duration.ofDays(3)),T.minus(Duration.ofDays(2)),T.minus(Duration.ofDays(1)));
+        for (Instant when:expiries) historicBreach(f.user(),when);
+        var reverse=new ArrayList<>(expiries);
+        Collections.reverse(reverse);
+        for (Instant when:reverse) historicBreach(userB,when);
+        evaluateHistoric(f.user());
+        evaluateHistoric(userB);
+        var expected=List.of(
+            List.of(T.minus(Duration.ofDays(88)),T.minus(Duration.ofDays(81))),
+            List.of(T.minus(Duration.ofDays(1)),T.plus(Duration.ofDays(6))));
+        assertEquals(expected,intervals(f.user()));
+        assertEquals(expected,intervals(userB));
+        // Re-evaluation must not duplicate or shift any historic interval.
+        evaluateHistoric(f.user());
+        evaluateHistoric(userB);
+        assertEquals(expected,intervals(f.user()));
+        assertEquals(expected,intervals(userB));
+    }
+
 }

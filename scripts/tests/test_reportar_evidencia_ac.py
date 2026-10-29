@@ -72,6 +72,30 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 if kind == 'pg':
                     self.assertIn(f'void {selector.rsplit(".", 1)[-1]}(', all_methods)
 
+    def test_new_acceptance_references_are_not_accepted_until_their_real_pg_run(self):
+        from scripts.reportar_evidencia_ac import ADDITIONAL_PG
+        matrix=ROOT/'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md'
+        with tempfile.TemporaryDirectory() as folder:
+            d=Path(folder)
+            before=make_report(matrix,d,None,'SHA_NEW')
+            for ac in ADDITIONAL_PG:
+                self.assertFalse(any(ev['referencia'].rsplit('.',1)[-1] in ADDITIONAL_PG[ac]
+                                     for ev in before['criterios'][ac-1]['evidencia_automatizada']))
+                self.assertEqual('PENDIENTE',before['criterios'][ac-1]['aceptacion_normativa'])
+            method=ADDITIONAL_PG[16][0]
+            xml=Element('testsuite', {'tests':'1','failures':'0','errors':'0','skipped':'0'})
+            SubElement(xml,'testcase',{'classname':R[:-1],'name':method})
+            ElementTree(xml).write(d/'TEST-new.xml',encoding='utf-8')
+            after=make_report(matrix,d,None,'SHA_NEW')
+            self.assertTrue(any(ev['referencia'].endswith(method)
+                                for ev in after['criterios'][15]['evidencia_automatizada']))
+            self.assertEqual('PENDIENTE',after['criterios'][15]['aceptacion_normativa'])
+            xml.find('testcase').append(Element('skipped'))
+            ElementTree(xml).write(d/'TEST-new.xml',encoding='utf-8')
+            skipped=make_report(matrix,d,None,'SHA_NEW')
+            self.assertFalse(any(ev['referencia'].endswith(method)
+                                 for ev in skipped['criterios'][15]['evidencia_automatizada']))
+
     def test_ac02_points_to_global_five_reservation_limit_not_otc(self):
         self.assertIn(("pg", R + "globalLimitIsCountedAcrossDifferentPresentations"), SOURCES[2])
         self.assertNotIn(("pg", R + "otcLimitAndGlobalLimitDoNotMutateStockOnRejection"), SOURCES[2])

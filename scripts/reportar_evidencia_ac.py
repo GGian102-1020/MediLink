@@ -95,6 +95,29 @@ SOURCES = {
          ("unit", D + "pendingBacklogMakesMultipleSeparateIntervalsAndDoesNotReuseDuringSuspension")],
 }
 
+
+# Additional PostgreSQL acceptance scenarios introduced after commit 33f946f.
+# These references are evidence candidates ONLY after the exact method passed on a real
+# PostgreSQL run; they do not turn the normative status to PASS by themselves.
+ADDITIONAL_PG = {
+    5: ['ac05CancellationAtExactExpiryMaterializesWithoutDoubleRelease'],
+    7: ['ac07ActualExpirySchedulerIsIdempotent'],
+    16: ['ac16TwoConcurrentExpiriesCreateExactlyOneSuspension'],
+    25: ['ac25SnapshotsStayConstantAfterAdminRenames'],
+    29: ['ac29PrescriptionItemLinkAndOtcNullArePersisted'],
+    30: ['ac30ReservationAndRestitutionMovementsAreTraceableAndOrdered'],
+    35: ['ac35NormalizedDuplicateRejectedButPharmacologicalEquivalenceNotInferred'],
+    37: ['ac37Ac54Ac60HistoricalBacklogPersistsDeterministically'],
+    50: ['ac50StockSurvivesPharmacyAndPresentationInactivation'],
+    52: ['ac52EffectiveExpiryAndSecondsInUserDTO'],
+    54: ['ac37Ac54Ac60HistoricalBacklogPersistsDeterministically'],
+    57: ['ac57AndAc58OperationalCancellationAuthorityAndMetadata'],
+    58: ['ac57AndAc58OperationalCancellationAuthorityAndMetadata'],
+    60: ['ac37Ac54Ac60HistoricalBacklogPersistsDeterministically'],
+}
+for ac, methods in ADDITIONAL_PG.items():
+    SOURCES[ac].extend(('pg', R + method) for method in methods)
+
 # An API step may have changed numbering; indexes are pinned to the current script.
 # Use named markers in newer runners to avoid assigning the wrong AC on renumbering.
 API_STEP_LABELS = {

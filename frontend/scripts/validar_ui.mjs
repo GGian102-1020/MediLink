@@ -129,5 +129,11 @@ try {
   console.error('FAIL UI:', String(error?.message || error));
   process.exitCode = 1;
 } finally {
-  await fs.writeFile(path.join(reportDir, 'resultado_ui.json'), JSON.stringify(result, null, 2)+'\n');
+  // Keep the final and progress artifacts consistent; the progress file may have been
+  // written while status was still FAIL (the safe initial state).
+  const finalEvidence = JSON.stringify(result, null, 2) + '\n';
+  await Promise.all([
+    fs.writeFile(path.join(reportDir, 'resultado_ui.json'), finalEvidence),
+    fs.writeFile(path.join(reportDir, 'progreso_ui.json'), finalEvidence),
+  ]);
 }
