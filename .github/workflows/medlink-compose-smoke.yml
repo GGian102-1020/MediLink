@@ -14,6 +14,8 @@ on:
       - 'docker-compose.yml'
       - '.dockerignore'
       - 'scripts/smoke_gateway.sh'
+      - 'scripts/smoke_roles.py'
+      - 'scripts/tests/test_smoke_roles_contract.py'
       - '.github/workflows/medlink-compose-smoke.yml'
   pull_request:
     branches:
@@ -57,6 +59,14 @@ jobs:
             -H 'Content-Type: application/json' \
             --data '{"correo":"admin@medlink.test","contrasena":"Password123!"}' \
             | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["perfil"]["rol"]=="ADMINISTRADOR"'
+      - name: Probar contrato del runner de recorridos API
+        run: python3 -m unittest discover -s scripts/tests -p 'test_smoke_roles_*.py' -v
+      - name: Recorridos reales por rol, stock, receta e idempotencia
+        env:
+          MEDLINK_SMOKE_EPHEMERAL: '1'
+          # Credencial EXCLUSIVAMENTE del seed ficticio de la base descartable.
+          MEDLINK_DEMO_PASSWORD: Password123!
+        run: python3 scripts/smoke_roles.py --demo-ack SEED_DEMO_EFIMERO
       - name: Diagnostico (sin secretos)
         if: failure()
         run: docker compose --profile api ps
