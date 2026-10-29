@@ -44,7 +44,7 @@ def hardware() -> dict:
 def run(n: int, workers: int) -> dict:
     if n < 20 or workers < 1 or workers > 16:
         raise ValueError('Usar >=20 iteraciones y entre 1 y 16 workers')
-    client = Client('https://127.0.0.1:8443')
+    client = Client('https://localhost:8443')
     pwd = os.environ['MEDLINK_DEMO_PASSWORD']
     admin_user = {'correo': 'juan.perez@mail.test', 'contrasena': pwd}
     user_login = client.expect('POST', '/api/auth/login', 200, data=admin_user)
@@ -114,7 +114,7 @@ def main(argv=None) -> int:
     parser.add_argument('--out', type=Path, default=Path('evidencias/perf_ci/resultado_p95.json'))
     args = parser.parse_args(argv)
     try:
-        check_base_url('https://127.0.0.1:8443')
+        check_base_url('https://localhost:8443')
         if args.demo_ack != 'SEED_DEMO_EFIMERO' or os.getenv('MEDLINK_PERF_EPHEMERAL') != '1' or \
                 os.getenv('MEDLINK_DEMO_PASSWORD') != 'Password123!':
             raise ValueError('Solo se ejecuta en la BD efimera con seed demo de GitHub Actions')

@@ -165,7 +165,7 @@ def ui_evidence_valid(path: Path | None, sha: str) -> bool:
         data = json.loads(path.read_text(encoding="utf-8"))
         return (data.get("schema") == 1 and data.get("ac") == "AC-48"
                 and data.get("status") == "PASS" and data.get("sha") == sha
-                and data.get("base") == "https://127.0.0.1:8443"
+                and data.get("base") == "https://localhost:8443"
                 and data.get("widths") == [360, 390, 768, 1440]
                 and not data.get("failures")
                 and all(isinstance(data.get("browsers", {}).get(browser, {}).get("version"), str)

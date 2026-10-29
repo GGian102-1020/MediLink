@@ -4,7 +4,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-const URL = 'https://127.0.0.1:8443';
+// Caddy terminates TLS for the localhost hostname (gateway/Caddyfile).
+const URL = 'https://localhost:8443';
 const widths = [360, 390, 768, 1440];
 const reportDir = process.env.MEDLINK_UI_EVIDENCE_DIR || path.resolve('../evidencias/ui_ci');
 const sha = process.env.GITHUB_SHA || 'LOCAL-SIN-SHA';

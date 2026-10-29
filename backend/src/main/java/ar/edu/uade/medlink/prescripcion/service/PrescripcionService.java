@@ -102,6 +102,12 @@ public class PrescripcionService {
     public PrescripcionDTO anular(long id, String motivo, CurrentAccount actor, HttpServletRequest request) {
         MedicamentoService.admin(actor);
         String reason=RequestValidation.requiredReason(motivo);
+        // The owner is immutable. Read it without a row lock, then acquire the
+        // same Usuario guard as POST /reservas before locking Prescripcion.
+        // Otherwise the reservation can hold Usuario and wait on Prescripcion,
+        // while annulling holds Prescripcion and waits on Usuario via the audit FK.
+        long owner=prescripciones.findOwnerId(id).orElseThrow(ApiException::notFound);
+        prescripciones.lockOwner(owner).orElseThrow(ApiException::notFound);
         var p=prescripciones.findLocked(id).orElseThrow(ApiException::notFound);
         if (p.getEstado()==EstadoPrescripcion.ANULADA)
             throw ApiException.conflict("INVALID_STATE_TRANSITION","La prescripción ya está anulada.");

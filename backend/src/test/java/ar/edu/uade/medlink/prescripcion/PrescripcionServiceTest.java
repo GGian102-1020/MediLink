@@ -118,8 +118,16 @@ class PrescripcionServiceTest {
     @Test void annulRequiresReasonAndIsIrreversible() {
         assertEquals("VALIDATION_ERROR",assertThrows(ApiException.class,()->service.anular(5,"  ",admin,null)).codigo());
         var p=prescription(5,1);
+        when(prescriptions.findOwnerId(5)).thenReturn(Optional.of(1L));
+        when(prescriptions.lockOwner(1)).thenReturn(Optional.of(1L));
         when(prescriptions.findLocked(5)).thenReturn(Optional.of(p));
         var dto=service.anular(5," Emitida con error ",admin,null);
+        var locks=inOrder(prescriptions,audit);
+        locks.verify(prescriptions).findOwnerId(5);
+        locks.verify(prescriptions).lockOwner(1);
+        locks.verify(prescriptions).findLocked(5);
+        locks.verify(audit).record(eq(4L),eq("ADMINISTRADOR"),eq("ANULAR_PRESCRIPCION"),eq("PRESCRIPCION"),
+            eq(5L),eq(1L),eq("Emitida con error"),anyMap(),anyMap(),isNull());
         assertEquals(EstadoPrescripcion.ANULADA,dto.estado());
         verify(audit).record(eq(4L),eq("ADMINISTRADOR"),eq("ANULAR_PRESCRIPCION"),eq("PRESCRIPCION"),
             eq(5L),eq(1L),eq("Emitida con error"),anyMap(),anyMap(),isNull());

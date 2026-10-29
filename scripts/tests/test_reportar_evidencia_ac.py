@@ -23,7 +23,7 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             self.assertTrue(all(not initial['criterios'][n-1]['evidencia_automatizada'] for n in missing))
             record = d / 'resultado_ui.json'
             valid = {'schema': 1, 'ac': 'AC-48', 'sha': 'SHA', 'status': 'PASS',
-                     'base': 'https://127.0.0.1:8443', 'widths': [360,390,768,1440],
+                     'base': 'https://localhost:8443', 'widths': [360,390,768,1440],
                      'failures': [], 'browsers': {b: {'version': '123', 'checks': ['ok']*5}
                                                for b in ('chromium','firefox')}}
             record.write_text(json.dumps(valid), encoding='utf-8')
@@ -35,6 +35,16 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             valid['status'] = 'FAIL'
             record.write_text(json.dumps(valid), encoding='utf-8')
             self.assertFalse(ui_evidence_valid(record, 'SHA'))
+
+    def test_ci_uses_caddy_tls_hostname_for_ui_and_benchmark(self):
+        # gateway/Caddyfile uses a TLS site for localhost, not the raw IPv4 literal.
+        caddy = (ROOT / 'gateway/Caddyfile').read_text(encoding='utf-8')
+        self.assertIn('https://localhost {', caddy)
+        for rel in ('frontend/scripts/validar_ui.mjs', 'scripts/medir_p95.py',
+                    'scripts/reportar_evidencia_ac.py'):
+            source = (ROOT / rel).read_text(encoding='utf-8')
+            self.assertIn('https://localhost:8443', source, rel)
+            self.assertNotIn('https://127.0.0.1:8443', source, rel)
 
     def test_matrix_contains_exactly_sixty_normative_ids(self):
         rows = parse_matrix(ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md')
