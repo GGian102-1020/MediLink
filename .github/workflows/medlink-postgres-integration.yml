@@ -3,6 +3,7 @@ name: MediLink - Integracion PostgreSQL
 on:
   push:
     branches:
+      - main
       - 'refactor/**'
       - 'fix/**'
       - 'feature/**'
@@ -11,6 +12,7 @@ on:
     branches:
       - main
       - develop
+      - 'feature/**'
   workflow_dispatch:
 
 permissions:

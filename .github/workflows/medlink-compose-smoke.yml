@@ -1,0 +1,67 @@
+name: MediLink - Despliegue HTTPS y seed demo
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'gateway/**'
+      - 'database/**'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - 'scripts/smoke_gateway.sh'
+      - '.github/workflows/medlink-compose-smoke.yml'
+  pull_request:
+    branches:
+      - main
+      - 'feature/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose-smoke:
+    name: Docker Compose + Flyway + React + API (HTTPS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preparar entorno efimero de CI
+        shell: bash
+        run: |
+          cat > .env <<EOF
+          POSTGRES_DB=medlink
+          POSTGRES_USER=medlink
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          JWT_SECRET_BASE64=$(openssl rand -base64 48 | tr -d '\n')
+          DB_FLYWAY_BASELINE_ON_MIGRATE=false
+          HTTPS_PORT=8443
+          EOF
+      - name: Compilar e iniciar migraciones sin scripts initdb
+        run: |
+          docker compose --profile api config --quiet
+          docker compose --profile api up -d --build
+      - name: Probar SPA, API y rutas directas HTTPS
+        run: bash scripts/smoke_gateway.sh
+      - name: Probar carga EXPLICITA del seed demo sobre esquema Flyway
+        run: |
+          docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/medlink/02_datos_prueba.sql'
+          curl -ksS --fail -X POST https://localhost:8443/api/auth/login \
+            -H 'Content-Type: application/json' \
+            --data '{"correo":"admin@medlink.test","contrasena":"Password123!"}' \
+            | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["perfil"]["rol"]=="ADMINISTRADOR"'
+      - name: Diagnostico (sin secretos)
+        if: failure()
+        run: docker compose --profile api ps
+      - name: Apagar entorno efimero
+        if: always()
+        run: |
+          docker compose --profile api down --remove-orphans || true
+          rm -f .env

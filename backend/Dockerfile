@@ -2,7 +2,8 @@ FROM maven:3.9.11-eclipse-temurin-21 AS builder
 WORKDIR /build
 COPY pom.xml .
 COPY src ./src
-RUN mvn -B -ntp clean package
+# La CI ejecuta verify con PostgreSQL real. El build de la imagen solo compila.
+RUN mvn -B -ntp -DskipTests clean package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app

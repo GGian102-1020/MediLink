@@ -6,15 +6,10 @@ on:
       - main
       - 'feature/**'
       - 'fix/**'
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/medlink-frontend.yml'
   pull_request:
     branches:
       - main
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/medlink-frontend.yml'
+      - 'feature/**'
   workflow_dispatch:
 
 permissions:
