@@ -1,0 +1,14 @@
+# No enviar secretos, historia Git ni artefactos locales al builder.
+.git
+**/.git
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/target
+**/dist
+**/coverage
+**/*.log
+**/*.dump
+**/*.backup
+**/npm-debug.log*

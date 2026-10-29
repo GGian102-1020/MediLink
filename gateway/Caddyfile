@@ -1,7 +1,19 @@
-# HTTPS for the local demonstrator. Trust the internal CA locally or use curl -k.
-# For production, configure a real hostname and a public CA certificate.
+# Demo local HTTPS: la CA interna de Caddy requiere confianza local (o curl -k).
+# El puerto del host se publica solo en 127.0.0.1. No expongas el seed de demo.
 https://localhost {
     tls internal
-    encode gzip
-    reverse_proxy backend:8081
+    encode zstd gzip
+
+    # La API no debe devolver index.html ante errores/rutas inexistentes.
+    @api path /api /api/*
+    handle @api {
+        reverse_proxy backend:8081
+    }
+
+    # React Router: enlaces profundos y refresh de una ruta SPA.
+    handle {
+        root * /srv/medlink
+        try_files {path} /index.html
+        file_server
+    }
 }

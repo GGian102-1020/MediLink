@@ -14,11 +14,9 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # Se ejecutan en orden alfabético SOLO la primera vez (volumen vacío):
-      #   01 -> crea enums, tablas, índices y triggers
-      #   02 -> carga los datos de prueba
-      - ./database/01_medlink_esquema.sql:/docker-entrypoint-initdb.d/01_medlink_esquema.sql:ro
-      - ./database/02_datos_prueba.sql:/docker-entrypoint-initdb.d/02_datos_prueba.sql:ro
+      # El esquema nuevo lo crea exclusivamente Flyway al iniciar backend.
+      # Datos ficticios: carga manual EXPLICITA, nunca automática en un entorno expuesto.
+      - ./database/02_datos_prueba.sql:/opt/medlink/02_datos_prueba.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -47,14 +45,15 @@ services:
 
   gateway:
     profiles: ["api"]
-    image: caddy:2.10-alpine
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "${HTTPS_PORT:-8443}:443"
+      - "127.0.0.1:${HTTPS_PORT:-8443}:443"
     volumes:
-      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
       - caddyconfig:/config
 
