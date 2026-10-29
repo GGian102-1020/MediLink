@@ -1,0 +1,749 @@
+{
+  "sha": "80bfbe06ae21b7e814700f9e88edd8bae2131f74",
+  "source": "MedLink MVP v1.4.3 Seccion 15 AC-01..60",
+  "fecha": "2026-10-29",
+  "verdict": "VALIDACION_INCOMPLETA: no 60/60",
+  "tests_surefire": {
+    "tests": 190,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0
+  },
+  "smoke_api": 20,
+  "backup_restauraciones_verificadas": 3,
+  "rnf11_referencia": {
+    "sha": "80bfbe06ae21b7e814700f9e88edd8bae2131f74",
+    "dateUtc": "2026-10-29T20:16:39.848098+00:00",
+    "environment": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+      "python": "3.12.3",
+      "cpu_logical": 4,
+      "memory_total_kib": 16367524
+    },
+    "dataset": {
+      "medicamentos_total": 13,
+      "farmacias_disponibles_presentacion_1": 3,
+      "seed_demo_explicit": true
+    },
+    "load": {
+      "read_workers": 4,
+      "transaction_workers": 1,
+      "iterations_per_operation": 25,
+      "https_loopback": true,
+      "warmup": "login and public catalog/availability before samples"
+    },
+    "operations": {
+      "catalogo": {
+        "samples": 25,
+        "p95_seconds": 0.045,
+        "mean_seconds": 0.0257,
+        "max_seconds": 0.0487
+      },
+      "presentacion": {
+        "samples": 25,
+        "p95_seconds": 0.044,
+        "mean_seconds": 0.0208,
+        "max_seconds": 0.0482
+      },
+      "disponibilidad": {
+        "samples": 25,
+        "p95_seconds": 0.0412,
+        "mean_seconds": 0.0249,
+        "max_seconds": 0.0796
+      },
+      "reservas_mias": {
+        "samples": 25,
+        "p95_seconds": 0.0441,
+        "mean_seconds": 0.0279,
+        "max_seconds": 0.0489
+      },
+      "registro": {
+        "samples": 25,
+        "p95_seconds": 0.3131,
+        "mean_seconds": 0.3027,
+        "max_seconds": 0.3188
+      },
+      "login": {
+        "samples": 25,
+        "p95_seconds": 0.0827,
+        "mean_seconds": 0.0815,
+        "max_seconds": 0.0828
+      },
+      "reserva": {
+        "samples": 25,
+        "p95_seconds": 0.0213,
+        "mean_seconds": 0.0167,
+        "max_seconds": 0.0263
+      },
+      "cancelacion": {
+        "samples": 25,
+        "p95_seconds": 0.023,
+        "mean_seconds": 0.0151,
+        "max_seconds": 0.0259
+      }
+    },
+    "p95_reads_seconds": 0.0441,
+    "p95_transactions_seconds": 0.3036,
+    "reference_slo": {
+      "reads_seconds": 1.0,
+      "transactions_seconds": 2.0
+    },
+    "result": "PASS",
+    "scope": "Referencia CI descartable; RNF-11 necesita aceptacion con dataset/hardware/carga convenidos."
+  },
+  "files_sha256": {
+    "medlink-postgres-surefire-reports.zip": "c8aba0e930049fba9b1b55d886b4ded9d49a3f0dfb0a7db274635ff1b333e6eb",
+    "medlink-ac-e2e-evidencia.zip": "26c9323e83d99d7cecb8b931dec38c20e7d5ee31f9d2e031b4f31fd8c2a225eb"
+  },
+  "counts": {
+    "DIRECTO": 23,
+    "PARCIAL": 35,
+    "BLOQUEADO": 2
+  },
+  "criterios": [
+    {
+      "ac": "AC-01",
+      "escenario": "Ultima unidad de Stock: un ganador",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A14",
+        "J:ReservasPostgresTest.concurrentLastStockUnitIsNeverOversold"
+      ],
+      "detalle_o_faltante": "HTTP 201/409, INSUFFICIENT_STOCK y saldo final 0 con peticiones simultaneas."
+    },
+    {
+      "ac": "AC-02",
+      "escenario": "Limite de 5 Reservas activas",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.globalLimitIsCountedAcrossDifferentPresentations"
+      ],
+      "detalle_o_faltante": "Falta verificar HTTP 409 y saldo inmutable contra API real en el mismo caso."
+    },
+    {
+      "ac": "AC-03",
+      "escenario": "Limite de 3 unidades OTC por Presentacion",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A09",
+        "J:ReservasPostgresTest.otcLimitAndGlobalLimitDoNotMutateStockOnRejection"
+      ],
+      "detalle_o_faltante": "HTTP 409 MAX_OTC_UNITS_EXCEEDED y stock sin cambios."
+    },
+    {
+      "ac": "AC-04",
+      "escenario": "Dos Reservas compiten por 1 unidad Rx",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "J:ReservasPostgresTest.concurrentSamePrescriptionItemNeverExceedsAuthorization"
+      ],
+      "detalle_o_faltante": "Dos Reservas Rx reales compiten por un Item y no sobrecomprometen; consultar respuesta HTTP para mayor cobertura."
+    },
+    {
+      "ac": "AC-05",
+      "escenario": "Cancelar exactamente al vencimiento",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:FarmaciaStockPostgresTest.expiredReservationsDoNotBlockPharmacyDeactivationAtTheExactBoundary"
+      ],
+      "detalle_o_faltante": "No hay cancelacion propia exactamente T ni comprobacion HTTP RESERVATION_EXPIRED."
+    },
+    {
+      "ac": "AC-06",
+      "escenario": "Cancelar Reserva bajo receta y liberar recursos",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A13",
+        "J:ReservasPostgresTest.prescriptionCommitCancellationAndCompletionConserveAuthorizedQuantity"
+      ],
+      "detalle_o_faltante": "Cancelacion Rx libera stock/compromiso; falta comprobar ausencia de incumplimiento del mismo caso."
+    },
+    {
+      "ac": "AC-07",
+      "escenario": "Scheduler vence una sola vez",
+      "evidencia_recomendada": "PostgreSQL/scheduler",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.expiredReservationIsEffectiveBeforeMaterializationAndReleaseIsOnce"
+      ],
+      "detalle_o_faltante": "Se verifica materializacion idempotente, pero no ejecucion efectiva del scheduler."
+    },
+    {
+      "ac": "AC-08",
+      "escenario": "Retiro no descuenta Stock dos veces",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A11",
+        "J:ReservasPostgresTest.operatorCompletesWithoutRedeductingStock"
+      ],
+      "detalle_o_faltante": "Retiro COMPLETADA en API y stock sin segundo descuento en BD."
+    },
+    {
+      "ac": "AC-09",
+      "escenario": "Operador no accede a otra Farmacia",
+      "evidencia_recomendada": "API autorizacion",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A05",
+        "J:ReservasPostgresTest.adminAndOperatorPermissionsAreSeparated"
+      ],
+      "detalle_o_faltante": "Operador fuera de farmacia recibe 403, sin datos de reserva."
+    },
+    {
+      "ac": "AC-10",
+      "escenario": "No deshabilitar ultimo Operador",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A07",
+        "J:AdministrationServiceTest.cannotDisableLastOperationalPharmacyOperator"
+      ],
+      "detalle_o_faltante": "409 LAST_OPERATIONAL_OPERATOR por API."
+    },
+    {
+      "ac": "AC-11",
+      "escenario": "Desactivacion con Reserva activa rechazada",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A07",
+        "J:FarmaciaServiceTest.cannotDeactivateWithFunctionallyActiveReservations"
+      ],
+      "detalle_o_faltante": "409 PHARMACY_HAS_ACTIVE_RESERVATIONS por API."
+    },
+    {
+      "ac": "AC-12",
+      "escenario": "Deshabilitar Usuario cancela y libera atomicamente",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.ac31ConcurrentReservationAndUserDeactivationAreAtomic"
+      ],
+      "detalle_o_faltante": "Falta fixture con mezcla de vencidas y Rx activas para verificar todas las liberaciones en una misma transaccion."
+    },
+    {
+      "ac": "AC-13",
+      "escenario": "Tres incumplimientos crean Suspensión",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:FarmaciaStockPostgresTest.expirationReleasesPrescriptionCommitmentsAndEvaluatesSuspensions",
+        "J:SuspensionPlannerTest.boundary30DaysInclusiveAndSchedulingOrderIrrelevant"
+      ],
+      "detalle_o_faltante": "Falta comprobar en PG duracion de Suspension e inicio en el tercer vencimiento con historia completa."
+    },
+    {
+      "ac": "AC-14",
+      "escenario": "Suspendido no reserva, puede retirar anterior",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.suspendedUserCannotReserveAndSuspensionStillVisibleAfterReplay"
+      ],
+      "detalle_o_faltante": "Bloqueo de nuevas Reservas probado; retiro de Reserva previa durante la suspension sin prueba conjunta."
+    },
+    {
+      "ac": "AC-15",
+      "escenario": "Incumplimientos previos a fin de Suspensión no reutilizables",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:SuspensionPlannerTest.exactlyEndOfPreviousSuspensionIsEligible"
+      ],
+      "detalle_o_faltante": "Seleccion historica cubierta en unidad; falta validacion de no reutilizacion de incumplimientos en persistencia real."
+    },
+    {
+      "ac": "AC-16",
+      "escenario": "Evaluaciones concurrentes no duplican Suspensión",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "BLOQUEADO",
+      "referencias": [
+        "J:SuspensionPostgresTest.schemaForbidsChangingOrOverlappingHistoricalIntervals"
+      ],
+      "detalle_o_faltante": "No hay dos evaluaciones concurrentes que compitan por crear la Suspension y demuestren unicidad."
+    },
+    {
+      "ac": "AC-17",
+      "escenario": "Replay de misma Idempotency-Key y payload",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A10",
+        "J:ReservasPostgresTest.sameIdempotencyKeyReplaysOriginal201EvenAfterCancellation"
+      ],
+      "detalle_o_faltante": "Respuesta 201 original reemitida sin otra Reserva aun tras cancelacion."
+    },
+    {
+      "ac": "AC-18",
+      "escenario": "Misma clave con payload distinto",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A10",
+        "J:ReservasPostgresTest.idempotencyKeyWithDifferentPayloadIsRejected"
+      ],
+      "detalle_o_faltante": "409 IDEMPOTENCY_KEY_REUSED al cambiar payload."
+    },
+    {
+      "ac": "AC-19",
+      "escenario": "Reserva Rx sobrevive a anulacion posterior",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A17",
+        "J:ReservasPostgresTest.prescriptionCommitCancellationAndCompletionConserveAuthorizedQuantity"
+      ],
+      "detalle_o_faltante": "Anulacion posterior no invalida retiro Rx ya confirmado."
+    },
+    {
+      "ac": "AC-20",
+      "escenario": "Stock ausente equivale a cero",
+      "evidencia_recomendada": "API/BD",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A08",
+        "J:FarmaciaStockPostgresTest.publicAvailabilityExcludesAbsentZeroInactiveAndNonOperationalStock"
+      ],
+      "detalle_o_faltante": "Stock ausente => no disponibilidad y 409 INSUFFICIENT_STOCK."
+    },
+    {
+      "ac": "AC-21",
+      "escenario": "Catalogo inactivo no es reservable",
+      "evidencia_recomendada": "API/UI",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A01",
+        "A08",
+        "J:CatalogoPostgresTest.activeDuplicateAndStateTransitionsDoNotErasePresentationOrAudit"
+      ],
+      "detalle_o_faltante": "Falta comprobar expresamente ciclo de Reserva anterior al desactivar junto con exclusion UI."
+    },
+    {
+      "ac": "AC-22",
+      "escenario": "STOCK_INCONSISTENTE atomico",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.manualRealStockCorrectionIsAbsoluteAndAudited",
+        "J:FarmaciaStockPostgresTest.auditFailureRollsBackBalanceMovementAndExpirationTogether"
+      ],
+      "detalle_o_faltante": "No se prueba junto en mismo escenario: cancelacion Rx, libera Item, stock real, auditoria y rollback ante fallo."
+    },
+    {
+      "ac": "AC-23",
+      "escenario": "Cambio de clave invalida JWT previos",
+      "evidencia_recomendada": "API/UI",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:BearerAuthenticationFilterTest.tokenVersionChangeInvalidatesPreviouslySignedJwt",
+        "J:AuthServiceTest.rejectsSamePasswordOrIncorrectCurrentPassword"
+      ],
+      "detalle_o_faltante": "JWT invalida tokenVersion; falta login real con nueva clave y rechazo HTTP del JWT previo en mismo flujo."
+    },
+    {
+      "ac": "AC-24",
+      "escenario": "Logout revoca jti",
+      "evidencia_recomendada": "API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A20",
+        "J:BearerAuthenticationFilterTest.revokedJtiIsNeverAccepted"
+      ],
+      "detalle_o_faltante": "Logout seguido de /api/me 401 INVALID_TOKEN."
+    },
+    {
+      "ac": "AC-25",
+      "escenario": "Snapshots historicos no cambian al renombrar",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.createIsAtomicAndProducesMovementAndSnapshots"
+      ],
+      "detalle_o_faltante": "Snapshots al crear si; falta editar/renombrar farmacia y medicamento y consultar historia."
+    },
+    {
+      "ac": "AC-26",
+      "escenario": "Suspension determinista con vencimientos desordenados",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:SuspensionPlannerTest.boundary30DaysInclusiveAndSchedulingOrderIrrelevant"
+      ],
+      "detalle_o_faltante": "Orden de entrada irrelevante en memoria; falta secuencia PG de materializaciones desordenadas y no superposicion."
+    },
+    {
+      "ac": "AC-27",
+      "escenario": "Deshabilitar Operador no ultimo",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:AdministrationServiceTest.cannotDisableLastOperationalPharmacyOperator",
+        "J:BearerAuthenticationFilterTest.tokenVersionChangeInvalidatesPreviouslySignedJwt"
+      ],
+      "detalle_o_faltante": "Falta deshabilitar un operador NO ultimo y comprobar JWT previo, reservas intactas y operatividad."
+    },
+    {
+      "ac": "AC-28",
+      "escenario": "Admin no confirma retiro",
+      "evidencia_recomendada": "API autorizacion",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A11",
+        "J:ReservasPostgresTest.adminCannotCompleteButCanCancelOperativelyWithoutRestitution"
+      ],
+      "detalle_o_faltante": "403 FORBIDDEN a administrador y posterior retiro del operador demuestra Reserva intacta."
+    },
+    {
+      "ac": "AC-29",
+      "escenario": "Vinculo Item Rx y venta libre sin Item",
+      "evidencia_recomendada": "PostgreSQL/BD",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A13",
+        "J:ReservasPostgresTest.prescriptionCommitCancellationAndCompletionConserveAuthorizedQuantity"
+      ],
+      "detalle_o_faltante": "Falta SELECT explicito sobre itemPrescripcionId de Rx y NULL de OTC y coherencia Usuario/Presentacion."
+    },
+    {
+      "ac": "AC-30",
+      "escenario": "Movimientos de Stock trazables y ordenados",
+      "evidencia_recomendada": "API/BD",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A12",
+        "J:FarmaciaStockPostgresTest.stockRestHistoryIsPaginatedFilteredAndOrderedAndRejectsNegative"
+      ],
+      "detalle_o_faltante": "Movimientos trazables y ordenados; falta demostrar secuencia DESCUENTO + RESTITUCION con saldo final e identidad exacta."
+    },
+    {
+      "ac": "AC-31",
+      "escenario": "Crear Reserva contra deshabilitar Usuario",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.ac31ConcurrentReservationAndUserDeactivationAreAtomic"
+      ],
+      "detalle_o_faltante": "Se verifica estado final PG con transacciones simultaneas; falta observar salida HTTP 409/201 en carrera."
+    },
+    {
+      "ac": "AC-32",
+      "escenario": "Crear Reserva contra deshabilitar ultimo Operador",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.ac32ConcurrentReservationCannotDisableLastOperationalOperator"
+      ],
+      "detalle_o_faltante": "Se prueba carrera y DB; falta observar salida HTTP LAST_OPERATIONAL_OPERATOR en ambas solicitudes."
+    },
+    {
+      "ac": "AC-33",
+      "escenario": "Estados iniciales correctos",
+      "evidencia_recomendada": "API/BD",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A10",
+        "J:ReservasPostgresTest.createIsAtomicAndProducesMovementAndSnapshots",
+        "J:FarmaciaStockPostgresTest.pharmacyRestCreationEditionFiltersAndStateTransitions"
+      ],
+      "detalle_o_faltante": "Faltan todos los estados iniciales de CUENTA, OPERADOR, MEDICAMENTO, PRESENTACION y PRESCRIPCION reunidos en un test."
+    },
+    {
+      "ac": "AC-34",
+      "escenario": "Ajuste Stock crea saldo ausente",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A14",
+        "J:StockServiceTest.absentStockCreatesZeroBaselineBeforeAbsoluteAdjustment",
+        "J:FarmaciaStockPostgresTest.absoluteAdjustmentPersistsMovementAuditAndRealTimestamp"
+      ],
+      "detalle_o_faltante": "Se crea Stock ausente y movimiento; falta caso exacto PUT 5 con anterior 0, delta 5 y motivo."
+    },
+    {
+      "ac": "AC-35",
+      "escenario": "Duplicado de Presentacion textual y sin equivalencia",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:CatalogoPostgresTest.activeDuplicateAndStateTransitionsDoNotErasePresentationOrAudit",
+        "J:PresentacionServiceTest.exactDuplicateReturns409"
+      ],
+      "detalle_o_faltante": "Falta diferencia textual farmacologicamente equivalente sin deduplicacion implicita."
+    },
+    {
+      "ac": "AC-36",
+      "escenario": "Suspension sin scheduler rechaza nueva Reserva",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:SuspensionPlannerTest.pendingBacklogMakesMultipleSeparateIntervalsAndDoesNotReuseDuringSuspension"
+      ],
+      "detalle_o_faltante": "Falta POST /api/reservas con tercer vencimiento aun ACTIVA en BD y scheduler detenido."
+    },
+    {
+      "ac": "AC-37",
+      "escenario": "Backlog reconstruye suspensiones historicas",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:SuspensionPlannerTest.pendingBacklogMakesMultipleSeparateIntervalsAndDoesNotReuseDuringSuspension"
+      ],
+      "detalle_o_faltante": "Backlog calculado en unidad; falta persistir historicos con PG y verificar resultado tras reinicio de scheduler."
+    },
+    {
+      "ac": "AC-38",
+      "escenario": "Ajuste absoluto materializa vencimiento pendiente",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "J:FarmaciaStockPostgresTest.expiredReservationIsReleasedExactlyOnceBeforeAbsoluteCount",
+        "J:FarmaciaStockPostgresTest.concurrentAdjustmentsMaterializeTheSameExpirationOnlyOnce"
+      ],
+      "detalle_o_faltante": "Stock absoluto tras vencer en PG sin llevar balance a 6."
+    },
+    {
+      "ac": "AC-39",
+      "escenario": "STOCK_INCONSISTENTE con vencimientos pendientes",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.inconsistentStockCorrectionRespectsPendingExpiry"
+      ],
+      "detalle_o_faltante": "Materializa vencimiento y fija stock, pero no prueba simultaneamente liberacion de Item Rx en ese flujo."
+    },
+    {
+      "ac": "AC-40",
+      "escenario": "Crear Reserva Rx contra anular Prescripcion",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "J:ReservasPostgresTest.ac40ConcurrentPrescriptionAnnulmentAndReservationSerialize"
+      ],
+      "detalle_o_faltante": "Carrera real PG; estado Rx ANULADA, max 1 Reserva, compromiso/stock invariantes."
+    },
+    {
+      "ac": "AC-41",
+      "escenario": "Crear Reserva contra desactivacion administrativa",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "J:ReservasPostgresTest.ac41ConcurrentPharmacyDeactivationAndReservationAreCompatible",
+        "J:ReservasPostgresTest.ac41ConcurrentMedicationDeactivationAndReservationAreCompatible",
+        "J:ReservasPostgresTest.ac41ConcurrentPresentationDeactivationAndReservationAreCompatible"
+      ],
+      "detalle_o_faltante": "Tres carreras reales y estados finales PG compatibles."
+    },
+    {
+      "ac": "AC-42",
+      "escenario": "Dos POST simultaneos con misma clave idempotente",
+      "evidencia_recomendada": "PostgreSQL concurrente",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A15",
+        "J:ReservasPostgresTest.concurrentSameIdempotencyKeyCreatesExactlyOneReservation"
+      ],
+      "detalle_o_faltante": "Dos POST HTTP simultaneos retornan 201 igual; stock disminuye solo una vez."
+    },
+    {
+      "ac": "AC-43",
+      "escenario": "Error no consume Idempotency-Key",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A16",
+        "J:ReservasPostgresTest.failedReservationDoesNotConsumeIdempotencyKey"
+      ],
+      "detalle_o_faltante": "Tras 409 por stock y ajuste, misma key permite 201 sin duplicacion."
+    },
+    {
+      "ac": "AC-44",
+      "escenario": "Estado API efectivo VENCIDA antes del scheduler",
+      "evidencia_recomendada": "API/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.expiredReservationIsEffectiveBeforeMaterializationAndReleaseIsOnce"
+      ],
+      "detalle_o_faltante": "Estado VENCIDA y filtro probado; falta segundosRestantes=0 en DTO de API sin scheduler."
+    },
+    {
+      "ac": "AC-45",
+      "escenario": "Nombre Medicamento no es unico",
+      "evidencia_recomendada": "API/BD",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "A18",
+        "J:MedicamentoServiceTest.createsAnActiveMedicineAuditingNormalizedName"
+      ],
+      "detalle_o_faltante": "API permite dos medicamentos con mismo nombre e ids distintos."
+    },
+    {
+      "ac": "AC-46",
+      "escenario": "Operador de Farmacia INACTIVA solo consulta historial",
+      "evidencia_recomendada": "API autorizacion",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:FarmaciaStockPostgresTest.realJwtRolesScopesAndInactivePharmacyRules"
+      ],
+      "detalle_o_faltante": "Historial y ajuste denegado comprobados en MockMvc; falta login y cancelacion/retiro en farmacia inactiva."
+    },
+    {
+      "ac": "AC-47",
+      "escenario": "Privacidad Reserva en vista de Operador",
+      "evidencia_recomendada": "API autorizacion",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A06",
+        "J:ReservasPostgresTest.visibilityIsRestrictedByUserAndOperatorScope"
+      ],
+      "detalle_o_faltante": "No expone correo/telefono; falta aseverar que nombre y apellido del titular SI aparecen."
+    },
+    {
+      "ac": "AC-48",
+      "escenario": "Navegacion publica catalogo a disponibilidad",
+      "evidencia_recomendada": "UI/API",
+      "estado_tecnico": "BLOQUEADO",
+      "referencias": [
+        "A01",
+        "UI:chromium-public-360-390-768-1440"
+      ],
+      "detalle_o_faltante": "Publico Chromium valido; workflow Playwright FAIL sin evidencia Firefox ni resultado_ui.json; no certificar."
+    },
+    {
+      "ac": "AC-49",
+      "escenario": "Multiples Reservas simultaneas validas",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "J:ReservasPostgresTest.globalLimitIsCountedAcrossDifferentPresentations",
+        "A12"
+      ],
+      "detalle_o_faltante": "Multiples reservas ACTIVA en distintas presentaciones; no unicidad indebida."
+    },
+    {
+      "ac": "AC-50",
+      "escenario": "Stock persiste tras desactivar/reactivar",
+      "evidencia_recomendada": "PostgreSQL/API",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:FarmaciaStockPostgresTest.realJwtRolesScopesAndInactivePharmacyRules"
+      ],
+      "detalle_o_faltante": "Persistencia del saldo tras inactivar/reactivar; falta disponibilidad publica antes/durante/despues."
+    },
+    {
+      "ac": "AC-51",
+      "escenario": "Ventana de incumplimientos inclusiva al milisegundo",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "J:SuspensionPlannerTest.boundary30DaysInclusiveAndSchedulingOrderIrrelevant",
+        "J:SuspensionPlannerTest.olderThan30DaysExcludedByOneMillisecond"
+      ],
+      "detalle_o_faltante": "Ventana de 30 dias exactos inclusiva y candidato 1 ms fuera excluido."
+    },
+    {
+      "ac": "AC-52",
+      "escenario": "Segundos restantes y vencimiento efectivo en DTO",
+      "evidencia_recomendada": "API/UI",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A11",
+        "J:ReservasPostgresTest.expiredReservationIsEffectiveBeforeMaterializationAndReleaseIsOnce"
+      ],
+      "detalle_o_faltante": "Segundos restantes positivos mientras ACTIVA; falta demostrar cero y VENCIDA en DTO en la frontera."
+    },
+    {
+      "ac": "AC-53",
+      "escenario": "Consulta administrativa sin secretos",
+      "evidencia_recomendada": "API autorizacion",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A19",
+        "J:AuditoriaPostgresTest.secretsAreNeitherPersistedNorExposedFromLegacySummaries"
+      ],
+      "detalle_o_faltante": "Sin secretos en listados; falta flujo Admin Usuario que consulte conjuntamente reservas/suspensiones/auditoria."
+    },
+    {
+      "ac": "AC-54",
+      "escenario": "Backlog mas antiguo que ventana actual",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:SuspensionPlannerTest.pendingBacklogMakesMultipleSeparateIntervalsAndDoesNotReuseDuringSuspension"
+      ],
+      "detalle_o_faltante": "Falta prueba PG con eventos ya mas antiguos que [T-30d,T] y reconstruccion historica tras pausa."
+    },
+    {
+      "ac": "AC-55",
+      "escenario": "Reactivar Cuenta no elimina Suspensión vigente",
+      "evidencia_recomendada": "API/BD",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.ac55ReactivatingAccountPreservesCurrentSuspension"
+      ],
+      "detalle_o_faltante": "Persistencia, bloqueo y stock comprobados en PostgreSQL; falta HTTP USER_SUSPENDED de POST real."
+    },
+    {
+      "ac": "AC-56",
+      "escenario": "Auditoria usuarioId filtra sujeto, no actor",
+      "evidencia_recomendada": "API/BD",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "J:AuditoriaPostgresTest.relatedUserNeverMeansActorAccount"
+      ],
+      "detalle_o_faltante": "Filtrado por sujeto usuarioRelacionadoId, no por actorCuentaId, probado en PostgreSQL."
+    },
+    {
+      "ac": "AC-57",
+      "escenario": "Operador no usa causas exclusivas Admin/Sistema",
+      "evidencia_recomendada": "API autorizacion",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:ReservasPostgresTest.adminAndOperatorPermissionsAreSeparated",
+        "J:ReservasPostgresTest.operationalCancellationRequiresStructuredRestitutionChoice"
+      ],
+      "detalle_o_faltante": "Falta comprobar ambos 403 del operador con ERROR_ADMINISTRATIVO y CUENTA_DESHABILITADA."
+    },
+    {
+      "ac": "AC-58",
+      "escenario": "Metadatos obligatorios de cancelación",
+      "evidencia_recomendada": "API/BD",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "A12",
+        "J:ReservasPostgresTest.ownCancellationReleasesExactlyOnceAndHasNoSuspension"
+      ],
+      "detalle_o_faltante": "Metadatos de usuario correctos; falta probar causa operativa con motivo obligatorio y momento T."
+    },
+    {
+      "ac": "AC-59",
+      "escenario": "Backup y restauracion real en base separada",
+      "evidencia_recomendada": "Operacion/backup",
+      "estado_tecnico": "DIRECTO",
+      "referencias": [
+        "B:backup_ci.md",
+        "B:backup_ci_flyway.md",
+        "B:backup-regression/restore.md"
+      ],
+      "detalle_o_faltante": "Tres restauraciones en DB separada con esquema/conteos/checksums verificados."
+    },
+    {
+      "ac": "AC-60",
+      "escenario": "Misma historia y T producen misma cadena de suspensiones",
+      "evidencia_recomendada": "PostgreSQL/reloj",
+      "estado_tecnico": "PARCIAL",
+      "referencias": [
+        "J:SuspensionPlannerTest.boundary30DaysInclusiveAndSchedulingOrderIrrelevant",
+        "J:SuspensionPlannerTest.pendingBacklogMakesMultipleSeparateIntervalsAndDoesNotReuseDuringSuspension"
+      ],
+      "detalle_o_faltante": "Falta comparar cadena PG persistida frente a dos ejecuciones de mismo historial y T con orden tecnico distinto."
+    }
+  ]
+}

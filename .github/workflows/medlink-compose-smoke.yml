@@ -94,10 +94,20 @@ jobs:
         env:
           MEDLINK_UI_EPHEMERAL: '1'
           MEDLINK_DEMO_PASSWORD: Password123!
-          MEDLINK_UI_EVIDENCE_DIR: evidencias/ui_ci
+        shell: bash
         run: |
+          set -uo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/evidencias/ui_ci"
           cd frontend
-          MEDLINK_UI_EVIDENCE_DIR="$GITHUB_WORKSPACE/evidencias/ui_ci" node scripts/validar_ui.mjs --demo-ack
+          # Record the precise stage and failure. Do not turn a failing browser run green.
+          MEDLINK_UI_EVIDENCE_DIR="$GITHUB_WORKSPACE/evidencias/ui_ci" node scripts/validar_ui.mjs --demo-ack \
+            2>&1 | tee "$GITHUB_WORKSPACE/evidencias/ui_ci/playwright.log"
+          status=${PIPESTATUS[0]}
+          if [ ! -f "$GITHUB_WORKSPACE/evidencias/ui_ci/resultado_ui.json" ]; then
+            printf '{"status":"FAIL","reason":"Playwright did not finish its result artifact"}\n' \
+              > "$GITHUB_WORKSPACE/evidencias/ui_ci/resultado_ui.json"
+          fi
+          exit "$status"
       - name: Probar el calculo p95 antes de medir carga
         if: ${{ !cancelled() && steps.api_smoke.outcome == 'success' }}
         run: python3 -m unittest discover -s scripts/tests -p 'test_medir_p95.py' -v

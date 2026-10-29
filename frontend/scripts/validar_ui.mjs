@@ -63,7 +63,16 @@ const visitRoles = async (browser, name) => {
       await page.getByRole('textbox', {name: 'Correo electrónico'}).fill(correo);
       await page.locator('input[type=password]').fill(process.env.MEDLINK_DEMO_PASSWORD);
       await page.getByRole('button', {name: /Ingresar a mi cuenta/}).click();
-      await page.waitForURL(/\/panel$/, {timeout: 15000});
+      try {
+        await page.waitForURL(/\/panel$/, {timeout: 15000});
+      } catch (error) {
+        const pathNow = new URL(page.url()).pathname;
+        const loginErrorVisible = await page.getByRole('alert').isVisible().catch(() => false);
+        const meCodes = meStatuses.slice(-4).join(',') || 'sin respuesta';
+        throw new Error(`${rol}/login: no llego a /panel; ruta=${pathNow}; ` +
+          `alertaVisible=${loginErrorVisible}; statusApiMe=${meCodes}; ` +
+          `causa=${error?.name || 'error'}`);
+      }
       await waitForAuthenticatedApp(page, rol, 'login', meStatuses);
       await page.goto(`${URL}${own}`);
       await waitForAuthenticatedApp(page, rol, 'navegacion-propia', meStatuses);
@@ -104,6 +113,9 @@ try {
           console.log(`PASS AC-48 ${name} ${width}px: catalogo->presentacion->disponibilidad->refresh->ingresar`);
         } finally {await context.close();}
       }
+      result.browsers[name].publicFinished = true;
+      await fs.writeFile(path.join(reportDir, 'progreso_ui.json'), JSON.stringify(result, null, 2) + '\n');
+      console.log(`INFO ${name}: rutas publicas comprobadas; iniciar controles autenticados`);
       await visitRoles(browser, name);
       result.browsers[name].checks.push('roles USUARIO/OPERADOR/ADMINISTRADOR: PASS');
       console.log(`PASS RNF UI ${name}: tres roles, refresh, acceso y logout`);
