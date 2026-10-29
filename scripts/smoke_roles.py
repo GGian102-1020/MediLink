@@ -311,6 +311,66 @@ def run(base: str, password: str) -> None:
         raise SmokeFailure("Stock no recuperado tras idempotencia concurrente")
     pass_step("Dos POST simultaneos misma clave, una sola reserva (AC-42)")
 
+    # AC-43: a rejected POST never reserves the key. Reusing it for a valid
+    # request must succeed (the earlier error does not create IdempotencyRecord).
+    fresh_key = str(uuid.uuid4())
+    pre_rejected = stock(3)
+    api.expect("POST", "/api/reservas", 409, user,
+               {"farmaciaId": 1, "presentacionId": 3, "cantidad": pre_rejected + 1},
+               fresh_key, error="INSUFFICIENT_STOCK")
+    if stock(3) != pre_rejected:
+        raise SmokeFailure("POST rechazado altero stock")
+    retried = api.expect("POST", "/api/reservas", 201, user,
+                         {"farmaciaId": 1, "presentacionId": 3, "cantidad": 1}, fresh_key)
+    if stock(3) != pre_rejected - 1:
+        raise SmokeFailure("Clave tras error no creo una sola reserva")
+    api.expect("POST", f"/api/reservas/{retried['codigoVisible']}/cancelacion", 200, user)
+    if stock(3) != pre_rejected:
+        raise SmokeFailure("Reserva recuperada tras error no restituyo saldo")
+    pass_step("Error previo no consume la clave idempotente (AC-43)")
+
+    # AC-19: a successfully confirmed Rx must remain valid if the prescription
+    # is annulled later. The cancellation above cleared its commitment.
+    rx_before_annulment = stock(11)
+    authorized = api.expect("POST", "/api/reservas", 201, user,
+                            {"farmaciaId": 1, "presentacionId": 11, "cantidad": 1,
+                             "codigoPrescripcion": "RX-2026-000008"}, str(uuid.uuid4()))
+    annulled = api.expect("POST", "/api/admin/prescripciones/8/anulacion", 200, admin,
+                           {"motivo": "Verificacion AC-19 en base efimera"})
+    if annulled.get("estado") != "ANULADA":
+        raise SmokeFailure("Anulacion no cambio estado de receta")
+    filled = api.expect("POST", f"/api/farmacias/1/reservas/{authorized['codigoVisible']}/retiro",
+                        200, op1)
+    if filled.get("estado") != "COMPLETADA" or stock(11) != rx_before_annulment - 1:
+        raise SmokeFailure("Retiro de Rx ya confirmada fue invalidado o descuento stock doble")
+    pass_step("Receta anulada posteriormente no invalida retiro confirmado (parcial AC-19)")
+
+    # AC-45: medication names are explicitly not globally unique.
+    duplicate = api.expect("POST", "/api/admin/medicamentos", 201, admin,
+                           {"nombre": "Ibuprofeno"})
+    if duplicate.get("nombre") != "Ibuprofeno" or duplicate.get("id") == 1:
+        raise SmokeFailure("Nombre duplicado de Medicamento no admitido correctamente")
+    pass_step("Nombre de medicamento no unico (AC-45)")
+
+    # AC-53: administrative user listing does not disclose credentials, JWT,
+    # hashes, versions or other session secrets, including nested structures.
+    administrative_users = api.expect("GET", "/api/admin/usuarios?size=100", 200, admin)
+    if not isinstance(administrative_users, dict) or not administrative_users.get("content"):
+        raise SmokeFailure("Listado administrativo de usuarios vacio")
+    banned = {"passwordhash", "contrasena", "password", "jwt", "accesstoken",
+              "tokenversion", "jti", "secret", "sesionesrevocadas"}
+    def assert_no_secrets(value: object) -> None:
+        if isinstance(value, dict):
+            for field, inner in value.items():
+                if str(field).casefold() in banned:
+                    raise SmokeFailure("Campo de autenticacion expuesto en administracion")
+                assert_no_secrets(inner)
+        elif isinstance(value, list):
+            for element in value:
+                assert_no_secrets(element)
+    assert_no_secrets(administrative_users)
+    pass_step("Consulta de usuarios administrativos sin secretos (parcial AC-53)")
+
     api.expect("POST", "/api/auth/logout", 204, user)
     api.expect("GET", "/api/me", 401, user, error="INVALID_TOKEN")
     pass_step("Logout invalida token (parcial AC-24)")

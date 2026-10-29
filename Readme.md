@@ -143,3 +143,12 @@ El PDF maestro v1.4.3 sigue siendo la única autoridad funcional, no estos READM
 Para integrar los cambios de cierre, trabajá en **`fix/cierre-mvp-v1.4.3` creada desde `feature/frontend-mvp-v1.4.3`** y aplicá los parches en el orden documentado en [docs/GUIA_GITHUB_DESKTOP_PARCHES.md](docs/GUIA_GITHUB_DESKTOP_PARCHES.md). **No sustituyas un repositorio existente por un ZIP completo** y no elimines `.git`.
 
 Las pruebas deben aprobar en el commit candidato (Java con PostgreSQL real, frontend y smoke Docker Compose). La matriz de [AC-01..AC-60](docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md) es un registro de verificaciones: un test escrito no equivale a un PASS si no se ha ejecutado. **No se ha certificado el cierre funcional del MVP en este parche.**
+
+### Registro y seguimiento de la validacion v1.4.3
+
+- [Registro de los workflows exitosos del 29/10/2026 y alcances](docs/REGISTRO_VERIFICACION_CI_2026-10-29.md)
+- [Campana de validacion AC-01..AC-60 y evidencia faltante](docs/CI_INDICE_AC_Y_PLAN_CIERRE.md)
+- [Protocolo individual de los 60 AC](docs/PROTOCOLO_AC_01_60.md)
+- [Matriz normativa de aceptacion (no marcar PASS sin evidencia)](docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md)
+
+Las dos workflows PostgreSQL/HTTPS generan artifacts de indice por AC (`indice_ac.md` / `indice_ac.json`) para el SHA del run. El indice solo indica **evidencia automatizada parcial**, no certifica los 60 AC. La rama `fix/cierre-mvp-v1.4.3` puede validarse sin Docker local y no se fusiona automaticamente a `main`.

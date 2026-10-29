@@ -1,0 +1,96 @@
+"""Contract tests for the AC evidence index: never infer normative acceptance."""
+import tempfile
+import unittest
+from pathlib import Path
+from xml.etree.ElementTree import Element, SubElement, ElementTree
+
+from scripts.reportar_evidencia_ac import (API_STEP_LABELS, SOURCES, find_api_steps,
+                                           junit_results, make_report, parse_matrix, R)
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+class AcceptanceEvidenceTests(unittest.TestCase):
+    def test_matrix_contains_exactly_sixty_normative_ids(self):
+        rows = parse_matrix(ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md')
+        self.assertEqual([n for n, _, _ in rows], list(range(1, 61)))
+        self.assertTrue(all(item[1] and item[2] for item in rows))
+
+    def test_every_mapped_api_step_has_stable_description(self):
+        smoke_source = (ROOT / 'scripts/smoke_roles.py').read_text(encoding='utf-8')
+        lines = [line.strip() for line in smoke_source.splitlines()
+                 if line.strip().startswith('pass_step("')]
+        self.assertEqual(len(lines), 20, 'Actualizar el mapeo AC si se agrega un escenario')
+        for num, expected in API_STEP_LABELS.items():
+            self.assertIn(expected, lines[num - 1], f'Paso API {num} apunta a otro escenario')
+        for refs in SOURCES.values():
+            for kind, key in refs:
+                if kind == 'api':
+                    self.assertIn(key, API_STEP_LABELS)
+
+    def test_pg_method_names_really_exist_in_source(self):
+        root = ROOT / 'backend/src/test/java'
+        all_methods = ''.join(path.read_text(encoding='utf-8')
+                              for path in root.rglob('*.java'))
+        for refs in SOURCES.values():
+            for kind, selector in refs:
+                if kind == 'pg':
+                    self.assertIn(f'void {selector.rsplit(".", 1)[-1]}(', all_methods)
+
+    def test_partial_or_missing_logs_never_count_as_pass(self):
+        self.assertEqual(find_api_steps('PASS 01: Visitante: catalogo y disponibilidad\n'), {})
+        self.assertEqual(find_api_steps('PASS: 20 escenarios de recorrido API; NO certifica AC-01..AC-60\n'), {})
+        with tempfile.TemporaryDirectory() as folder:
+            info = make_report(ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md',
+                               Path(folder) / 'absent', None, 'FAKE')
+            self.assertEqual(info['con_evidencia_parcial'], 0)
+            self.assertEqual(info['ac_verificados_completamente'], 0)
+            self.assertTrue(all(x['aceptacion_normativa'] == 'PENDIENTE' for x in info['criterios']))
+
+    def test_successful_xml_counts_only_exact_methods_and_excludes_skips(self):
+        with tempfile.TemporaryDirectory() as folder:
+            d = Path(folder)
+            xml = Element('testsuite', {'tests': '2', 'failures': '0', 'errors': '0', 'skipped': '1'})
+            SubElement(xml, 'testcase', {'classname': R[:-1], 'name': 'concurrentLastStockUnitIsNeverOversold'})
+            skipped = SubElement(xml, 'testcase', {'classname': R[:-1], 'name': 'failedReservationDoesNotConsumeIdempotencyKey'})
+            SubElement(skipped, 'skipped')
+            ElementTree(xml).write(d / 'TEST-any.xml', encoding='utf-8')
+            seen = junit_results(d)
+            self.assertTrue(seen[R + 'concurrentLastStockUnitIsNeverOversold'])
+            self.assertFalse(seen[R + 'failedReservationDoesNotConsumeIdempotencyKey'])
+            info = make_report(ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md', d, None, 'FAKE')
+            self.assertTrue(info['criterios'][0]['evidencia_automatizada'])
+            self.assertFalse(info['criterios'][42]['evidencia_automatizada'])
+            self.assertEqual(info['ac_verificados_completamente'], 0)
+
+    def test_backup_requires_two_explicit_successful_restorations(self):
+        with tempfile.TemporaryDirectory() as folder:
+            d = Path(folder)
+            a, b = d / 'backup_ci.md', d / 'backup_ci_flyway.md'
+            a.write_text('Resultado: PASS (esquema, conteos y checksums coinciden).', encoding='utf-8')
+            b.write_text('Resultado: FAIL', encoding='utf-8')
+            matrix = ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md'
+            no = make_report(matrix, None, None, 'FAKE', [a, b])
+            self.assertFalse(no['criterios'][58]['evidencia_automatizada'])
+            b.write_text('Resultado: PASS (esquema, conteos y checksums coinciden).', encoding='utf-8')
+            yes = make_report(matrix, None, None, 'FAKE', [a, b])
+            self.assertTrue(yes['criterios'][58]['evidencia_automatizada'])
+            self.assertEqual(yes['criterios'][58]['aceptacion_normativa'], 'PENDIENTE')
+
+    def test_api_requires_real_final_marker_and_matching_step_label(self):
+        lines = [f'PASS {i:02d}: {API_STEP_LABELS.get(i, "Otro escenario")}' for i in range(1, 21)]
+        log_text = '\n'.join(lines + ['PASS: 20 escenarios de recorrido API; NO certifica AC-01..AC-60'])
+        self.assertEqual(len(find_api_steps(log_text)), 20)
+        with tempfile.TemporaryDirectory() as folder:
+            p = Path(folder) / 'api.log'
+            p.write_text(log_text, encoding='utf-8')
+            info = make_report(ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md', None, p, 'FAKE')
+            self.assertTrue(info['criterios'][42]['evidencia_automatizada'])
+            self.assertEqual(info['ac_verificados_completamente'], 0)
+            p.write_text(log_text.replace('PASS 16: Error previo', 'PASS 16: Error equivocado'), encoding='utf-8')
+            info = make_report(ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md', None, p, 'FAKE')
+            self.assertFalse(info['criterios'][42]['evidencia_automatizada'])
+
+
+if __name__ == '__main__':
+    unittest.main()

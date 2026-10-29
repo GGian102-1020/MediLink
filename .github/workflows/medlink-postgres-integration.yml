@@ -67,6 +67,9 @@ jobs:
       - name: Assert PostgreSQL and full suite tests actually ran and passed
         run: python3 scripts/verificar_tests_postgres.py
 
+      - name: Probar generador de indice de evidencias AC
+        run: python3 -m unittest discover -s scripts/tests -p 'test_reportar_evidencia_ac.py' -v
+
       - name: Regress PostgreSQL temporary-server readiness and real restoration
         shell: pwsh
         run: >-
@@ -89,6 +92,15 @@ jobs:
           -BackupPath '${{ runner.temp }}/medlink-ci-flyway.dump'
           -EvidencePath './evidencias/backup_ci_flyway.md'
 
+      - name: Generar indice AC desde las pruebas reales PostgreSQL
+        shell: bash
+        run: |
+          python3 scripts/reportar_evidencia_ac.py \
+            --reports backend/target/surefire-reports \
+            --backup-evidence evidencias/backup_ci.md evidencias/backup_ci_flyway.md \
+            --sha "$GITHUB_SHA" --out-dir evidencias/indice_ac_postgres
+          head -n 10 evidencias/indice_ac_postgres/indice_ac.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Preserve test results for diagnosis
         if: always()
         uses: actions/upload-artifact@v7
@@ -97,6 +109,7 @@ jobs:
           path: |
             backend/target/surefire-reports/
             evidencias/backup_ci*.md
+            evidencias/indice_ac_postgres/
             ${{ runner.temp }}/backup-regression/*.md
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 90
