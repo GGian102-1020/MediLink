@@ -17,6 +17,8 @@ on:
       - 'scripts/smoke_roles.py'
       - 'scripts/tests/test_smoke_roles_contract.py'
       - 'scripts/reportar_evidencia_ac.py'
+      - 'scripts/medir_p95.py'
+      - 'scripts/tests/test_medir_p95.py'
       - 'scripts/tests/test_reportar_evidencia_ac.py'
       - 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md'
       - '.github/workflows/medlink-compose-smoke.yml'
@@ -33,7 +35,7 @@ jobs:
   compose-smoke:
     name: Docker Compose + Flyway + React + API (HTTPS)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,11 +77,39 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/smoke_roles.py --demo-ack SEED_DEMO_EFIMERO | tee "$RUNNER_TEMP/medlink_smoke_roles.log"
+      - name: Preparar Node 22 para la prueba de navegador
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar Playwright para navegador real (Chromium y Firefox)
+        run: |
+          npm ci --prefix frontend --no-audit --no-fund
+          npm install --prefix frontend --no-save --package-lock=false --no-audit --no-fund playwright@1.56.1
+          cd frontend
+          npx playwright install --with-deps chromium firefox
+      - name: Navegar React, roles y responsive en navegadores reales (AC-48)
+        env:
+          MEDLINK_UI_EPHEMERAL: '1'
+          MEDLINK_DEMO_PASSWORD: Password123!
+          MEDLINK_UI_EVIDENCE_DIR: evidencias/ui_ci
+        run: |
+          cd frontend
+          MEDLINK_UI_EVIDENCE_DIR="$GITHUB_WORKSPACE/evidencias/ui_ci" node scripts/validar_ui.mjs --demo-ack
+      - name: Probar el calculo p95 antes de medir carga
+        run: python3 -m unittest discover -s scripts/tests -p 'test_medir_p95.py' -v
+      - name: Medir RNF-11 en base efimera y conservar hardware y dataset
+        env:
+          MEDLINK_PERF_EPHEMERAL: '1'
+          MEDLINK_DEMO_PASSWORD: Password123!
+        run: |
+          python3 -m scripts.medir_p95 --demo-ack SEED_DEMO_EFIMERO --iterations 25 --workers 4 \
+            --out evidencias/perf_ci/resultado_p95.json
       - name: Registrar evidencias AC de los recorridos
         shell: bash
         run: |
           python3 scripts/reportar_evidencia_ac.py \
             --api-log "$RUNNER_TEMP/medlink_smoke_roles.log" \
+            --ui-evidence evidencias/ui_ci/resultado_ui.json \
             --sha "$GITHUB_SHA" --out-dir evidencias/indice_ac_e2e
           head -n 10 evidencias/indice_ac_e2e/indice_ac.md >> "$GITHUB_STEP_SUMMARY"
       - name: Diagnostico (sin secretos)
@@ -92,6 +122,8 @@ jobs:
           name: medlink-ac-e2e-evidencia
           path: |
             evidencias/indice_ac_e2e/
+            evidencias/ui_ci/
+            evidencias/perf_ci/
             ${{ runner.temp }}/medlink_smoke_roles.log
           if-no-files-found: warn
           retention-days: 90

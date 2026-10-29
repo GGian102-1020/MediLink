@@ -59,6 +59,8 @@ SOURCES = {
     28: [("pg", R + "adminCannotCompleteButCanCancelOperativelyWithoutRestitution"), ("api", 11)],
     29: [("pg", R + "prescriptionCommitCancellationAndCompletionConserveAuthorizedQuantity"), ("api", 13)],
     30: [("pg", S + "stockRestHistoryIsPaginatedFilteredAndOrderedAndRejectsNegative"), ("api", 12)],
+    31: [("pg", R + "ac31ConcurrentReservationAndUserDeactivationAreAtomic")],
+    32: [("pg", R + "ac32ConcurrentReservationCannotDisableLastOperationalOperator")],
     33: [("pg", R + "createIsAtomicAndProducesMovementAndSnapshots"), ("api", 10)],
     34: [("pg", S + "absoluteAdjustmentPersistsMovementAuditAndRealTimestamp"), ("api", 14)],
     35: [("pg", C + "activeDuplicateAndStateTransitionsDoNotErasePresentationOrAudit")],
@@ -66,12 +68,17 @@ SOURCES = {
     37: [("unit", D + "pendingBacklogMakesMultipleSeparateIntervalsAndDoesNotReuseDuringSuspension")],
     38: [("pg", S + "expiredReservationIsReleasedExactlyOnceBeforeAbsoluteCount")],
     39: [("pg", R + "inconsistentStockCorrectionRespectsPendingExpiry")],
+    40: [("pg", R + "ac40ConcurrentPrescriptionAnnulmentAndReservationSerialize")],
+    41: [("pg", R + "ac41ConcurrentPharmacyDeactivationAndReservationAreCompatible"),
+         ("pg", R + "ac41ConcurrentMedicationDeactivationAndReservationAreCompatible"),
+         ("pg", R + "ac41ConcurrentPresentationDeactivationAndReservationAreCompatible")],
     42: [("pg", R + "concurrentSameIdempotencyKeyCreatesExactlyOneReservation"), ("api", 15)],
     43: [("pg", R + "failedReservationDoesNotConsumeIdempotencyKey"), ("api", 16)],
     44: [("pg", R + "expiredReservationIsEffectiveBeforeMaterializationAndReleaseIsOnce")],
     45: [("api", 18)],
     46: [("pg", S + "realJwtRolesScopesAndInactivePharmacyRules")],
     47: [("pg", R + "visibilityIsRestrictedByUserAndOperatorScope"), ("api", 6)],
+    48: [("ui", "AC-48 navegador real catalogo a disponibilidad")],
     49: [("pg", R + "globalLimitIsCountedAcrossDifferentPresentations")],
     50: [("pg", S + "deactivationUsesFunctionalExpiryAndReactivationPreservesStock")],
     51: [("unit", D + "boundary30DaysInclusiveAndSchedulingOrderIrrelevant"),
@@ -79,6 +86,7 @@ SOURCES = {
     52: [("api", 11)],
     53: [("api", 19)],
     54: [("unit", D + "pendingBacklogMakesMultipleSeparateIntervalsAndDoesNotReuseDuringSuspension")],
+    55: [("pg", R + "ac55ReactivatingAccountPreservesCurrentSuspension")],
     56: [("pg", A + "relatedUserNeverMeansActorAccount")],
     57: [("pg", R + "operationalCancellationRequiresStructuredRestitutionChoice")],
     58: [("pg", R + "ownCancellationReleasesExactlyOnceAndHasNoSuspension"), ("api", 12)],
@@ -150,10 +158,29 @@ def parse_matrix(path: Path) -> list[tuple[int, str, str]]:
     return rows
 
 
+def ui_evidence_valid(path: Path | None, sha: str) -> bool:
+    if not path or not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return (data.get("schema") == 1 and data.get("ac") == "AC-48"
+                and data.get("status") == "PASS" and data.get("sha") == sha
+                and data.get("base") == "https://127.0.0.1:8443"
+                and data.get("widths") == [360, 390, 768, 1440]
+                and not data.get("failures")
+                and all(isinstance(data.get("browsers", {}).get(browser, {}).get("version"), str)
+                        and data["browsers"][browser]["version"]
+                        and len(data["browsers"][browser].get("checks", [])) == 5
+                        for browser in ("chromium", "firefox")))
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return False
+
+
 def make_report(matrix: Path, reports: Path | None, log: Path | None, sha: str,
-                backups: list[Path] | None = None) -> dict:
+                backups: list[Path] | None = None, ui_evidence: Path | None = None) -> dict:
     junit = junit_results(reports)
     api_steps = find_api_steps(log.read_text(encoding="utf-8") if log and log.exists() else "")
+    ui_ok = ui_evidence_valid(ui_evidence, sha)
     backup_ok = bool(backups) and len(backups) == 2 and all(
         file.exists() and "Resultado: PASS" in file.read_text(encoding="utf-8") for file in backups)
     entries = []
@@ -162,6 +189,8 @@ def make_report(matrix: Path, reports: Path | None, log: Path | None, sha: str,
         for kind, selector in SOURCES.get(number, []):
             if kind in {"pg", "unit"} and junit.get(selector) is True:
                 found.append({"tipo": "PostgreSQL JUnit" if kind == "pg" else "JUnit unitario", "referencia": selector})
+            if kind == "ui" and ui_ok:
+                found.append({"tipo": "Navegador real Chromium+Firefox", "referencia": str(selector)})
             if kind == "backup" and backup_ok:
                 found.append({"tipo": "Restauracion CI", "referencia": selector})
             if kind == "api":
@@ -205,12 +234,13 @@ def main(argv=None):
     parser.add_argument("--matrix", default="docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md", type=Path)
     parser.add_argument("--reports", type=Path)
     parser.add_argument("--api-log", type=Path)
+    parser.add_argument("--ui-evidence", type=Path)
     parser.add_argument("--sha", default="NO_DECLARADO")
     parser.add_argument("--backup-evidence", type=Path, nargs=2)
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        data = make_report(args.matrix, args.reports, args.api_log, args.sha, args.backup_evidence)
+        data = make_report(args.matrix, args.reports, args.api_log, args.sha, args.backup_evidence, args.ui_evidence)
         args.out_dir.mkdir(parents=True, exist_ok=True)
         (args.out_dir / "indice_ac.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         (args.out_dir / "indice_ac.md").write_text(markdown(data), encoding="utf-8")

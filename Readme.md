@@ -152,3 +152,7 @@ Las pruebas deben aprobar en el commit candidato (Java con PostgreSQL real, fron
 - [Matriz normativa de aceptacion (no marcar PASS sin evidencia)](docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md)
 
 Las dos workflows PostgreSQL/HTTPS generan artifacts de indice por AC (`indice_ac.md` / `indice_ac.json`) para el SHA del run. El indice solo indica **evidencia automatizada parcial**, no certifica los 60 AC. La rama `fix/cierre-mvp-v1.4.3` puede validarse sin Docker local y no se fusiona automaticamente a `main`.
+
+### Validación dirigida de los seis AC sin correlación previa y p95
+
+Las pruebas nuevas en GitHub Actions para AC-31, AC-32, AC-40, AC-41, AC-48 y AC-55, la navegación real Chromium/Firefox, la referencia p95 y la interpretación rigurosa de sus evidencias están documentadas en [CI_AC_31_32_40_41_48_55_RNF11_2026-10-29.md](docs/CI_AC_31_32_40_41_48_55_RNF11_2026-10-29.md). **No equivalen a cierre normativo automático ni requieren Docker Desktop en el equipo local.**

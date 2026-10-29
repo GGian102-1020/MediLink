@@ -51,3 +51,9 @@ Estos seis no tienen todavia una referencia automatizada individual en el indice
 ## Precauciones
 
 Nunca ejecutar `scripts/smoke_roles.py` ni las pruebas destructivas contra una base real, persistente o compartida. No versionar `.env`, JWT, dumps, contraseñas ni resultados que contengan datos personales. No hacer merge ni borrar volúmenes para forzar un PASS.
+
+## Ampliación dirigida en la siguiente entrega
+
+Las seis filas originalmente sin fuente individual (AC-31/32/40/41/48/55) ahora cuentan con **pruebas candidatas** (transacciones PostgreSQL reales y navegador real). No convertirlas en PASS antes de que Actions las ejecute en el SHA exacto. La prueba AC-41 abarca Farmacia, Medicamento y Presentación. El índice se alimenta de JUnit y `resultado_ui.json`; las pruebas ausentes, fallidas o omitidas no cuentan como evidencia.
+
+Se agrega la medición reproducible de p95 para RNF-11 en la base de demostración, con JSON de carga y hardware. Consultar [documento de cierre dirigido](CI_AC_31_32_40_41_48_55_RNF11_2026-10-29.md) para alcance, límites y artifacts.

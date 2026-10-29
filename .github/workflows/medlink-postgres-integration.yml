@@ -70,6 +70,9 @@ jobs:
       - name: Probar generador de indice de evidencias AC
         run: python3 -m unittest discover -s scripts/tests -p 'test_reportar_evidencia_ac.py' -v
 
+      - name: Probar contrato de p95
+        run: python3 -m unittest discover -s scripts/tests -p 'test_medir_p95.py' -v
+
       - name: Regress PostgreSQL temporary-server readiness and real restoration
         shell: pwsh
         run: >-

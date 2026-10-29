@@ -1,6 +1,12 @@
 package ar.edu.uade.medlink.reserva;
 
 import ar.edu.uade.medlink.auth.AccountRepository;
+import ar.edu.uade.medlink.admin.AdministrationService;
+import ar.edu.uade.medlink.farmacia.service.FarmaciaService;
+import ar.edu.uade.medlink.medicamento.service.MedicamentoService;
+import ar.edu.uade.medlink.presentacion.service.PresentacionService;
+import ar.edu.uade.medlink.prescripcion.service.PrescripcionService;
+import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.reserva.dto.*;
 import ar.edu.uade.medlink.reserva.service.ReservaService;
 import ar.edu.uade.medlink.security.CurrentAccount;
@@ -51,6 +57,11 @@ class ReservasPostgresTest {
     @TestConfiguration static class FixedTime {
         @Bean @Primary Clock clockForReservations() { return Clock.fixed(T,ZoneOffset.UTC); }
     }
+    @Autowired AdministrationService administration;
+    @Autowired FarmaciaService pharmacies;
+    @Autowired MedicamentoService medicines;
+    @Autowired PresentacionService presentations;
+    @Autowired PrescripcionService prescriptionsAdmin;
     @Autowired JdbcTemplate db;
     @Autowired AccountRepository accounts;
     @Autowired ReservaService reservations;
@@ -387,5 +398,130 @@ class ReservasPostgresTest {
         assertEquals(0,count("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_item_prescripcion=?",rx.item()));
         assertEquals(1,count("SELECT count(*) FROM movimiento_stock WHERE id_reserva=? AND tipo='VENCIMIENTO'",reservation));
         assertEquals("VENCIDA",db.queryForObject("SELECT estado_persistido::text FROM reserva WHERE id_reserva=?",String.class,reservation));
+    }
+
+    /** Two independent Spring transactions start together; assertions inspect committed PostgreSQL state. */
+    private List<String> concurrent(Callable<String> first, Callable<String> second) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Callable<String> a = () -> { start.await(); return first.call(); };
+            Callable<String> b = () -> { start.await(); return second.call(); };
+            Future<String> fa = executor.submit(a);
+            Future<String> fb = executor.submit(b);
+            start.countDown();
+            return List.of(fa.get(30, TimeUnit.SECONDS), fb.get(30, TimeUnit.SECONDS));
+        } finally { executor.shutdownNow(); }
+    }
+    private String attempt(Callable<?> operation) throws Exception {
+        try { operation.call(); return "OK"; }
+        catch (ApiException error) { return error.codigo(); }
+    }
+
+    @Test void ac31ConcurrentReservationAndUserDeactivationAreAtomic() throws Exception {
+        List<String> results = concurrent(
+            () -> attempt(() -> reservations.crear(cmd(1), key(), f.userActor(), null)),
+            () -> attempt(() -> administration.changeState(f.account(), false, "Cierre AC31", f.adminActor(), null)));
+        assertEquals("OK", results.get(1), "La deshabilitación debe concluir y liberar recursos");
+        assertTrue(Set.of("OK", "ACCOUNT_DISABLED").contains(results.get(0)), results.toString());
+        assertEquals("DESHABILITADA", db.queryForObject("SELECT estado::text FROM cuenta WHERE id_cuenta=?", String.class, f.account()));
+        assertEquals(0, count("SELECT count(*) FROM reserva WHERE id_usuario=? AND estado_persistido='ACTIVA'", f.user()));
+        assertEquals(10, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", f.stock()));
+        if ("OK".equals(results.get(0))) {
+            assertEquals(1, count("SELECT count(*) FROM reserva WHERE id_usuario=? AND estado_persistido='CANCELADA' " +
+                "AND origen_cancelacion='SISTEMA' AND causa_cancelacion='CUENTA_DESHABILITADA'", f.user()));
+            assertEquals(1, count("SELECT count(*) FROM movimiento_stock m JOIN reserva r ON r.id_reserva=m.id_reserva " +
+                "WHERE r.id_usuario=? AND m.tipo='CANCELACION_RESTITUCION'", f.user()));
+        }
+    }
+
+    @Test void ac32ConcurrentReservationCannotDisableLastOperationalOperator() throws Exception {
+        List<String> results = concurrent(
+            () -> attempt(() -> reservations.crear(cmd(1), key(), f.userActor(), null)),
+            () -> attempt(() -> administration.changeState(f.operator(), false, "Cierre AC32", f.adminActor(), null)));
+        assertEquals("OK", results.get(0), results.toString());
+        assertEquals("LAST_OPERATIONAL_OPERATOR", results.get(1));
+        assertEquals("ACTIVA", db.queryForObject("SELECT estado::text FROM cuenta WHERE id_cuenta=?", String.class, f.operator()));
+        assertEquals("ACTIVA", db.queryForObject("SELECT estado::text FROM farmacia WHERE id_farmacia=?", String.class, f.pharmacy()));
+        assertEquals(1, count("SELECT count(*) FROM reserva WHERE id_usuario=? AND estado_persistido='ACTIVA'", f.user()));
+        assertEquals(9, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", f.stock()));
+    }
+
+    @Test void ac40ConcurrentPrescriptionAnnulmentAndReservationSerialize() throws Exception {
+        RxFixture rx = rx(1);
+        List<String> results = concurrent(
+            () -> attempt(() -> reservations.crear(rxCmd(rx, 1), key(), f.userActor(), null)),
+            () -> attempt(() -> prescriptionsAdmin.anular(rx.prescription(), "Anulación AC40", f.adminActor(), null)));
+        assertTrue(Set.of("OK", "PRESCRIPTION_INVALID").contains(results.get(0)), results.toString());
+        assertEquals("OK", results.get(1), results.toString());
+        assertEquals("ANULADA", db.queryForObject("SELECT estado::text FROM prescripcion WHERE id_prescripcion=?", String.class, rx.prescription()));
+        int total = count("SELECT count(*) FROM reserva WHERE id_item_prescripcion=?", rx.item());
+        int committed = count("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_item_prescripcion=?", rx.item());
+        int used = count("SELECT cantidad_utilizada FROM item_prescripcion WHERE id_item_prescripcion=?", rx.item());
+        assertTrue(committed >= 0 && used >= 0 && committed + used <= 1);
+        assertEquals("OK".equals(results.get(0)) ? 1 : 0, total);
+        assertEquals(total, committed);
+        assertEquals(10 - total, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", rx.stock()));
+        if (total == 1) {
+            String code = db.queryForObject("SELECT codigo_visible FROM reserva WHERE id_item_prescripcion=?", String.class, rx.item());
+            assertEquals("COMPLETADA", reservations.retirar(f.pharmacy(), code, f.operatorActor(), null).dto().estado());
+            assertEquals(0, count("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_item_prescripcion=?", rx.item()));
+            assertEquals(1, count("SELECT cantidad_utilizada FROM item_prescripcion WHERE id_item_prescripcion=?", rx.item()));
+        }
+    }
+
+    @Test void ac41ConcurrentPharmacyDeactivationAndReservationAreCompatible() throws Exception {
+        List<String> results = concurrent(
+            () -> attempt(() -> reservations.crear(cmd(1), key(), f.userActor(), null)),
+            () -> attempt(() -> pharmacies.cambiarEstado(f.pharmacy(), false, "Cierre AC41", f.adminActor(), null)));
+        assertTrue(Set.of("OK", "PHARMACY_INACTIVE").contains(results.get(0)), results.toString());
+        assertTrue(Set.of("OK", "PHARMACY_HAS_ACTIVE_RESERVATIONS").contains(results.get(1)), results.toString());
+        int active = count("SELECT count(*) FROM reserva WHERE id_usuario=? AND estado_persistido='ACTIVA'", f.user());
+        assertEquals("OK".equals(results.get(0)) ? 1 : 0, active);
+        assertEquals(active == 1 ? "ACTIVA" : "INACTIVA",
+            db.queryForObject("SELECT estado::text FROM farmacia WHERE id_farmacia=?", String.class, f.pharmacy()));
+        assertEquals(10 - active, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", f.stock()));
+        assertEquals(active == 1 ? "PHARMACY_HAS_ACTIVE_RESERVATIONS" : "OK", results.get(1));
+    }
+
+    @Test void ac55ReactivatingAccountPreservesCurrentSuspension() {
+        Instant from = T.minus(Duration.ofDays(1));
+        Instant until = from.plus(Duration.ofDays(7));
+        long suspensionId = create("INSERT INTO suspension(id_usuario,fecha_hora_inicio,fecha_hora_fin,motivo) " +
+            "VALUES (?,?,?,'INCUMPLIMIENTOS_REITERADOS') RETURNING id_suspension", f.user(), ts(from), ts(until));
+        administration.changeState(f.account(), false, "Deshabilitación AC55", f.adminActor(), null);
+        administration.changeState(f.account(), true, "Reactivación AC55", f.adminActor(), null);
+        assertEquals("ACTIVA", db.queryForObject("SELECT estado::text FROM cuenta WHERE id_cuenta=?", String.class, f.account()));
+        assertEquals(1, count("SELECT count(*) FROM suspension WHERE id_suspension=? AND id_usuario=? " +
+            "AND fecha_hora_inicio=? AND fecha_hora_fin=?", suspensionId, f.user(), ts(from), ts(until)));
+        var denied = reservations.crear(cmd(1), key(), f.userActor(), null);
+        assertTrue(denied.suspended(), "La suspensión vigente sigue impidiendo reservas nuevas");
+        assertNull(denied.dto());
+        assertEquals(10, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", f.stock()));
+        assertEquals(0, count("SELECT count(*) FROM idempotency_record WHERE id_cuenta=?", f.account()));
+    }
+
+    @Test void ac41ConcurrentMedicationDeactivationAndReservationAreCompatible() throws Exception {
+        List<String> results = concurrent(
+            () -> attempt(() -> reservations.crear(cmd(1), key(), f.userActor(), null)),
+            () -> attempt(() -> medicines.cambiarEstado(f.medicine(), false, "Desactivar medicamento AC41", f.adminActor(), null)));
+        assertTrue(Set.of("OK", "MEDICATION_INACTIVE").contains(results.get(0)), results.toString());
+        assertEquals("OK", results.get(1));
+        assertEquals("INACTIVO", db.queryForObject("SELECT estado::text FROM medicamento WHERE id_medicamento=?", String.class, f.medicine()));
+        int active = count("SELECT count(*) FROM reserva WHERE id_usuario=? AND estado_persistido='ACTIVA'", f.user());
+        assertEquals("OK".equals(results.get(0)) ? 1 : 0, active);
+        assertEquals(10 - active, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", f.stock()));
+    }
+
+    @Test void ac41ConcurrentPresentationDeactivationAndReservationAreCompatible() throws Exception {
+        List<String> results = concurrent(
+            () -> attempt(() -> reservations.crear(cmd(1), key(), f.userActor(), null)),
+            () -> attempt(() -> presentations.cambiarEstado(f.presentation(), false, "Desactivar presentación AC41", f.adminActor(), null)));
+        assertTrue(Set.of("OK", "PRESENTATION_INACTIVE").contains(results.get(0)), results.toString());
+        assertEquals("OK", results.get(1));
+        assertEquals("INACTIVA", db.queryForObject("SELECT estado::text FROM presentacion_medicamento WHERE id_presentacion=?", String.class, f.presentation()));
+        int active = count("SELECT count(*) FROM reserva WHERE id_usuario=? AND estado_persistido='ACTIVA'", f.user());
+        assertEquals("OK".equals(results.get(0)) ? 1 : 0, active);
+        assertEquals(10 - active, count("SELECT cantidad_disponible FROM stock WHERE id_stock=?", f.stock()));
     }
 }

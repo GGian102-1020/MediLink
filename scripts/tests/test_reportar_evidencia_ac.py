@@ -1,4 +1,5 @@
 """Contract tests for the AC evidence index: never infer normative acceptance."""
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,30 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class AcceptanceEvidenceTests(unittest.TestCase):
+    def test_ac_31_32_40_41_48_55_only_have_evidence_when_executed(self):
+        from scripts.reportar_evidencia_ac import ui_evidence_valid
+        missing = {31, 32, 40, 41, 48, 55}
+        self.assertTrue(all(x in SOURCES for x in missing))
+        with tempfile.TemporaryDirectory() as folder:
+            d = Path(folder)
+            matrix = ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md'
+            initial = make_report(matrix, d, None, 'SHA', ui_evidence=d/'no_ui.json')
+            self.assertTrue(all(not initial['criterios'][n-1]['evidencia_automatizada'] for n in missing))
+            record = d / 'resultado_ui.json'
+            valid = {'schema': 1, 'ac': 'AC-48', 'sha': 'SHA', 'status': 'PASS',
+                     'base': 'https://127.0.0.1:8443', 'widths': [360,390,768,1440],
+                     'failures': [], 'browsers': {b: {'version': '123', 'checks': ['ok']*5}
+                                               for b in ('chromium','firefox')}}
+            record.write_text(json.dumps(valid), encoding='utf-8')
+            self.assertTrue(ui_evidence_valid(record, 'SHA'))
+            self.assertFalse(ui_evidence_valid(record, 'DIFFERENT_SHA'))
+            yes = make_report(matrix, d, None, 'SHA', ui_evidence=record)
+            self.assertTrue(yes['criterios'][47]['evidencia_automatizada'])
+            self.assertEqual(0, yes['ac_verificados_completamente'])
+            valid['status'] = 'FAIL'
+            record.write_text(json.dumps(valid), encoding='utf-8')
+            self.assertFalse(ui_evidence_valid(record, 'SHA'))
+
     def test_matrix_contains_exactly_sixty_normative_ids(self):
         rows = parse_matrix(ROOT / 'docs/MATRIZ_ACEPTACION_MVP_v1.4.3.md')
         self.assertEqual([n for n, _, _ in rows], list(range(1, 61)))

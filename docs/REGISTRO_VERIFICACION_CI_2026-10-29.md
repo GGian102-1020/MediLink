@@ -57,3 +57,12 @@ En la rama `fix/cierre-mvp-v1.4.3`, sin PR ni merge:
 - RNF-11: p95 de lecturas <=1 s y transacciones <=2 s, con hardware, dataset, volumen y concurrencia documentados.
 - RNF-12 / AC-59: verificar al menos una restauracion en base separada, con contenido y esquema contrastados. El workflow proporciona evidencias, pero hay que conservarlas.
 - La rama no debe fusionarse con `main` durante esta campaña de validacion sin decision posterior del equipo.
+
+## Actualización de las ejecuciones posteriores (aportada por el equipo)
+
+| Commit | PostgreSQL | Despliegue HTTPS | Frontend | Estado de aceptación |
+|---|---|---|---|---|
+| `4dd252e` | #30 verde; XML 183/183 sin skips; dos restauraciones | #5 verde; 20/20 recorridos API | #7 verde | Evidencia parcial, NO AC 60/60 |
+| `86f07a8` | #31 verde | #6 verde | #8 verde | Parche documental 08 aplicado; ninguna aceptación normativa inferida |
+
+La revisión de los artifacts del SHA `4dd252e` se registra en `docs/REVISION_ARTIFACTS_CI_4dd252e_2026-10-29.md`. La captura compartida del SHA `86f07a8` confirma los tres checks verdes; no sustituye el examen de artifacts de las nuevas pruebas. Ver [guía del cierre dirigido](CI_AC_31_32_40_41_48_55_RNF11_2026-10-29.md) para los ensayos añadidos en la siguiente entrega.
