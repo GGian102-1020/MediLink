@@ -98,6 +98,24 @@ def find_stock(page: object, presentation: int) -> int:
     return matches[0]["cantidadDisponible"]
 
 
+def verify_foreign_operator_withdrawal_scope(api: Client, reservation_code: str,
+                                           reservation_pharmacy_id: int,
+                                           operator_pharmacy_id: int,
+                                           foreign_operator_token: str) -> None:
+    """Distinguish forbidden pharmacy access (403) from missing resource in scope (404).
+
+    AC-09: a pharmacy 2 operator cannot invoke pharmacy 1 endpoints (403).
+    A reservation from pharmacy 1 is not a resource of pharmacy 2 (404),
+    even if its non-secret code is known. Both calls must leave it unchanged.
+    """
+    if reservation_pharmacy_id == operator_pharmacy_id:
+        raise ValueError("El operador de ensayo debe pertenecer a otra farmacia")
+    api.expect("POST", f"/api/farmacias/{reservation_pharmacy_id}/reservas/{reservation_code}/retiro",
+               403, foreign_operator_token, error="FORBIDDEN")
+    api.expect("POST", f"/api/farmacias/{operator_pharmacy_id}/reservas/{reservation_code}/retiro",
+               404, foreign_operator_token, error="RESOURCE_NOT_FOUND")
+
+
 def run(base: str, password: str) -> None:
     api = Client(base)
     count = 0
@@ -204,7 +222,7 @@ def run(base: str, password: str) -> None:
     if dto["codigoVisible"] != code or dto["segundosRestantes"] <= 0:
         raise SmokeFailure("Reserva propia sin codigo/tiempo restante")
     api.expect("POST", f"/api/farmacias/1/reservas/{code}/retiro", 403, admin, error="FORBIDDEN")
-    api.expect("POST", f"/api/farmacias/2/reservas/{code}/retiro", 403, op2, error="FORBIDDEN")
+    verify_foreign_operator_withdrawal_scope(api, code, 1, 2, op2)
     completed = api.expect("POST", f"/api/farmacias/1/reservas/{code}/retiro", 200, op1)
     if completed["estado"] != "COMPLETADA" or stock(1) != pre - 1:
         raise SmokeFailure("Retiro no completo o altero stock")

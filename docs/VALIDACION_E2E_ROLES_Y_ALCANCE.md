@@ -11,6 +11,8 @@ El workflow **MediLink - Despliegue HTTPS y seed demo** crea una base PostgreSQL
 
 Los recorridos comprueban: busqueda y disponibilidad; autenticacion/roles; aislamiento por Farmacia; privacidad en DTO; ultimo Operador y desactivacion con reservas; Stock ausente y catalogo inactivo; limite OTC; crear Reserva, idempotencia secuencial y concurrente; ultima unidad de Stock entre dos Usuarios en paralelo; rechazo de clave reutilizada; retiro sin doble descuento; cancelacion y metadatos; traza de MovimientoStock; Reserva Rx con liberacion de Stock; logout y revocacion.
 
+**Distincion de autorizacion AC-09 / AC-28:** cuando un Operador de Farmacia 2 intenta retirar una Reserva de Farmacia 1 usando la ruta de Farmacia 1, se espera `403 FORBIDDEN` (no puede operar otra Farmacia). Si usa la ruta de su Farmacia 2 con el codigo de una Reserva de Farmacia 1, se espera `404 RESOURCE_NOT_FOUND` (esa Reserva no pertenece a la Farmacia de la ruta). Administrador no puede confirmar retiros: `403 FORBIDDEN`. Las tres negativas se verifican antes del retiro autorizado y no deben modificar la Reserva.
+
 **Precauciones:** el runner altera Stock y Reservas y utiliza credenciales ficticias conocidas. Solo se permite en HTTPS `localhost` o `127.0.0.1`, con puerto explicito, marcador de entorno efimero y confirmacion en la CLI. Nunca usar con bases persistentes, staging compartido, datos reales ni produccion. El seed de prueba NO es apropiado para una instalacion publica.
 
 ## Interpretacion honesta de resultados

@@ -2,9 +2,10 @@
 import io
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
-from scripts.smoke_roles import Client, Reply, SmokeFailure, check_base_url, find_stock
+from scripts.smoke_roles import (Client, Reply, SmokeFailure, check_base_url, find_stock,
+                                 verify_foreign_operator_withdrawal_scope)
 
 
 class SmokeRoleContractTests(unittest.TestCase):
@@ -31,6 +32,29 @@ class SmokeRoleContractTests(unittest.TestCase):
                      [{"presentacionId": 7, "cantidadDisponible": "5"}]):
             with self.subTest(rows=rows), self.assertRaises(SmokeFailure):
                 find_stock({"content": rows}, 7)
+
+    def test_retiro_ajeno_distingue_acceso_prohibido_de_recurso_fuera_de_farmacia(self):
+        client = Client("https://localhost:8443")
+        with patch.object(client, "request", side_effect=[
+            Reply(403, {"codigo": "FORBIDDEN"}),
+            Reply(404, {"codigo": "RESOURCE_NOT_FOUND"}),
+        ]) as request:
+            verify_foreign_operator_withdrawal_scope(client, "ABCD1234EFGH", 1, 2, "token-operador-2")
+        self.assertEqual(request.call_args_list, [
+            call("POST", "/api/farmacias/1/reservas/ABCD1234EFGH/retiro", "token-operador-2", None, None),
+            call("POST", "/api/farmacias/2/reservas/ABCD1234EFGH/retiro", "token-operador-2", None, None),
+        ])
+        # Si el test confunde 403 y 404, debe fallar y no ocultar un problema de scope.
+        with patch.object(client, "request", return_value=Reply(404, {"codigo": "RESOURCE_NOT_FOUND"})):
+            with self.assertRaises(SmokeFailure):
+                verify_foreign_operator_withdrawal_scope(client, "ABCD1234EFGH", 1, 2, "token-operador-2")
+
+    def test_retiro_ajeno_no_admite_misma_farmacia_para_los_dos_ambitos(self):
+        client = Client("https://localhost:8443")
+        with patch.object(client, "expect") as expect:
+            with self.assertRaises(ValueError):
+                verify_foreign_operator_withdrawal_scope(client, "ABCD1234EFGH", 1, 1, "token-operador-1")
+            expect.assert_not_called()
 
     def test_error_funcional_y_codigo_se_verifican(self):
         client = Client("https://localhost:8443")
