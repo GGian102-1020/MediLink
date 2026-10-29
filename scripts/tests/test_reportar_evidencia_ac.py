@@ -37,6 +37,11 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 if kind == 'pg':
                     self.assertIn(f'void {selector.rsplit(".", 1)[-1]}(', all_methods)
 
+    def test_ac02_points_to_global_five_reservation_limit_not_otc(self):
+        self.assertIn(("pg", R + "globalLimitIsCountedAcrossDifferentPresentations"), SOURCES[2])
+        self.assertNotIn(("pg", R + "otcLimitAndGlobalLimitDoNotMutateStockOnRejection"), SOURCES[2])
+        self.assertIn(("pg", R + "otcLimitAndGlobalLimitDoNotMutateStockOnRejection"), SOURCES[3])
+
     def test_partial_or_missing_logs_never_count_as_pass(self):
         self.assertEqual(find_api_steps('PASS 01: Visitante: catalogo y disponibilidad\n'), {})
         self.assertEqual(find_api_steps('PASS: 20 escenarios de recorrido API; NO certifica AC-01..AC-60\n'), {})

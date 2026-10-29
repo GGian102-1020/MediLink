@@ -30,7 +30,7 @@ B = PG + "security.BearerAuthenticationFilterTest."
 # Source references only; NO assertion that a whole AC has been proven.
 SOURCES = {
     1: [("pg", R + "concurrentLastStockUnitIsNeverOversold"), ("api", 14)],
-    2: [("pg", R + "otcLimitAndGlobalLimitDoNotMutateStockOnRejection")],
+    2: [("pg", R + "globalLimitIsCountedAcrossDifferentPresentations")],
     3: [("pg", R + "otcLimitAndGlobalLimitDoNotMutateStockOnRejection"), ("api", 9)],
     4: [("pg", P + "onlyOneOfTwoSimultaneousReservationsGetsTheLastUnit")],
     5: [("pg", R + "expiredReservationIsEffectiveBeforeMaterializationAndReleaseIsOnce")],
