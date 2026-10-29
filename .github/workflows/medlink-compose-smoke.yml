@@ -83,7 +83,7 @@ jobs:
         with:
           node-version: '22'
       - name: Probar la espera de sesiones en Playwright
-        run: node --test frontend/scripts/tests/esperar_sesion_ui.test.mjs
+        run: node --test frontend/scripts/tests/esperar_sesion_ui.test.mjs frontend/scripts/tests/ui_url.test.mjs
       - name: Instalar Playwright para navegador real (Chromium y Firefox)
         run: |
           npm ci --prefix frontend --no-audit --no-fund

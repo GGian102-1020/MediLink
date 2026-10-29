@@ -4,9 +4,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { waitForAuthenticatedApp } from './esperar_sesion_ui.mjs';
+import { pathnameFromUrl } from './ui_url.mjs';
 
 // Caddy terminates TLS for the localhost hostname (gateway/Caddyfile).
-const URL = 'https://localhost:8443';
+const BASE_URL = 'https://localhost:8443';
 const widths = [360, 390, 768, 1440];
 const reportDir = process.env.MEDLINK_UI_EVIDENCE_DIR || path.resolve('../evidencias/ui_ci');
 const sha = process.env.GITHUB_SHA || 'LOCAL-SIN-SHA';
@@ -15,7 +16,7 @@ if (process.env.MEDLINK_UI_EPHEMERAL !== '1' || process.argv[2] !== '--demo-ack'
   throw new Error('Solo se permite ejecutar en el entorno efimero y seed ficticio explicito de CI.');
 }
 await fs.mkdir(reportDir, { recursive: true });
-const result = { schema: 1, ac: 'AC-48', sha, base: URL, dateUtc: new Date().toISOString(),
+const result = { schema: 1, ac: 'AC-48', sha, base: BASE_URL, dateUtc: new Date().toISOString(),
   os: `${os.platform()} ${os.release()}`, widths, browsers: {}, status: 'FAIL', failures: [] };
 const assert = (predicate, message) => { if (!predicate) throw new Error(message); };
 const noHorizontalOverflow = async (page, label) => {
@@ -24,7 +25,7 @@ const noHorizontalOverflow = async (page, label) => {
   assert(x.scroll <= x.viewport + 2, `${label}: scroll horizontal ${x.scroll} > ${x.viewport}`);
 };
 const visitPublic = async (page, name, width) => {
-  await page.goto(`${URL}/catalogo`, {waitUntil: 'domcontentloaded'});
+  await page.goto(`${BASE_URL}/catalogo`, {waitUntil: 'domcontentloaded'});
   await page.getByRole('textbox', { name: 'Nombre del medicamento' }).fill('Ibuprofeno');
   await page.getByRole('button', {name: /^Buscar/}).click();
   await page.locator('.medicine-toggle').first().waitFor();
@@ -56,17 +57,17 @@ const visitRoles = async (browser, name) => {
     const page = await context.newPage();
     const meStatuses = [];
     page.on('response', response => {
-      if (new URL(response.url()).pathname === '/api/me') meStatuses.push(response.status());
+      if (pathnameFromUrl(response.url()) === '/api/me') meStatuses.push(response.status());
     });
     try {
-      await page.goto(`${URL}/ingresar`);
+      await page.goto(`${BASE_URL}/ingresar`);
       await page.getByRole('textbox', {name: 'Correo electrónico'}).fill(correo);
       await page.locator('input[type=password]').fill(process.env.MEDLINK_DEMO_PASSWORD);
       await page.getByRole('button', {name: /Ingresar a mi cuenta/}).click();
       try {
         await page.waitForURL(/\/panel$/, {timeout: 15000});
       } catch (error) {
-        const pathNow = new URL(page.url()).pathname;
+        const pathNow = pathnameFromUrl(page.url());
         const loginErrorVisible = await page.getByRole('alert').isVisible().catch(() => false);
         const meCodes = meStatuses.slice(-4).join(',') || 'sin respuesta';
         throw new Error(`${rol}/login: no llego a /panel; ruta=${pathNow}; ` +
@@ -74,24 +75,24 @@ const visitRoles = async (browser, name) => {
           `causa=${error?.name || 'error'}`);
       }
       await waitForAuthenticatedApp(page, rol, 'login', meStatuses);
-      await page.goto(`${URL}${own}`);
+      await page.goto(`${BASE_URL}${own}`);
       await waitForAuthenticatedApp(page, rol, 'navegacion-propia', meStatuses);
-      assert(new URL(page.url()).pathname === own, `${rol}: no ingreso en su ruta ${own}`);
+      assert(pathnameFromUrl(page.url()) === own, `${rol}: no ingreso en su ruta ${own}`);
       await noHorizontalOverflow(page, `${name}/${rol}/panel`);
       await page.reload();
       // La URL ya coincide al iniciar la recarga. Esperar a que /api/me restaure React.
       await waitForAuthenticatedApp(page, rol, 'refresh', meStatuses);
-      assert(new URL(page.url()).pathname === own, `${rol}: ruta inesperada tras refresh`);
+      assert(pathnameFromUrl(page.url()) === own, `${rol}: ruta inesperada tras refresh`);
       const expectedRoleName = { USUARIO: 'Usuario', OPERADOR: 'Operador de farmacia',
         ADMINISTRADOR: 'Administrador' }[rol];
       assert((await page.locator('.user-info small').innerText()) === expectedRoleName,
         `${rol}: la sesion recuperada no muestra el rol esperado`);
-      await page.goto(`${URL}${forbidden}`);
+      await page.goto(`${BASE_URL}${forbidden}`);
       await page.waitForURL(/\/panel$/, {timeout: 15000});
       await waitForAuthenticatedApp(page, rol, 'acceso-prohibido', meStatuses);
       await page.getByRole('button', {name: 'Abrir menú'}).click();
       await page.getByRole('button', {name:/Cerrar sesión/i}).click();
-      await page.waitForURL(`${URL}/`, {timeout: 15000});
+      await page.waitForURL(`${BASE_URL}/`, {timeout: 15000});
     } catch (error) {
       // Las cuentas son exclusivamente las ficticias del seed efimero.
       try { await page.screenshot({path: path.join(reportDir, `${name}-${rol.toLowerCase()}-fallo.png`), fullPage: true}); }

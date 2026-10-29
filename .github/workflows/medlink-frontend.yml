@@ -41,5 +41,7 @@ jobs:
         run: npm run typecheck
       - name: Pruebas frontend
         run: npm test
+      - name: Probar contrato de runner Playwright (sin navegador)
+        run: node --test scripts/tests/esperar_sesion_ui.test.mjs scripts/tests/ui_url.test.mjs
       - name: Compilar frontend
         run: npm run build
