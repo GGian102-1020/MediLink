@@ -14,6 +14,15 @@ export default defineConfig({
         target: process.env.MEDLINK_API_ORIGIN || 'https://localhost:8443',
         changeOrigin: true,
         secure: false,
+        // El navegador manda Origin en POST desde http://127.0.0.1:5173.
+        // Este es un proxy de desarrollo en localhost, no una peticion CORS
+        // directa al backend. Si reenviamos ese Origin, Spring responde 403
+        // antes de entrar a /api/auth/login ("Invalid CORS request").
+        configure(proxy) {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin');
+          });
+        },
       },
     },
   },
