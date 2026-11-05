@@ -12,6 +12,7 @@ expected = {
     'ar.edu.uade.medlink.prescripcion.PrescripcionConcurrencyTest': 2,
     'ar.edu.uade.medlink.suspension.SuspensionPostgresTest': 2,
     'ar.edu.uade.medlink.reserva.ReservasPostgresTest': 21,
+    'ar.edu.uade.medlink.recetademo.RecetaDemoPostgresTest': 13,
 }
 for classname, minimum in expected.items():
     report = reports / f'TEST-{classname}.xml'

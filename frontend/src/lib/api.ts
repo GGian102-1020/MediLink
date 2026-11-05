@@ -33,7 +33,8 @@ export async function api<T>(path: string, options: RequestInit & { idempotencyK
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   headers.set('X-Correlation-Id', crypto.randomUUID());
-  if (init.body !== undefined && init.body !== null) headers.set('Content-Type', 'application/json');
+  if (init.body instanceof FormData) headers.delete('Content-Type');
+  else if (init.body !== undefined && init.body !== null) headers.set('Content-Type', 'application/json');
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
   let response: Response;

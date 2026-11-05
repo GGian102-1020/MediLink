@@ -8,6 +8,7 @@ const userNav: NavItem[] = [
   { path: '/panel', label: 'Mi inicio', icon: LayoutDashboard },
   { path: '/catalogo', label: 'Explorar medicamentos', icon: Search },
   { path: '/mis-reservas', label: 'Mis reservas', icon: CalendarCheck },
+  { path: '/mis-recetas', label: 'Mis recetas', icon: ClipboardList },
   { path: '/perfil', label: 'Mi cuenta', icon: Settings },
 ];
 const operatorNav: NavItem[] = [

@@ -1,0 +1,34 @@
+[
+  {
+    "pregunta": "¿Cómo reservo un medicamento?",
+    "respuesta": "Elegí una presentación y una farmacia con disponibilidad. Para una presentación bajo receta, usá el código de una prescripción vinculada a tu cuenta."
+  },
+  {
+    "pregunta": "¿Cuánto dura una reserva?",
+    "respuesta": "La reserva dura cuatro horas desde su confirmación."
+  },
+  {
+    "pregunta": "¿Cómo cargo una receta?",
+    "respuesta": "Iniciá sesión con tu cuenta de usuario y vinculá el código de la receta ficticia. Si el escaneo está habilitado, también podés enviar una foto del documento de demostración."
+  },
+  {
+    "pregunta": "¿Cómo sé si mi receta fue aceptada?",
+    "respuesta": "Una vinculación exitosa devuelve tu prescripción y la deja disponible en la consulta de tus prescripciones."
+  },
+  {
+    "pregunta": "¿Puedo cancelar una reserva?",
+    "respuesta": "Podés cancelar tu reserva mientras siga activa y dentro del plazo. La cancelación libera la cantidad de receta comprometida."
+  },
+  {
+    "pregunta": "¿Qué sucede si mi reserva vence?",
+    "respuesta": "Al vencer se libera la cantidad comprometida. Tres vencimientos computables dentro de 30 días activan una suspensión de reservas por siete días."
+  },
+  {
+    "pregunta": "¿Puedo utilizar la misma receta otra vez?",
+    "respuesta": "Podés usarla mientras esté vigente y tenga cantidad disponible. La unidad retirada se considera utilizada y ya no queda disponible."
+  },
+  {
+    "pregunta": "¿Qué hago si la imagen no puede leerse?",
+    "respuesta": "Probá con una foto nítida, bien iluminada y con toda la receta visible. También podés ingresar el código impreso."
+  }
+]

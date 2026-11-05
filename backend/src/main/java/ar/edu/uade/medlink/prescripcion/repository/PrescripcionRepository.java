@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface PrescripcionRepository extends JpaRepository<Prescripcion,Long>, JpaSpecificationExecutor<Prescripcion> {
     boolean existsByCodigoExterno(String codigoExterno);
+    Optional<Prescripcion> findByIdAndUsuarioId(long id, long usuarioId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Prescripcion p where p.id=:id")
@@ -20,5 +21,8 @@ public interface PrescripcionRepository extends JpaRepository<Prescripcion,Long>
     // Usuario has no JPA entity yet; only its identifier is needed here.
     @Query(value="SELECT EXISTS (SELECT 1 FROM usuario WHERE id_usuario=:id)",nativeQuery=true)
     boolean existeUsuario(@Param("id") long id);
+
+    @Query(value="SELECT EXISTS (SELECT 1 FROM usuario WHERE id_usuario=:id AND id_cuenta=:cuenta)",nativeQuery=true)
+    boolean esUsuarioDeCuenta(@Param("id") long id, @Param("cuenta") long cuenta);
 
 }

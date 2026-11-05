@@ -61,9 +61,33 @@ public class PrescripcionService {
         MedicamentoService.admin(actor);
         return dto(prescripciones.findById(id).orElseThrow(ApiException::notFound));
     }
+
+    public PageDTO<PrescripcionDTO> listarPropias(long usuarioId, int page, int size) {
+        return PageRequests.dto(prescripciones.findAll(filter(usuarioId,null,null),
+            PageRequests.of(page,size,null,SORTABLE,DEFAULT_SORT)).map(PrescripcionService::dto));
+    }
+
+    public PrescripcionDTO detallePropio(long id, long usuarioId) {
+        return dto(prescripciones.findByIdAndUsuarioId(id,usuarioId).orElseThrow(ApiException::notFound));
+    }
+
     @Transactional
     public PrescripcionDTO crear(@Valid PrescripcionCreateRequest req, CurrentAccount actor, HttpServletRequest request) {
         MedicamentoService.admin(actor);
+        return crearPrescripcion(req,actor,request);
+    }
+
+    /** Internal entry point. Only the transaction that locks a demo recipe may use it. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public PrescripcionDTO crearDesdeRecetaDemo(PrescripcionCreateRequest req, CurrentAccount actor,
+                                                 HttpServletRequest request) {
+        if (actor==null || !"USUARIO".equals(actor.rol()) || req.usuarioId()==null
+            || !prescripciones.esUsuarioDeCuenta(req.usuarioId(),actor.id())) throw ApiException.forbidden();
+        return crearPrescripcion(req,actor,request);
+    }
+
+    private PrescripcionDTO crearPrescripcion(PrescripcionCreateRequest req, CurrentAccount actor,
+                                                HttpServletRequest request) {
         if (req.codigoExterno()==null || req.codigoExterno().isEmpty() || req.codigoExterno().length()>80
             || req.usuarioId()==null || req.fechaEmision()==null || req.fechaVencimiento()==null
             || req.items()==null || req.items().isEmpty())

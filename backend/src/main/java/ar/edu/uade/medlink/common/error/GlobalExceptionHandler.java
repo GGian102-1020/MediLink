@@ -17,12 +17,18 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private final ErrorResponses errors;
     public GlobalExceptionHandler(ErrorResponses errors) { this.errors = errors; }
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String,Object>> demasiadoGrande(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        return ResponseEntity.status(413).body(errors.body(request,"ARCHIVO_DEMASIADO_GRANDE",
+            "El archivo supera el límite de tamaño."));
+    }
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Map<String,Object>> api(ApiException ex, HttpServletRequest request) {

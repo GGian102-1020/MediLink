@@ -5,6 +5,7 @@ import { AppLayout, PublicLayout } from './components/Layout';
 import { Home, Catalog, PresentationDetail } from './pages/Public';
 import { LoginPage, RegisterPage, ProfilePage } from './pages/Auth';
 import { Dashboard, MyReservations, ReservationDetail } from './pages/User';
+import { MyPrescriptions } from './pages/MyPrescriptions';
 import { PharmacyReservations, PharmacyStock, StockMovements } from './pages/Operator';
 import { AdminFarmacias, AdminMedicamentos, AdminPresentaciones, AdminOperadores, AdminUsuarios, AdminPrescripciones, AdminAuditoria, AdminUsuarioDetalle } from './pages/Admin';
 
@@ -28,6 +29,7 @@ export default function App() {
     </Route>
     <Route element={<Protected roles={['USUARIO']}/> }>
       <Route path="mis-reservas" element={<MyReservations/>}/><Route path="mis-reservas/:codigo" element={<ReservationDetail/>}/>
+      <Route path="mis-recetas" element={<MyPrescriptions/>}/>
     </Route>
     <Route element={<Protected roles={['OPERADOR', 'ADMINISTRADOR']}/> }>
       <Route path="operacion/reservas" element={<PharmacyReservations/>}/><Route path="operacion/stock" element={<PharmacyStock/>}/><Route path="operacion/movimientos" element={<StockMovements/>}/>
