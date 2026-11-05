@@ -76,7 +76,7 @@ public class FarmaciaController {
     public List<FarmaciaCercanaDTO> cercanas(
             @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0")  BigDecimal lat,
             @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal lng,
-            @RequestParam(defaultValue="10.0") double radio) {
+            @RequestParam(defaultValue="10.0") @DecimalMin("0.1") @DecimalMax("100.0") double radio) {
         return service.buscarCercanas(lat, lng, radio);
     }
 }

@@ -1,7 +1,36 @@
-import { describe, expect, it } from 'vitest';
-import { acortarDireccion, decodificarPolyline, enlaceComoLlegar, formatoDistancia, formatoDuracion, redondear, textoPaso } from '../src/lib/geo';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { acortarDireccion, buscarDireccion, coords, decodificarPolyline, enlaceComoLlegar, esCoordenadaValida, estaEnCaba, formatoDistancia, formatoDuracion, redondear, textoPaso } from '../src/lib/geo';
 
 describe('geo', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('descarta coordenadas invalidas y ubicaciones incompletas', () => {
+    expect(coords({ latitud: -34.60, longitud: -58.40 })).toEqual({ lat: -34.60, lng: -58.40 });
+    expect(coords({ latitud: 91, longitud: -58.40 })).toBeNull();
+    expect(coords({ latitud: Number.NaN, longitud: -58.40 })).toBeNull();
+    expect(coords({ latitud: -34.60, longitud: null })).toBeNull();
+    expect(esCoordenadaValida({ lat: -34.60, lng: -58.40 })).toBe(true);
+  });
+  it('filtra jurisdiccion usando address.state', () => {
+    expect(estaEnCaba({ address: { state: 'Ciudad Autónoma de Buenos Aires' }, display_name: '' })).toBe(true);
+    expect(estaEnCaba({ address: { state: 'Buenos Aires' }, display_name: 'CABA' })).toBe(false);
+    expect(estaEnCaba({ display_name: 'Corrientes, Ciudad Autónoma de Buenos Aires, Argentina' })).toBe(true);
+  });
+  it('usa cache y excluye direcciones fuera de CABA', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [
+      { lat: '-34.6', lon: '-58.4', display_name: 'Av. Corrientes 1500, Ciudad Autónoma de Buenos Aires', address: { state: 'Ciudad Autónoma de Buenos Aires' } },
+      { lat: '-34.8', lon: '-58.3', display_name: 'Avellaneda', address: { state: 'Buenos Aires' } },
+    ] });
+    vi.stubGlobal('fetch', fetchMock);
+    const first = await buscarDireccion('Corrientes 1500');
+    expect(first).toHaveLength(1);
+    expect(first[0].lat).toBe(-34.6);
+    expect(await buscarDireccion(' corrientes 1500 ')).toEqual(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('respeta la cancelacion previa a la busqueda', async () => {
+    const ctrl = new AbortController(); ctrl.abort();
+    await expect(buscarDireccion('Rivadavia 1000', ctrl.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  });
   it('decodifica la polyline de ejemplo de Google/OSRM', () => {
     expect(decodificarPolyline('_p~iF~ps|U_ulLnnqC_mqNvxq`@')).toEqual([[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]]);
   });
@@ -9,7 +38,8 @@ describe('geo', () => {
     expect(redondear({ lat: -34.603722, lng: -58.381592 })).toEqual({ lat: -34.6037, lng: -58.3816 });
   });
   it('formatea distancias y duraciones en castellano', () => {
-    expect(formatoDistancia(4)).toBe('10 m');
+    expect(formatoDistancia(0)).toBe('0 m');
+    expect(formatoDistancia(4)).toBe('4 m');
     expect(formatoDistancia(846)).toBe('850 m');
     expect(formatoDistancia(1234)).toBe('1,2 km');
     expect(formatoDuracion(20)).toBe('1 min');

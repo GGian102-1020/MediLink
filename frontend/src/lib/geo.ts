@@ -15,8 +15,13 @@ export type ResultadoDireccion = LatLng & { etiqueta: string };
 /** Encuadre pedido al mapa: cambia `clave` para que el mapa se mueva una sola vez. */
 export type Encuadre = { clave: string; puntos: [number, number][] };
 
+export function esCoordenadaValida(p: LatLng): boolean {
+  return Number.isFinite(p.lat) && Number.isFinite(p.lng) && p.lat >= -90 && p.lat <= 90 && p.lng >= -180 && p.lng <= 180;
+}
 export function coords(f: { latitud?: number | null; longitud?: number | null }): LatLng | null {
-  return f.latitud != null && f.longitud != null ? { lat: Number(f.latitud), lng: Number(f.longitud) } : null;
+  if (f.latitud == null || f.longitud == null) return null;
+  const p = { lat: Number(f.latitud), lng: Number(f.longitud) };
+  return esCoordenadaValida(p) ? p : null;
 }
 
 /** Centro aproximado de CABA y caja para acotar busquedas. */
@@ -29,6 +34,31 @@ const OSRM: Record<ModoViaje, string> = {
   pie: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving',
 };
 const STORAGE_KEY = 'medlink.ubicacion';
+// Limite por pestaña. El servicio público impone además un límite GLOBAL a cada aplicación:
+// esta demo local no debe exponerse a tráfico concurrente sin geocodificador propio/proveedor.
+const CACHE_MS = 5 * 60 * 1000;
+let proximaConsulta = 0;
+const cacheDirecciones = new Map<string, { hasta: number; resultados: ResultadoDireccion[] }>();
+
+async function turnoNominatim(signal?: AbortSignal) {
+  if (signal?.aborted) throw new DOMException('Solicitud cancelada', 'AbortError');
+  const espera = Math.max(0, proximaConsulta - Date.now());
+  proximaConsulta = Date.now() + espera + 1100;
+  if (!espera) return;
+  await new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => { signal?.removeEventListener('abort', cancel); resolve(); }, espera);
+    function cancel() { clearTimeout(t); reject(new DOMException('Solicitud cancelada', 'AbortError')); }
+    signal?.addEventListener('abort', cancel, { once: true });
+  });
+}
+
+/** Intenta usar la división administrativa estructurada, no solo el texto libre. */
+export function estaEnCaba(d: { address?: Record<string, string>; display_name: string }): boolean {
+  const estado = d.address?.state || d.address?.province || '';
+  if (/ciudad aut[oó]noma de buenos aires|autonomous city of buenos aires/i.test(estado)) return true;
+  if (estado) return false;
+  return /ciudad aut[oó]noma de buenos aires/i.test(d.display_name);
+}
 
 export function redondear(p: LatLng): LatLng {
   return { lat: Math.round(p.lat * 1e4) / 1e4, lng: Math.round(p.lng * 1e4) / 1e4 };
@@ -39,7 +69,7 @@ export function leerOrigenGuardado(): Origen | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const o = JSON.parse(raw) as Origen;
-    return Number.isFinite(o.lat) && Number.isFinite(o.lng) && typeof o.etiqueta === 'string' ? o : null;
+    return esCoordenadaValida(o) && typeof o.etiqueta === 'string' && (o.fuente === 'gps' || o.fuente === 'direccion') ? o : null;
   } catch { return null; }
 }
 export function guardarOrigen(o: Origen | null) {
@@ -62,21 +92,31 @@ export function ubicacionActual(): Promise<LatLng> {
   });
 }
 
-/** Nominatim: solo al enviar el formulario (su politica no permite autocompletar). */
+/** Nominatim: solo al enviar el formulario; nunca autocompletado. */
 export async function buscarDireccion(texto: string, signal?: AbortSignal): Promise<ResultadoDireccion[]> {
+  const clave = texto.trim().toLocaleLowerCase('es-AR');
+  if (clave.length < 3) return [];
+  if (signal?.aborted) throw new DOMException('Solicitud cancelada', 'AbortError');
+  const previo = cacheDirecciones.get(clave);
+  if (previo && previo.hasta > Date.now()) return previo.resultados;
   const params = new URLSearchParams({
-    format: 'jsonv2', q: texto, countrycodes: 'ar', viewbox: CABA_VIEWBOX, bounded: '1', limit: '5', 'accept-language': 'es',
+    format: 'jsonv2', addressdetails: '1', q: texto.trim(), countrycodes: 'ar',
+    viewbox: CABA_VIEWBOX, bounded: '1', limit: '5', 'accept-language': 'es',
   });
+  await turnoNominatim(signal);
   let res: Response;
   try { res = await fetch(`${NOMINATIM}?${params}`, { signal, headers: { Accept: 'application/json' } }); }
   catch (e) { if ((e as Error).name === 'AbortError') throw e; throw new Error('No se pudo conectar con el buscador de direcciones.'); }
   if (!res.ok) throw new Error('El buscador de direcciones no respondió. Probá en unos segundos.');
-  const data = await res.json() as { lat: string; lon: string; display_name: string }[];
-  // La caja de CABA roza el conurbano (p. ej. Avellaneda): solo se aceptan resultados de la Ciudad.
+  const data = await res.json() as { lat: string; lon: string; display_name: string; address?: Record<string, string> }[];
+  if (signal?.aborted) throw new DOMException('Solicitud cancelada', 'AbortError');
   const vistos = new Set<string>();
-  return data.filter(d => d.display_name.includes('Ciudad Autónoma de Buenos Aires'))
+  const resultados = data.filter(estaEnCaba)
     .map(d => ({ ...redondear({ lat: Number(d.lat), lng: Number(d.lon) }), etiqueta: acortarDireccion(d.display_name) }))
-    .filter(r => !vistos.has(r.etiqueta) && Boolean(vistos.add(r.etiqueta)));
+    .filter(r => esCoordenadaValida(r) && !vistos.has(`${r.lat},${r.lng}`) && Boolean(vistos.add(`${r.lat},${r.lng}`)));
+  if (cacheDirecciones.size >= 50) cacheDirecciones.delete(cacheDirecciones.keys().next().value!);
+  cacheDirecciones.set(clave, { hasta: Date.now() + CACHE_MS, resultados });
+  return resultados;
 }
 
 /**
@@ -153,7 +193,9 @@ export function textoPaso(s: OsrmPaso): string {
 }
 
 export function formatoDistancia(metros: number): string {
-  if (metros < 1000) return `${Math.max(10, Math.round(metros / 10) * 10)} m`;
+  if (metros <= 0) return '0 m';
+  if (metros < 10) return `${Math.round(metros)} m`;
+  if (metros < 1000) return `${Math.round(metros / 10) * 10} m`;
   return `${(metros / 1000).toLocaleString('es-AR', { maximumFractionDigits: metros < 10000 ? 1 : 0 })} km`;
 }
 export function formatoDuracion(segundos: number): string {

@@ -16,6 +16,11 @@ public record FarmaciaRequest(
         telefono      = optional(telefono);
         emailContacto = optional(emailContacto);
     }
+    // Permite sin geolocalizacion, pero no un punto con un solo eje.
+    @AssertTrue(message = "latitud y longitud deben informarse juntas")
+    public boolean isUbicacionCompleta() {
+        return (latitud == null) == (longitud == null);
+    }
     private static String optional(String text) {
         return text == null || text.isBlank() ? null : text.strip();
     }

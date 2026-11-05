@@ -14,7 +14,7 @@ const iconoFarmacia = L.divIcon({
   html: '<span class="map-pin"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/></svg></span>',
 });
 
-function Encuadrar({ encuadre, conTarjeta }: { encuadre: Encuadre | null; conTarjeta: boolean }) {
+function Encuadrar({ encuadre, conTarjeta, puntosIniciales }: { encuadre: Encuadre | null; conTarjeta: boolean; puntosIniciales: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
     if (!encuadre || !encuadre.puntos.length) return;
@@ -27,6 +27,10 @@ function Encuadrar({ encuadre, conTarjeta }: { encuadre: Encuadre | null; conTar
     });
     // Solo reacciona a un pedido nuevo de encuadre (cambia la clave).
   }, [encuadre?.clave, map]);
+  useEffect(() => {
+    if (encuadre?.puntos.length || !puntosIniciales.length) return;
+    map.fitBounds(L.latLngBounds(puntosIniciales), { padding: [45, 45], maxZoom: 14, animate: false });
+  }, [map, encuadre?.clave, puntosIniciales]);
   return null;
 }
 
@@ -36,6 +40,10 @@ export default function PharmacyMap({ farmacias, seleccionada, origen, ruta, enc
 }) {
   const conCoords = useMemo(() => farmacias.flatMap(f => { const c = coords(f); return c ? [{ f, c }] : []; }), [farmacias]);
   const sel = seleccionada ? coords(seleccionada) : null;
+  const puntosIniciales = useMemo<[number, number][]>(() => [
+    ...(origen ? [[origen.lat, origen.lng] as [number, number]] : []),
+    ...conCoords.map(({ c }) => [c.lat, c.lng] as [number, number]),
+  ], [conCoords, origen?.lat, origen?.lng]);
   return <MapContainer className="pharmacy-map" center={[CABA_CENTRO.lat, CABA_CENTRO.lng]} zoom={12} minZoom={10} maxZoom={19}
     preferCanvas scrollWheelZoom={false} attributionControl>
     <TileLayer
@@ -60,6 +68,6 @@ export default function PharmacyMap({ farmacias, seleccionada, origen, ruta, enc
     {origen && <Marker position={[origen.lat, origen.lng]} icon={iconoUsuario} zIndexOffset={900} keyboard={false}>
       <Tooltip direction="top" offset={[0, -12]} className="map-tooltip">{origen.fuente === 'gps' ? 'Estás acá' : origen.etiqueta}</Tooltip>
     </Marker>}
-    <Encuadrar encuadre={encuadre} conTarjeta={seleccionada !== null}/>
+    <Encuadrar encuadre={encuadre} conTarjeta={seleccionada !== null} puntosIniciales={puntosIniciales}/>
   </MapContainer>;
 }

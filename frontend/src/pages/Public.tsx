@@ -35,7 +35,11 @@ function cercanas(lista: Disponibilidad[], n: number): [number, number][] {
   return lista.flatMap(f => { const c = coords(f); return c ? [[c.lat, c.lng] as [number, number]] : []; }).slice(0, n);
 }
 export function PresentationDetail() {
-  const { id } = useParams(); const navigate = useNavigate(); const { me } = useAuth();
+  const { id } = useParams();
+  return <PresentationContent key={id} id={id}/>;
+}
+function PresentationContent({ id }: { id?: string }) {
+  const navigate = useNavigate(); const { me } = useAuth();
   const [presentation, setPresentation] = useState<Presentacion | null>(null); const [avail, setAvail] = useState<Disponibilidad[]>([]); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [retryVersion, setRetryVersion] = useState(0);
   const [selected, setSelected] = useState<Disponibilidad | null>(null); const [quantity, setQuantity] = useState(1); const [rxCode, setRxCode] = useState(''); const [busy, setBusy] = useState(false); const [actionError, setActionError] = useState('');
   const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
@@ -46,25 +50,38 @@ export function PresentationDetail() {
   const [modo, setModo] = useState<ModoViaje>('pie'); const [ruta, setRuta] = useState<Ruta | null>(null); const [rutaLoading, setRutaLoading] = useState(false); const [rutaError, setRutaError] = useState(''); const [showSteps, setShowSteps] = useState(false);
   const [encuadre, setEncuadre] = useState<Encuadre | null>(null); const [visible, setVisible] = useState(PAGINA_FARMACIAS);
   const bookingRef = useRef<HTMLDivElement>(null);
-  const origenRef = useRef(origen); origenRef.current = origen;
-  const primerOrigen = useRef(true);
+  const addressAbortRef = useRef<AbortController | null>(null);
   const origenQuery = (o: Origen | null) => (o ? { lat: o.lat, lng: o.lng } : undefined);
 
-  useEffect(() => { let active = true; setLoading(true); setError(''); if (!id || !/^\d+$/.test(id)) { setError('Presentación inválida.'); setLoading(false); return; } const o = origenRef.current; Promise.all([get<Presentacion>(`/api/presentaciones/${id}`), get<Disponibilidad[]>(`/api/presentaciones/${id}/disponibilidad`, origenQuery(o))]).then(([p, a]) => { if (active) { setPresentation(p); setAvail(a); if (o) setEncuadre({ clave: `inicio-${o.lat},${o.lng}`, puntos: [[o.lat, o.lng], ...cercanas(a, 6)] }); } }).catch((e: Error) => { if (active) setError(e.message); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [id, retryVersion]);
-
-  // Al cambiar el origen se pide de nuevo la disponibilidad, ahora ordenada por cercania.
+  // El detalle se carga solo al cambiar la presentación; la disponibilidad se
+  // actualiza independientemente y cancela respuestas obsoletas al cambiar de origen.
   useEffect(() => {
-    if (primerOrigen.current) { primerOrigen.current = false; return; }
+    let active = true;
+    setLoading(true); setError('');
+    if (!id || !/^\d+$/.test(id)) { setError('Presentación inválida.'); setLoading(false); return; }
+    get<Presentacion>(`/api/presentaciones/${id}`)
+      .then(p => { if (active) setPresentation(p); })
+      .catch((e: Error) => { if (active) setError(e.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id, retryVersion]);
+
+  useEffect(() => {
     if (!id || !/^\d+$/.test(id)) return;
-    let active = true; setSorting(true);
+    let active = true;
+    setSorting(true); setGeoError('');
     get<Disponibilidad[]>(`/api/presentaciones/${id}/disponibilidad`, origenQuery(origen)).then(a => {
       if (!active) return;
       setAvail(a); setVisible(PAGINA_FARMACIAS);
-      setSelected(prev => (prev ? a.find(x => x.farmaciaId === prev.farmaciaId) ?? null : null));
-      if (origen) setEncuadre({ clave: `origen-${origen.lat},${origen.lng}-${Date.now()}`, puntos: [[origen.lat, origen.lng], ...cercanas(a, 6)] });
-    }).catch((e: Error) => { if (active) setGeoError(e.message); }).finally(() => { if (active) setSorting(false); });
+      setSelected(prev => prev ? a.find(x => x.farmaciaId === prev.farmaciaId) ?? null : null);
+      const puntos = origen ? [[origen.lat, origen.lng] as [number, number], ...cercanas(a, 6)] : cercanas(a, 8);
+      setEncuadre(puntos.length ? { clave: `disponibilidad-${id}-${Date.now()}`, puntos } : null);
+    }).catch((e: Error) => { if (active) setGeoError(e.message); })
+      .finally(() => { if (active) setSorting(false); });
     return () => { active = false; };
-  }, [origen]);
+  }, [id, retryVersion, origen]);
+
+  useEffect(() => () => { addressAbortRef.current?.abort(); }, []);
 
   const destino = selected ? coords(selected) : null;
   useEffect(() => {
@@ -76,16 +93,16 @@ export function PresentationDetail() {
       .catch((e: Error) => { if (e.name !== 'AbortError') setRutaError(e.message); })
       .finally(() => { if (!ctrl.signal.aborted) setRutaLoading(false); });
     return () => { ctrl.abort(); setRutaLoading(false); };
-  }, [selected?.farmaciaId, origen?.lat, origen?.lng, modo]);
+  }, [selected?.farmaciaId, destino?.lat, destino?.lng, origen?.lat, origen?.lng, modo]);
 
   function choose(f: Disponibilidad) {
     setSelected(f); setActionError('');
-    const c = coords(f); if (!c) return;
+    const c = coords(f); if (!c) { setRuta(null); setRutaError('Esta farmacia no tiene ubicación en el mapa.'); return; }
     setEncuadre({ clave: `farmacia-${f.farmaciaId}-${Date.now()}`, puntos: origen ? [[origen.lat, origen.lng], [c.lat, c.lng]] : [[c.lat, c.lng]] });
     const idx = avail.findIndex(x => x.farmaciaId === f.farmaciaId);
     if (idx >= visible) setVisible(idx + 1);
   }
-  function changeOrigin(o: Origen | null) { setOrigen(o); guardarOrigen(o); setResults([]); setGeoError(''); }
+  function changeOrigin(o: Origen | null) { addressAbortRef.current?.abort(); setSearching(false); setOrigen(o); guardarOrigen(o); setResults([]); setGeoError(''); }
   async function locate() {
     setLocating(true); setGeoError(''); setResults([]);
     try { const p = await ubicacionActual(); changeOrigin({ ...p, etiqueta: 'Tu ubicación', fuente: 'gps' }); }
@@ -95,14 +112,20 @@ export function PresentationDetail() {
   async function searchAddress(e: FormEvent) {
     e.preventDefault(); const q = address.trim();
     if (q.length < 3) { setGeoError('Escribí una dirección, por ejemplo "Av. Corrientes 1500".'); return; }
+    addressAbortRef.current?.abort();
+    const ctrl = new AbortController(); addressAbortRef.current = ctrl;
     setSearching(true); setGeoError(''); setResults([]);
     try {
-      const r = await buscarDireccion(q);
+      const r = await buscarDireccion(q, ctrl.signal);
+      if (ctrl.signal.aborted) return;
       if (!r.length) setGeoError('No encontramos esa dirección en CABA. Probá con calle y altura.');
       else if (r.length === 1) changeOrigin({ ...r[0], fuente: 'direccion' });
       else setResults(r);
-    } catch (err) { setGeoError(err instanceof Error ? err.message : 'No se pudo buscar la dirección.'); }
-    finally { setSearching(false); }
+    } catch (err) {
+      if (!ctrl.signal.aborted && (err as Error).name !== 'AbortError')
+        setGeoError(err instanceof Error ? err.message : 'No se pudo buscar la dirección.');
+    } finally { if (addressAbortRef.current === ctrl) setSearching(false); }
+
   }
 
   async function reserve(e: FormEvent) {
@@ -126,7 +149,7 @@ export function PresentationDetail() {
       <div className="map-toolbar">
         <button type="button" className="btn btn-primary" onClick={locate} disabled={locating}>{locating ? <LoaderCircle size={16} className="spin"/> : <LocateFixed size={16}/>} Usar mi ubicación</button>
         <form className="map-search" onSubmit={searchAddress} role="search">
-          <Search size={16}/><input value={address} onChange={e => setAddress(e.target.value)} placeholder="o buscá una dirección en CABA" aria-label="Dirección de partida" maxLength={120}/>
+          <Search size={16}/><input value={address} onChange={e => { addressAbortRef.current?.abort(); setSearching(false); setResults([]); setAddress(e.target.value); }} placeholder="o buscá una dirección en CABA" aria-label="Dirección de partida" maxLength={120}/>
           <button type="submit" className="map-search-btn" disabled={searching} aria-label="Buscar dirección">{searching ? <LoaderCircle size={16} className="spin"/> : <ArrowRight size={16}/>}</button>
         </form>
       </div>
@@ -155,7 +178,7 @@ export function PresentationDetail() {
               <button type="button" className="route-steps-toggle" onClick={() => setShowSteps(v => !v)} aria-expanded={showSteps}><Navigation size={14}/> {showSteps ? 'Ocultar indicaciones' : `Ver indicaciones (${ruta.pasos.length})`}<ChevronRight size={14} className={showSteps ? 'rotate90' : ''}/></button>
               {showSteps && <ol className="route-steps">{ruta.pasos.map((p, i) => <li key={i}><span>{p.texto}</span>{p.distanciaM > 0 && <small>{formatoDistancia(p.distanciaM)}</small>}</li>)}</ol>}
             </>}
-        </> : <p className="route-status">Compartí tu ubicación para ver cómo llegar.</p>}
+        </> : <p className="route-status">{!destino ? 'Esta farmacia no tiene ubicación en el mapa.' : 'Compartí tu ubicación para ver cómo llegar.'}</p>}
         <div className="route-actions">
           <button type="button" className="btn btn-primary" onClick={() => bookingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Reservar acá <ArrowRight size={15}/></button>
           {destino && <a className="btn btn-outline" href={enlaceComoLlegar(destino, modo)} target="_blank" rel="noreferrer">Google Maps <ExternalLink size={13}/></a>}
@@ -166,5 +189,6 @@ export function PresentationDetail() {
 
   return <div className="wide-wrap detail-page"><BackLink to="/catalogo" label="Volver al catálogo"/>{loading ? <Loading/> : error ? <ErrorState error={error} retry={() => setRetryVersion(v => v + 1)}/> : presentation && <><div className="detail-intro"><div className="detail-drug-icon"><Pill size={48}/></div><div><div className="eyebrow">MEDICAMENTOS / PRESENTACIÓN</div><h1>{presentation.medicamentoNombre}</h1><p>{presentationLabel(presentation)}</p><Badge value={presentation.condicionDispensa}/></div></div>
     {avail.length > 0 && mapCard}
-    <div className="detail-grid"><Panel title="Disponibilidad por farmacia" subtitle={origen ? 'Las más cercanas primero.' : 'Elegí dónde querés retirar tu medicamento.'}><p className="muted small-text">{avail.length > 0 && <>{number(avail.length)} {avail.length === 1 ? 'farmacia' : 'farmacias'} con stock. </>}El stock mostrado puede cambiar hasta confirmar la reserva.</p>{!avail.length ? <Empty title="Sin disponibilidad por ahora" detail="Volvé a consultar más tarde."/> : <><div className="availability-list">{avail.slice(0, visible).map(f => <button type="button" key={f.farmaciaId} onClick={() => choose(f)} disabled={f.cantidadDisponible <= 0} className={`pharmacy-option ${selected?.farmaciaId === f.farmaciaId ? 'selected' : ''}`}><span className="pharmacy-marker"><Store size={22}/></span><span className="pharmacy-meta"><strong>{f.nombre}</strong><small><MapPin size={13}/>{f.direccion}</small>{f.distanciaKm != null && <span className="distance-chip"><Navigation size={11}/> a {formatoDistancia(f.distanciaKm * 1000)}</span>}</span><span className={`stock-count ${f.cantidadDisponible > 0 ? '' : 'sold-out'}`}><strong>{f.cantidadDisponible}</strong><small>unidades</small></span><span className="radio-indicator"/></button>)}</div>{visible < avail.length && <button type="button" className="btn btn-outline load-more" onClick={() => setVisible(v => v + PAGINA_FARMACIAS)}>Ver más farmacias <span>({number(avail.length - visible)} restantes)</span></button>}</>}</Panel><div ref={bookingRef} className="booking-anchor"><Panel title="Tu reserva" subtitle="Confirmá los detalles antes de continuar."><div className="booking-summary"><span><Pill size={17}/> {presentation.medicamentoNombre}</span><strong>{presentationLabel(presentation)}</strong><div className="summary-divider"/><span><Store size={17}/> Farmacia seleccionada</span><strong>{selected ? selected.nombre : 'Elegí una farmacia de la lista o del mapa'}</strong>{selected && <small className="booking-pharmacy-detail">{selected.direccion}{selected.distanciaKm != null && <> · a {formatoDistancia(selected.distanciaKm * 1000)}</>}</small>}</div><form onSubmit={reserve} className="stack-form"><Field label="Cantidad"><input type="number" min="1" max={selected?.cantidadDisponible || 1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} required/></Field>{presentation.condicionDispensa === 'BAJO_RECETA' && <Field label="Código de Prescripción" hint="El código debe pertenecer a una Prescripción activa y válida a tu nombre."><input maxLength={80} value={rxCode} onChange={e => setRxCode(e.target.value)} placeholder="Ingresá el código de tu receta" required/></Field>}{!me ? <Alert tone="info">Necesitás iniciar sesión como Usuario para reservar.</Alert> : me.perfil.rol !== 'USUARIO' ? <Alert tone="info">La creación de reservas está disponible solo para cuentas de Usuario.</Alert> : me.suspensionVigente?.vigente ? <Alert>Tu cuenta está suspendida hasta {new Date(me.suspensionVigente.fechaHoraFin).toLocaleDateString('es-AR')}.</Alert> : null}{actionError && <Alert>{actionError}</Alert>}<Button type="submit" disabled={!selected || (me !== null && me.perfil.rol !== 'USUARIO') || Boolean(me?.suspensionVigente?.vigente)} busy={busy}> {me ? 'Confirmar reserva' : 'Ingresar para reservar'} <ArrowRight size={17}/></Button><p className="booking-disclaimer"><Clock3 size={15}/> Si se confirma, verás el plazo exacto para retirar.</p></form></Panel></div></div></>}</div>;
+    {geoError && !avail.length && <Alert>{geoError}</Alert>}
+    <div className="detail-grid"><Panel title="Disponibilidad por farmacia" subtitle={origen ? 'Las más cercanas primero.' : 'Elegí dónde querés retirar tu medicamento.'}><p className="muted small-text">{avail.length > 0 && <>{number(avail.length)} {avail.length === 1 ? 'farmacia' : 'farmacias'} con stock. </>}El stock mostrado puede cambiar hasta confirmar la reserva.</p>{!avail.length ? sorting ? <Loading/> : <Empty title="Sin disponibilidad por ahora" detail="Volvé a consultar más tarde."/> : <><div className="availability-list">{avail.slice(0, visible).map(f => <button type="button" key={f.farmaciaId} onClick={() => choose(f)} disabled={f.cantidadDisponible <= 0} className={`pharmacy-option ${selected?.farmaciaId === f.farmaciaId ? 'selected' : ''}`}><span className="pharmacy-marker"><Store size={22}/></span><span className="pharmacy-meta"><strong>{f.nombre}</strong><small><MapPin size={13}/>{f.direccion}</small>{!coords(f) && <span className="distance-chip">Sin ubicación en mapa</span>}{f.distanciaKm != null && <span className="distance-chip"><Navigation size={11}/> a {formatoDistancia(f.distanciaKm * 1000)}</span>}</span><span className={`stock-count ${f.cantidadDisponible > 0 ? '' : 'sold-out'}`}><strong>{f.cantidadDisponible}</strong><small>unidades</small></span><span className="radio-indicator"/></button>)}</div>{visible < avail.length && <button type="button" className="btn btn-outline load-more" onClick={() => setVisible(v => v + PAGINA_FARMACIAS)}>Ver más farmacias <span>({number(avail.length - visible)} restantes)</span></button>}</>}</Panel><div ref={bookingRef} className="booking-anchor"><Panel title="Tu reserva" subtitle="Confirmá los detalles antes de continuar."><div className="booking-summary"><span><Pill size={17}/> {presentation.medicamentoNombre}</span><strong>{presentationLabel(presentation)}</strong><div className="summary-divider"/><span><Store size={17}/> Farmacia seleccionada</span><strong>{selected ? selected.nombre : 'Elegí una farmacia de la lista o del mapa'}</strong>{selected && <small className="booking-pharmacy-detail">{selected.direccion}{selected.distanciaKm != null && <> · a {formatoDistancia(selected.distanciaKm * 1000)}</>}</small>}</div><form onSubmit={reserve} className="stack-form"><Field label="Cantidad"><input type="number" min="1" max={selected?.cantidadDisponible || 1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} required/></Field>{presentation.condicionDispensa === 'BAJO_RECETA' && <Field label="Código de Prescripción" hint="El código debe pertenecer a una Prescripción activa y válida a tu nombre."><input maxLength={80} value={rxCode} onChange={e => setRxCode(e.target.value)} placeholder="Ingresá el código de tu receta" required/></Field>}{!me ? <Alert tone="info">Necesitás iniciar sesión como Usuario para reservar.</Alert> : me.perfil.rol !== 'USUARIO' ? <Alert tone="info">La creación de reservas está disponible solo para cuentas de Usuario.</Alert> : me.suspensionVigente?.vigente ? <Alert>Tu cuenta está suspendida hasta {new Date(me.suspensionVigente.fechaHoraFin).toLocaleDateString('es-AR')}.</Alert> : null}{actionError && <Alert>{actionError}</Alert>}<Button type="submit" disabled={!selected || (me !== null && me.perfil.rol !== 'USUARIO') || Boolean(me?.suspensionVigente?.vigente)} busy={busy}> {me ? 'Confirmar reserva' : 'Ingresar para reservar'} <ArrowRight size={17}/></Button><p className="booking-disclaimer"><Clock3 size={15}/> Si se confirma, verás el plazo exacto para retirar.</p></form></Panel></div></div></>}</div>;
 }
