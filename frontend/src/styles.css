@@ -110,10 +110,3 @@
 @media(max-width:400px){.pharmacy-map{height:320px}.map-card-copy h2{font-size:17px}}
 .map-placeholder{display:flex;align-items:center;justify-content:center;gap:9px;color:#7d90a4;font-size:12px}
 .pharmacy-map .leaflet-tile-pane{filter:saturate(.72) brightness(1.03) contrast(.96)}
-/* Infraestructura mínima del MVP de mapas: la rama no contiene pantallas de administración. */
-.demo-header-nav{margin-left:auto;display:flex;gap:18px;align-items:center}.demo-header-nav a,.demo-header-nav button{border:0;background:none;color:#235784;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-.demo-alert{margin:12px 0;padding:11px 13px;border-radius:10px;background:#fff1f1;color:#9a2932;font-size:13px}.demo-alert.info{background:#eaf5fd;color:#235784}
-.demo-badge{display:inline-block;background:#eaf7f4;color:#087b75;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700}
-.demo-empty{text-align:center;padding:24px}.demo-empty p{color:#61768c;margin-top:8px}.demo-loading{padding:26px;color:#61768c;text-align:center}
-.demo-pagination{display:flex;align-items:center;justify-content:center;gap:15px;margin:20px 0}.demo-pagination button{padding:8px 14px;border:1px solid #d8e2ed;border-radius:8px;background:white;cursor:pointer}.demo-pagination button:disabled{opacity:.4;cursor:not-allowed}
-.demo-auth{max-width:620px;padding-top:50px;padding-bottom:70px}.demo-auth .panel{padding:32px}.demo-auth .stack-form{margin:20px 0}.demo-auth .stack-form input{width:100%}

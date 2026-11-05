@@ -1,42 +1,38 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { get, guardarToken, post, tokenActual } from '../lib/api';
-import type { Login, Me } from '../lib/types';
+import { authApi, getAccessToken, setAccessToken } from '../lib/api';
+import type { Cuenta, Me } from '../lib/types';
 
-type AuthContextType = {
-  me: Me | null;
-  loading: boolean;
-  login: (correo: string, contrasena: string) => Promise<void>;
-  logout: () => Promise<void>;
-};
-const Context = createContext<AuthContextType | null>(null);
-
+type AuthState = { me: Me | null; loading: boolean; signIn: (email: string, password: string) => Promise<Cuenta>; signOut: () => Promise<void>; refresh: () => Promise<void> };
+const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(Boolean(tokenActual()));
+  const [loading, setLoading] = useState(Boolean(getAccessToken()));
+  async function refresh() {
+    if (!getAccessToken()) { setMe(null); return; }
+    try { setMe(await authApi.me()); }
+    catch { setAccessToken(null); setMe(null); }
+  }
   useEffect(() => {
-    if (!tokenActual()) return;
-    let active = true;
-    get<Me>('/api/me').then(data => { if (active) setMe(data); })
-      .catch(() => { if (active) guardarToken(null); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    void refresh().finally(() => setLoading(false));
+    const onExpired = () => setMe(null);
+    window.addEventListener('medlink:session-expired', onExpired);
+    return () => window.removeEventListener('medlink:session-expired', onExpired);
   }, []);
-  async function login(correo: string, contrasena: string) {
-    const data = await post<Login>('/api/auth/login', { correo, contrasena });
-    guardarToken(data.accessToken);
-    try { setMe(await get<Me>('/api/me')); }
-    catch (error) { guardarToken(null); throw error; }
+  async function signIn(email: string, password: string) {
+    const response = await authApi.login(email.trim(), password);
+    setAccessToken(response.accessToken);
+    try { setMe(await authApi.me()); }
+    catch { setAccessToken(null); setMe(null); throw new Error('No se pudo validar la sesión. Volvé a iniciar sesión.'); }
+    return response.perfil;
   }
-  async function logout() {
-    try { if (tokenActual()) await post<void>('/api/auth/logout'); }
-    catch { /* Logout local aun cuando la API no responda. */ }
-    finally { guardarToken(null); setMe(null); }
+  async function signOut() {
+    try { if (getAccessToken()) await authApi.logout(); } catch { /* borrar token aunque la red falle */ }
+    finally { setAccessToken(null); setMe(null); }
   }
-  return <Context.Provider value={{ me, loading, login, logout }}>{children}</Context.Provider>;
+  return <AuthContext.Provider value={{ me, loading, signIn, signOut, refresh }}>{children}</AuthContext.Provider>;
 }
-
 export function useAuth() {
-  const ctx = useContext(Context);
-  if (!ctx) throw new Error('AuthProvider no esta disponible.');
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('AuthProvider faltante');
+  return context;
 }
