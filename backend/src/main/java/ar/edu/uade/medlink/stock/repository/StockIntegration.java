@@ -124,10 +124,25 @@ public class StockIntegration {
     }
     @SuppressWarnings("unchecked")
     public List<DisponibilidadFarmaciaDTO> disponibilidad(long presentacion) {
+        return disponibilidad(presentacion,null,null);
+    }
+
+    /** Con lat/lng ordena por distancia (Haversine, km); sin ellas, alfabeticamente como siempre. */
+    public List<DisponibilidadFarmaciaDTO> disponibilidad(long presentacion, Double lat, Double lng) {
         if (em.createNativeQuery("SELECT id_presentacion FROM presentacion_medicamento WHERE id_presentacion=:id")
             .setParameter("id",presentacion).getResultList().isEmpty()) throw ApiException.notFound();
-        List<Object[]> rows=em.createNativeQuery("""
-            SELECT f.id_farmacia,f.nombre,f.direccion,s.cantidad_disponible FROM stock s
+        boolean conUbicacion=lat!=null && lng!=null;
+        String distancia=conUbicacion ? """
+            CASE WHEN f.latitud IS NULL OR f.longitud IS NULL THEN NULL ELSE
+              12742.0 * asin(least(1.0, sqrt(
+                power(sin(radians(f.latitud::float8 - :lat) / 2), 2)
+                + cos(radians(:lat)) * cos(radians(f.latitud::float8))
+                  * power(sin(radians(f.longitud::float8 - :lng) / 2), 2))))
+            END""" : "CAST(NULL AS float8)";
+        String orden=conUbicacion ? "distancia ASC NULLS LAST,f.nombre ASC,f.id_farmacia ASC" : "f.nombre ASC,f.id_farmacia ASC";
+        var query=em.createNativeQuery("""
+            SELECT f.id_farmacia,f.nombre,f.direccion,s.cantidad_disponible,f.latitud,f.longitud,%s AS distancia
+            FROM stock s
             JOIN farmacia f ON f.id_farmacia=s.id_farmacia
             JOIN presentacion_medicamento p ON p.id_presentacion=s.id_presentacion
             JOIN medicamento m ON m.id_medicamento=p.id_medicamento
@@ -135,8 +150,15 @@ public class StockIntegration {
             AND p.estado='ACTIVA' AND m.estado='ACTIVO'
             AND EXISTS (SELECT 1 FROM operador o JOIN cuenta c ON c.id_cuenta=o.id_cuenta
                         WHERE o.id_farmacia=f.id_farmacia AND c.estado='ACTIVA')
-            ORDER BY f.nombre ASC,f.id_farmacia ASC
-            """).setParameter("id",presentacion).getResultList();
-        return rows.stream().map(r->new DisponibilidadFarmaciaDTO(number(r[0]),(String)r[1],(String)r[2],((Number)r[3]).intValue())).toList();
+            ORDER BY %s
+            """.formatted(distancia,orden)).setParameter("id",presentacion);
+        if (conUbicacion) query.setParameter("lat",lat).setParameter("lng",lng);
+        @SuppressWarnings("unchecked") List<Object[]> rows=query.getResultList();
+        return rows.stream().map(r->new DisponibilidadFarmaciaDTO(number(r[0]),(String)r[1],(String)r[2],((Number)r[3]).intValue(),
+            decimal(r[4]),decimal(r[5]),r[6]==null?null:((Number)r[6]).doubleValue())).toList();
+    }
+    private static java.math.BigDecimal decimal(Object value) {
+        if (value==null) return null;
+        return value instanceof java.math.BigDecimal b ? b : new java.math.BigDecimal(value.toString());
     }
 }

@@ -29,12 +29,12 @@ class FarmaciaServiceTest {
     final CurrentAccount admin=new CurrentAccount(1,"ADMINISTRADOR","test",0);
     @BeforeEach void setUp() { service=new FarmaciaService(repository,integration,audit,Clock.fixed(t,ZoneOffset.UTC)); }
     Farmacia farmacia() {
-        var f=new Farmacia("Central","Calle 1",null,null);
+        var f=new Farmacia("Central","Calle 1",null,null,null,null);
         ReflectionTestUtils.setField(f,"id",4L); return f;
     }
     @Test void listingLoadsOperationalStateInOneBatch() {
         var active=farmacia();
-        var inactive=new Farmacia("Sur", "Calle 2", null, null);
+        var inactive=new Farmacia("Sur", "Calle 2", null, null,null,null);
         ReflectionTestUtils.setField(inactive,"id",5L);
         inactive.cambiarEstado(EstadoFarmacia.INACTIVA);
         when(repository.findAll(any(org.springframework.data.jpa.domain.Specification.class),any(org.springframework.data.domain.Pageable.class)))
@@ -51,7 +51,7 @@ class FarmaciaServiceTest {
         when(repository.saveAndFlush(any())).thenAnswer(call->{
             Farmacia f=call.getArgument(0); ReflectionTestUtils.setField(f,"id",4L);return f;
         });
-        var dto=service.crear(new FarmaciaRequest(" Nueva "," Calle 3 "," ",null),admin,null);
+        var dto=service.crear(new FarmaciaRequest(" Nueva "," Calle 3 "," ",null,null,null),admin,null);
         assertEquals(EstadoFarmacia.ACTIVA,dto.estado()); assertFalse(dto.operativa());
         assertEquals("Nueva",dto.nombre()); assertNull(dto.telefono());
         verify(integration, never()).tieneOperadorActivo(anyLong());
@@ -61,7 +61,7 @@ class FarmaciaServiceTest {
     @Test void editsContactAndPreservesState() {
         var f=farmacia(); f.cambiarEstado(EstadoFarmacia.INACTIVA);
         when(repository.findLocked(4)).thenReturn(Optional.of(f));
-        var dto=service.editar(4,new FarmaciaRequest("Editada","Otra", "123","a@b.test"),admin,null);
+        var dto=service.editar(4,new FarmaciaRequest("Editada","Otra", "123","a@b.test",null,null),admin,null);
         assertEquals("Editada",dto.nombre()); assertEquals(EstadoFarmacia.INACTIVA,dto.estado());
         verify(audit).record(eq(1L),anyString(),eq("EDITAR_FARMACIA"),eq("FARMACIA"),eq(4L),isNull(),isNull(),
             argThat(m->m.get("nombre").equals("Central")),argThat(m->m.get("nombre").equals("Editada")),isNull());
@@ -100,8 +100,8 @@ class FarmaciaServiceTest {
         for (String role:List.of("OPERADOR","USUARIO")) {
             var actor=new CurrentAccount(2,role,"test",0);
             assertEquals("FORBIDDEN",assertThrows(ApiException.class,
-                ()->service.crear(new FarmaciaRequest("Nueva","Calle",null,null),actor,null)).codigo());
-            assertThrows(ApiException.class,()->service.editar(4,new FarmaciaRequest("Nueva","Calle",null,null),actor,null));
+                ()->service.crear(new FarmaciaRequest("Nueva","Calle",null,null,null,null),actor,null)).codigo());
+            assertThrows(ApiException.class,()->service.editar(4,new FarmaciaRequest("Nueva","Calle",null,null,null,null),actor,null));
             assertThrows(ApiException.class,()->service.cambiarEstado(4,false,"Cierre",actor,null));
             assertThrows(ApiException.class,()->service.listar(null,null,0,20,null,actor));
         }
@@ -109,7 +109,7 @@ class FarmaciaServiceTest {
     }
     @Test void rejectsMissingPharmacyAndInvalidFilters() {
         assertEquals("RESOURCE_NOT_FOUND",assertThrows(ApiException.class,
-            ()->service.editar(99,new FarmaciaRequest("Nueva","Calle",null,null),admin,null)).codigo());
+            ()->service.editar(99,new FarmaciaRequest("Nueva","Calle",null,null,null,null),admin,null)).codigo());
         assertThrows(ApiException.class,()->service.listar(null,"INVALIDO",0,20,null,admin));
         assertThrows(ApiException.class,()->service.listar(null,null,0,101,null,admin));
         assertThrows(ApiException.class,()->service.listar(null,null,0,20,List.of("nombre;DROP TABLE farmacia,asc"),admin));

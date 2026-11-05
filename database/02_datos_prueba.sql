@@ -44,12 +44,12 @@ INSERT INTO administrador (id_administrador, id_cuenta, nombre, apellido) VALUES
 -- ---------------------------------------------------------------------
 --  Farmacias (CABA)
 -- ---------------------------------------------------------------------
-INSERT INTO farmacia (id_farmacia, nombre, direccion, telefono, email_contacto, estado) VALUES
- (1, 'Farmacia Central Palermo', 'Av. Santa Fe 3200, Palermo, CABA',       '011 4821-1000', 'palermo@farmacia-central.test', 'ACTIVA'),
- (2, 'Farmacia San Martín',      'Av. Rivadavia 5100, Caballito, CABA',    '011 4902-2000', 'contacto@fsanmartin.test',      'ACTIVA'),
- (3, 'Farmacia del Centro',      'Av. Corrientes 1200, San Nicolás, CABA', '011 4381-3000', 'info@delcentro.test',           'ACTIVA'),
- (4, 'Farmacia Belgrano Salud',  'Av. Cabildo 2100, Belgrano, CABA',       '011 4784-4000', 'belgrano@salud.test',           'ACTIVA'),
- (5, 'Farmacia Flores',          'Av. Rivadavia 7000, Flores, CABA',       NULL,            NULL,                            'INACTIVA');
+INSERT INTO farmacia (id_farmacia, nombre, direccion, telefono, email_contacto, latitud, longitud, estado) VALUES
+ (1, 'Farmacia Central Palermo', 'Av. Santa Fe 3200, Palermo, CABA',       '011 4821-1000', 'palermo@farmacia-central.test', -34.5956400, -58.4059200, 'ACTIVA'),
+ (2, 'Farmacia San Martín',      'Av. Rivadavia 5100, Caballito, CABA',    '011 4902-2000', 'contacto@fsanmartin.test',      -34.6197300, -58.4421100, 'ACTIVA'),
+ (3, 'Farmacia del Centro',      'Av. Corrientes 1200, San Nicolás, CABA', '011 4381-3000', 'info@delcentro.test',           -34.6042000, -58.3843500, 'ACTIVA'),
+ (4, 'Farmacia Belgrano Salud',  'Av. Cabildo 2100, Belgrano, CABA',       '011 4784-4000', 'belgrano@salud.test',           -34.5633200, -58.4551000, 'ACTIVA'),
+ (5, 'Farmacia Flores',          'Av. Rivadavia 7000, Flores, CABA',       NULL,            NULL,                            -34.6269000, -58.4654000, 'INACTIVA');
 
 -- ---------------------------------------------------------------------
 --  Operadores de farmacia

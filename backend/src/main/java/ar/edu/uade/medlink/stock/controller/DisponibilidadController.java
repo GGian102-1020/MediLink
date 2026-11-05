@@ -11,7 +11,8 @@ public class DisponibilidadController {
     private final StockService service;
     public DisponibilidadController(StockService service) { this.service=service; }
     @GetMapping("/{id}/disponibilidad")
-    public List<DisponibilidadFarmaciaDTO> disponibilidad(@PathVariable long id) {
-        return service.disponibilidad(id);
+    public List<DisponibilidadFarmaciaDTO> disponibilidad(@PathVariable long id,
+        @RequestParam(required=false) Double lat, @RequestParam(required=false) Double lng) {
+        return service.disponibilidad(id,lat,lng);
     }
 }

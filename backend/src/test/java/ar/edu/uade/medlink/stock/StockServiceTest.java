@@ -34,7 +34,7 @@ class StockServiceTest {
     @BeforeEach void setUp() {
         service=new StockService(stocks,movimientos,farmacias,pharmacyIntegration,integration,audit,Clock.fixed(t,ZoneOffset.UTC));
     }
-    Farmacia farmacia() { return new Farmacia("Central","Calle",null,null); }
+    Farmacia farmacia() { return new Farmacia("Central","Calle",null,null,null,null); }
     Stock stock(int amount) {
         var s=new Stock(4,3,t);s.establecerCantidad(amount,t);ReflectionTestUtils.setField(s,"id",8L);return s;
     }

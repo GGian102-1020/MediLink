@@ -95,6 +95,8 @@ CREATE TABLE farmacia (
     direccion VARCHAR(200) NOT NULL,
     telefono VARCHAR(30),
     email_contacto VARCHAR(254),
+    latitud  NUMERIC(10, 7),
+    longitud NUMERIC(10, 7),
     estado estado_farmacia NOT NULL DEFAULT 'ACTIVA',
     CONSTRAINT ck_farmacia_nombre CHECK (length(btrim(nombre)) BETWEEN 1 AND 120),
     CONSTRAINT ck_farmacia_direccion CHECK (length(btrim(direccion)) BETWEEN 1 AND 200),

@@ -95,6 +95,14 @@ public class StockService {
     public List<DisponibilidadFarmaciaDTO> disponibilidad(long presentacion) {
         return integration.disponibilidad(presentacion);
     }
+    /** lat y lng van juntas; la ubicacion solo se usa para ordenar y no se guarda ni se audita. */
+    public List<DisponibilidadFarmaciaDTO> disponibilidad(long presentacion, Double lat, Double lng) {
+        if (lat==null && lng==null) return integration.disponibilidad(presentacion);
+        if (lat==null || lng==null) throw ApiException.validation("Enviá lat y lng juntas.");
+        if (!Double.isFinite(lat) || !Double.isFinite(lng) || lat<-90 || lat>90 || lng<-180 || lng>180)
+            throw ApiException.validation("Ubicación fuera de rango.");
+        return integration.disponibilidad(presentacion,lat,lng);
+    }
     private void checkRead(long farmacia, CurrentAccount actor) {
         integration.autorizar(farmacia,actor);
         if (!farmacias.existsById(farmacia)) throw ApiException.notFound();

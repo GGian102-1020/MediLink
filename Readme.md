@@ -105,7 +105,22 @@ La configuración incluida permite levantar PostgreSQL mediante Docker Compose. 
 docker compose up -d
 ```
 
+<<<<<<< Updated upstream
 Conexión, cuentas de prueba y cómo resetear la base: ver [database/README.md](database/README.md).
+=======
+3. Abrí `https://localhost:8443` y comprobá la API en `https://localhost:8443/api/medicamentos`. Caddy usa una CA local: el navegador puede advertir que no confía todavía en ella. El puerto HTTPS se publica **solo en 127.0.0.1**.
+4. **Solo para una demo local descartable**, cargá las cuentas ficticias una vez, después de las migraciones de Flyway:
+
+```bash
+# Paso 1: datos de prueba (usuarios, médicos, presentaciones, etc.)
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/medlink/02_datos_prueba.sql'
+
+# Paso 2: farmacias reales de CABA con stock de prueba (reemplaza las ficticias del paso 1)
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/medlink/03_farmacias_reales.sql'
+```
+
+**IMPORTANTE:** el arranque nuevo no carga automáticamente cuentas con contraseñas de demostración. Si el volumen ya tiene el esquema anterior a Flyway, **no ejecutes este procedimiento como instalación nueva**: seguí la adopción controlada en [database/README.md](database/README.md). Nunca uses `down -v` en una base con datos que necesites conservar.
+>>>>>>> Stashed changes
 
 ## Cuentas y autenticación (backend)
 

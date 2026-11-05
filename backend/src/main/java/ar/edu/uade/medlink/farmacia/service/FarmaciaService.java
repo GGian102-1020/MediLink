@@ -1,8 +1,10 @@
 package ar.edu.uade.medlink.farmacia.service;
 
 import ar.edu.uade.medlink.common.*;
+import java.math.BigDecimal;
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.farmacia.dto.*;
+import java.util.Comparator;
 import ar.edu.uade.medlink.farmacia.entity.*;
 import ar.edu.uade.medlink.farmacia.repository.*;
 import ar.edu.uade.medlink.security.CurrentAccount;
@@ -55,7 +57,7 @@ public class FarmaciaService {
     @Transactional
     public FarmaciaDTO crear(@Valid FarmaciaRequest req, CurrentAccount actor, HttpServletRequest request) {
         requireAdmin(actor);
-        Farmacia f=farmacias.saveAndFlush(new Farmacia(req.nombre(),req.direccion(),req.telefono(),req.emailContacto()));
+        Farmacia f=farmacias.saveAndFlush(new Farmacia(req.nombre(),req.direccion(),req.telefono(),req.emailContacto(),req.latitud(),req.longitud()));
         audit.record(actor.id(),actor.rol(),"CREAR_FARMACIA","FARMACIA",f.getId(),null,null,null,summary(f),request);
         // The new pharmacy cannot have any operators until their separate creation.
         return dto(f, false);
@@ -65,7 +67,7 @@ public class FarmaciaService {
         requireAdmin(actor);
         Farmacia f=farmacias.findLocked(id).orElseThrow(ApiException::notFound);
         var before=summary(f);
-        f.editar(req.nombre(),req.direccion(),req.telefono(),req.emailContacto());
+        f.editar(req.nombre(),req.direccion(),req.telefono(),req.emailContacto(),req.latitud(),req.longitud());
         audit.record(actor.id(),actor.rol(),"EDITAR_FARMACIA","FARMACIA",id,null,null,before,summary(f),request);
         return dto(f);
     }
@@ -90,7 +92,36 @@ public class FarmaciaService {
     }
     private static FarmaciaDTO dto(Farmacia f,boolean operativa) {
         return new FarmaciaDTO(f.getId(),f.getNombre(),f.getDireccion(),f.getTelefono(),f.getEmailContacto(),
-            f.getEstado(),f.getEstado()==EstadoFarmacia.ACTIVA && operativa);
+            f.getLatitud(),f.getLongitud(),f.getEstado(),f.getEstado()==EstadoFarmacia.ACTIVA && operativa);
+    }
+
+    /** Busca farmacias ACTIVAS que tengan coords y las ordena por distancia (Haversine). */
+    @Transactional(readOnly=true)
+    public List<FarmaciaCercanaDTO> buscarCercanas(BigDecimal latUsuario, BigDecimal lngUsuario, double radioKm) {
+        return farmacias.findByEstado(EstadoFarmacia.ACTIVA).stream()
+            .filter(f -> f.getLatitud() != null && f.getLongitud() != null)
+            .map(f -> {
+                double dist = haversine(latUsuario.doubleValue(), lngUsuario.doubleValue(),
+                                        f.getLatitud().doubleValue(), f.getLongitud().doubleValue());
+                return new FarmaciaCercanaDTO(f.getId(), f.getNombre(), f.getDireccion(),
+                    f.getTelefono(), f.getLatitud(), f.getLongitud(), dist);
+            })
+            .filter(fc -> fc.distanciaKm() <= radioKm)
+            .sorted(Comparator.comparingDouble(FarmaciaCercanaDTO::distanciaKm))
+            .toList();
+    }
+
+    /**
+     * Fórmula de Haversine: distancia en km entre dos puntos geográficos.
+     */
+    private static double haversine(double lat1, double lon1, double lat2, double lon2) {
+        final double R = 6371.0; // radio de la Tierra en km
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat/2)*Math.sin(dLat/2)
+                 + Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))
+                 * Math.sin(dLon/2)*Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
     private static Map<String,Object> summary(Farmacia f) {
         Map<String,Object> data=new LinkedHashMap<>();
