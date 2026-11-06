@@ -170,3 +170,23 @@
 }
 .map-placeholder{display:flex;align-items:center;justify-content:center;gap:9px;color:#7d90a4;font-size:12px}
 .pharmacy-map .leaflet-tile-pane{filter:saturate(.72) brightness(1.03) contrast(.96)}
+
+.receta-reservar { justify-self: start; margin-top: 6px; }
+
+.reserva-exitosa { text-align: center; }
+.reserva-exitosa-tick {
+  width: 72px; height: 72px; margin: 4px auto 14px; border-radius: 50%;
+  display: grid; place-items: center; background: #e6f7ef; color: #1f9d63;
+  animation: reserva-tick .35s ease-out;
+}
+.reserva-exitosa > p { font-size: 13px; color: #5f7287; }
+.reserva-exitosa-datos {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+  margin: 0; padding: 14px; border-radius: 12px; background: #f4f8fc; text-align: left;
+}
+.reserva-exitosa-datos dt { font-size: 11px; color: #8a9aad; }
+.reserva-exitosa-datos dd { margin: 3px 0 0; font-weight: 800; overflow-wrap: anywhere; }
+.reserva-exitosa .modal-actions { justify-content: center; }
+@keyframes reserva-tick { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .reserva-exitosa-tick { animation: none; } }
+@media (max-width: 480px) { .reserva-exitosa-datos { grid-template-columns: 1fr; } }

@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, BadgeCheck, CalendarCheck2, Car, ChevronRight, Clock3, Cross, ExternalLink, Footprints, HeartPulse, LoaderCircle, LocateFixed, MapPin, Navigation, Pill, Search, ShieldCheck, Sparkles, Store, Stethoscope, X } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowRight, BadgeCheck, CalendarCheck2, Car, ChevronRight, CircleCheck, Clock3, Cross, ExternalLink, Footprints, HeartPulse, LoaderCircle, LocateFixed, MapPin, Navigation, Pill, Search, ShieldCheck, Sparkles, Store, Stethoscope, X } from 'lucide-react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { get, pageQuery, post } from '../lib/api';
-import { presentationLabel, number } from '../lib/format';
-import type { Disponibilidad, Medicamento, Page, Presentacion, Reserva } from '../lib/types';
+import { dateOnly, dateTime, presentationLabel, number } from '../lib/format';
+import { recetasUsablesPara } from '../lib/recetas';
+import type { Disponibilidad, Medicamento, Page, Prescripcion, Presentacion, Reserva } from '../lib/types';
 import { buscarDireccion, calcularRuta, coords, enlaceComoLlegar, formatoDistancia, formatoDuracion, guardarOrigen, leerOrigenGuardado, ubicacionActual, type Encuadre, type ModoViaje, type Origen, type ResultadoDireccion, type Ruta } from '../lib/geo';
 import { Alert, BackLink, Badge, Button, Empty, ErrorState, Field, Loading, Pagination, Panel, PageTitle } from '../components/UI';
 
@@ -30,6 +31,33 @@ function MedicineRow({ med }: { med: Medicamento }) {
 }
 // Leaflet se descarga solo al abrir una Presentacion con stock.
 const PharmacyMap = lazy(() => import('../components/PharmacyMap'));
+
+function ReservaExitosa({ reserva, onVer, onCerrar }: { reserva: Reserva; onVer: () => void; onCerrar: () => void }) {
+  const verRef = useRef<HTMLButtonElement>(null);
+  const cerrarRef = useRef(onCerrar); cerrarRef.current = onCerrar;
+  useEffect(() => {
+    verRef.current?.focus();
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') cerrarRef.current(); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, []);
+  return <div className="modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onCerrar(); }}>
+    <div className="modal reserva-exitosa" role="alertdialog" aria-modal="true" aria-labelledby="reserva-ok-title" aria-describedby="reserva-ok-desc">
+      <button type="button" className="icon-button modal-close" aria-label="Cerrar" onClick={onCerrar}><X size={20}/></button>
+      <div className="reserva-exitosa-tick"><CircleCheck size={40}/></div>
+      <h2 id="reserva-ok-title">¡Tu reserva se realizó con éxito!</h2>
+      <p id="reserva-ok-desc">Reservaste {reserva.cantidad} {reserva.cantidad === 1 ? 'unidad' : 'unidades'} de <strong>{reserva.medicamentoNombreSnapshot}</strong> en <strong>{reserva.farmaciaNombreSnapshot}</strong>.</p>
+      <dl className="reserva-exitosa-datos">
+        <div><dt>Código de reserva</dt><dd>{reserva.codigoVisible}</dd></div>
+        <div><dt>Retirá antes del</dt><dd>{dateTime(reserva.fechaHoraVencimiento)}</dd></div>
+      </dl>
+      <div className="modal-actions">
+        <Button type="button" variant="secondary" onClick={onCerrar}>Seguir explorando</Button>
+        <button ref={verRef} type="button" className="btn btn-primary" onClick={onVer}>Ver mi reserva <ArrowRight size={17}/></button>
+      </div>
+    </div>
+  </div>;
+}
 const PAGINA_FARMACIAS = 12;
 function cercanas(lista: Disponibilidad[], n: number): [number, number][] {
   return lista.flatMap(f => { const c = coords(f); return c ? [[c.lat, c.lng] as [number, number]] : []; }).slice(0, n);
@@ -40,8 +68,10 @@ export function PresentationDetail() {
 }
 function PresentationContent({ id }: { id?: string }) {
   const navigate = useNavigate(); const { me } = useAuth();
+  // "Reservar ahora" desde Mis recetas trae el código elegido en el estado de navegación.
+  const codigoRecibido = (useLocation().state as { codigoReceta?: unknown } | null)?.codigoReceta;
   const [presentation, setPresentation] = useState<Presentacion | null>(null); const [avail, setAvail] = useState<Disponibilidad[]>([]); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [retryVersion, setRetryVersion] = useState(0);
-  const [selected, setSelected] = useState<Disponibilidad | null>(null); const [quantity, setQuantity] = useState(1); const [rxCode, setRxCode] = useState(''); const [busy, setBusy] = useState(false); const [actionError, setActionError] = useState('');
+  const [selected, setSelected] = useState<Disponibilidad | null>(null); const [quantity, setQuantity] = useState(1); const [rxCode, setRxCode] = useState(() => typeof codigoRecibido === 'string' ? codigoRecibido : ''); const [busy, setBusy] = useState(false); const [actionError, setActionError] = useState('');
   const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
   // Mapa: origen del usuario, busqueda de direcciones y recorrido hasta la farmacia elegida.
   const [origen, setOrigen] = useState<Origen | null>(() => leerOrigenGuardado());
@@ -49,6 +79,29 @@ function PresentationContent({ id }: { id?: string }) {
   const [address, setAddress] = useState(''); const [results, setResults] = useState<ResultadoDireccion[]>([]); const [searching, setSearching] = useState(false);
   const [modo, setModo] = useState<ModoViaje>('pie'); const [ruta, setRuta] = useState<Ruta | null>(null); const [rutaLoading, setRutaLoading] = useState(false); const [rutaError, setRutaError] = useState(''); const [showSteps, setShowSteps] = useState(false);
   const [encuadre, setEncuadre] = useState<Encuadre | null>(null); const [visible, setVisible] = useState(PAGINA_FARMACIAS);
+  const [misRecetas, setMisRecetas] = useState<Prescripcion[]>([]);
+  const [reservaCreada, setReservaCreada] = useState<Reserva | null>(null);
+  function cerrarReservaCreada() {
+    // El stock y la receta usada cambiaron: se limpia el formulario y se refresca la disponibilidad.
+    setReservaCreada(null); setSelected(null); setQuantity(1); setRxCode(''); setRetryVersion(v => v + 1);
+  }
+
+  // Si el usuario ya vinculó (p. ej. escaneó) una receta válida para esta presentación,
+  // se precarga su código: la más reciente, sin pisar lo que haya escrito a mano.
+  const requiereReceta = presentation?.condicionDispensa === 'BAJO_RECETA';
+  const esUsuario = me?.perfil.rol === 'USUARIO';
+  useEffect(() => {
+    setMisRecetas([]);
+    if (!presentation || !requiereReceta || !esUsuario) return;
+    let active = true;
+    recetasUsablesPara(presentation.id).then(r => {
+      if (!active) return;
+      setMisRecetas(r);
+      if (r.length) setRxCode(prev => prev.trim() ? prev : r[0].codigoExterno);
+    }).catch(() => { /* sin recetas precargadas: queda el ingreso manual */ });
+    return () => { active = false; };
+  }, [presentation?.id, requiereReceta, esUsuario]);
+  const recetaElegida = misRecetas.find(r => r.codigoExterno === rxCode.trim());
   const bookingRef = useRef<HTMLDivElement>(null);
   const addressAbortRef = useRef<AbortController | null>(null);
   const origenQuery = (o: Origen | null) => (o ? { lat: o.lat, lng: o.lng } : undefined);
@@ -139,7 +192,7 @@ function PresentationContent({ id }: { id?: string }) {
     const fingerprint = JSON.stringify(payload);
     if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, key: crypto.randomUUID() };
     setBusy(true); setActionError('');
-    try { const reservation = await post<Reserva>('/api/reservas', payload, attempt.current.key); attempt.current = null; navigate(`/mis-reservas/${encodeURIComponent(reservation.codigoVisible)}`, { state: { created: true } }); }
+    try { const reservation = await post<Reserva>('/api/reservas', payload, attempt.current.key); attempt.current = null; setReservaCreada(reservation); }
     catch (e) { setActionError(e instanceof Error ? e.message : 'No se pudo reservar.'); } finally { setBusy(false); }
   }
 
@@ -190,5 +243,5 @@ function PresentationContent({ id }: { id?: string }) {
   return <div className="wide-wrap detail-page"><BackLink to="/catalogo" label="Volver al catálogo"/>{loading ? <Loading/> : error ? <ErrorState error={error} retry={() => setRetryVersion(v => v + 1)}/> : presentation && <><div className="detail-intro"><div className="detail-drug-icon"><Pill size={48}/></div><div><div className="eyebrow">MEDICAMENTOS / PRESENTACIÓN</div><h1>{presentation.medicamentoNombre}</h1><p>{presentationLabel(presentation)}</p><Badge value={presentation.condicionDispensa}/></div></div>
     {avail.length > 0 && mapCard}
     {geoError && !avail.length && <Alert>{geoError}</Alert>}
-    <div className="detail-grid"><Panel title="Disponibilidad por farmacia" subtitle={origen ? 'Las más cercanas primero.' : 'Elegí dónde querés retirar tu medicamento.'}><p className="muted small-text">{avail.length > 0 && <>{number(avail.length)} {avail.length === 1 ? 'farmacia' : 'farmacias'} con stock. </>}El stock mostrado puede cambiar hasta confirmar la reserva.</p>{!avail.length ? sorting ? <Loading/> : <Empty title="Sin disponibilidad por ahora" detail="Volvé a consultar más tarde."/> : <><div className="availability-list">{avail.slice(0, visible).map(f => <button type="button" key={f.farmaciaId} onClick={() => choose(f)} disabled={f.cantidadDisponible <= 0} className={`pharmacy-option ${selected?.farmaciaId === f.farmaciaId ? 'selected' : ''}`}><span className="pharmacy-marker"><Store size={22}/></span><span className="pharmacy-meta"><strong>{f.nombre}</strong><small><MapPin size={13}/>{f.direccion}</small>{!coords(f) && <span className="distance-chip">Sin ubicación en mapa</span>}{f.distanciaKm != null && <span className="distance-chip"><Navigation size={11}/> a {formatoDistancia(f.distanciaKm * 1000)}</span>}</span><span className={`stock-count ${f.cantidadDisponible > 0 ? '' : 'sold-out'}`}><strong>{f.cantidadDisponible}</strong><small>unidades</small></span><span className="radio-indicator"/></button>)}</div>{visible < avail.length && <button type="button" className="btn btn-outline load-more" onClick={() => setVisible(v => v + PAGINA_FARMACIAS)}>Ver más farmacias <span>({number(avail.length - visible)} restantes)</span></button>}</>}</Panel><div ref={bookingRef} className="booking-anchor"><Panel title="Tu reserva" subtitle="Confirmá los detalles antes de continuar."><div className="booking-summary"><span><Pill size={17}/> {presentation.medicamentoNombre}</span><strong>{presentationLabel(presentation)}</strong><div className="summary-divider"/><span><Store size={17}/> Farmacia seleccionada</span><strong>{selected ? selected.nombre : 'Elegí una farmacia de la lista o del mapa'}</strong>{selected && <small className="booking-pharmacy-detail">{selected.direccion}{selected.distanciaKm != null && <> · a {formatoDistancia(selected.distanciaKm * 1000)}</>}</small>}</div><form onSubmit={reserve} className="stack-form"><Field label="Cantidad"><input type="number" min="1" max={selected?.cantidadDisponible || 1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} required/></Field>{presentation.condicionDispensa === 'BAJO_RECETA' && <Field label="Código de Prescripción" hint="El código debe pertenecer a una Prescripción activa y válida a tu nombre."><input maxLength={80} value={rxCode} onChange={e => setRxCode(e.target.value)} placeholder="Ingresá el código de tu receta" required/></Field>}{!me ? <Alert tone="info">Necesitás iniciar sesión como Usuario para reservar.</Alert> : me.perfil.rol !== 'USUARIO' ? <Alert tone="info">La creación de reservas está disponible solo para cuentas de Usuario.</Alert> : me.suspensionVigente?.vigente ? <Alert>Tu cuenta está suspendida hasta {new Date(me.suspensionVigente.fechaHoraFin).toLocaleDateString('es-AR')}.</Alert> : null}{actionError && <Alert>{actionError}</Alert>}<Button type="submit" disabled={!selected || (me !== null && me.perfil.rol !== 'USUARIO') || Boolean(me?.suspensionVigente?.vigente)} busy={busy}> {me ? 'Confirmar reserva' : 'Ingresar para reservar'} <ArrowRight size={17}/></Button><p className="booking-disclaimer"><Clock3 size={15}/> Si se confirma, verás el plazo exacto para retirar.</p></form></Panel></div></div></>}</div>;
+    {reservaCreada && <ReservaExitosa reserva={reservaCreada} onCerrar={cerrarReservaCreada} onVer={() => navigate(`/mis-reservas/${encodeURIComponent(reservaCreada.codigoVisible)}`, { state: { created: true } })}/>}<div className="detail-grid"><Panel title="Disponibilidad por farmacia" subtitle={origen ? 'Las más cercanas primero.' : 'Elegí dónde querés retirar tu medicamento.'}><p className="muted small-text">{avail.length > 0 && <>{number(avail.length)} {avail.length === 1 ? 'farmacia' : 'farmacias'} con stock. </>}El stock mostrado puede cambiar hasta confirmar la reserva.</p>{!avail.length ? sorting ? <Loading/> : <Empty title="Sin disponibilidad por ahora" detail="Volvé a consultar más tarde."/> : <><div className="availability-list">{avail.slice(0, visible).map(f => <button type="button" key={f.farmaciaId} onClick={() => choose(f)} disabled={f.cantidadDisponible <= 0} className={`pharmacy-option ${selected?.farmaciaId === f.farmaciaId ? 'selected' : ''}`}><span className="pharmacy-marker"><Store size={22}/></span><span className="pharmacy-meta"><strong>{f.nombre}</strong><small><MapPin size={13}/>{f.direccion}</small>{!coords(f) && <span className="distance-chip">Sin ubicación en mapa</span>}{f.distanciaKm != null && <span className="distance-chip"><Navigation size={11}/> a {formatoDistancia(f.distanciaKm * 1000)}</span>}</span><span className={`stock-count ${f.cantidadDisponible > 0 ? '' : 'sold-out'}`}><strong>{f.cantidadDisponible}</strong><small>unidades</small></span><span className="radio-indicator"/></button>)}</div>{visible < avail.length && <button type="button" className="btn btn-outline load-more" onClick={() => setVisible(v => v + PAGINA_FARMACIAS)}>Ver más farmacias <span>({number(avail.length - visible)} restantes)</span></button>}</>}</Panel><div ref={bookingRef} className="booking-anchor"><Panel title="Tu reserva" subtitle="Confirmá los detalles antes de continuar."><div className="booking-summary"><span><Pill size={17}/> {presentation.medicamentoNombre}</span><strong>{presentationLabel(presentation)}</strong><div className="summary-divider"/><span><Store size={17}/> Farmacia seleccionada</span><strong>{selected ? selected.nombre : 'Elegí una farmacia de la lista o del mapa'}</strong>{selected && <small className="booking-pharmacy-detail">{selected.direccion}{selected.distanciaKm != null && <> · a {formatoDistancia(selected.distanciaKm * 1000)}</>}</small>}</div><form onSubmit={reserve} className="stack-form"><Field label="Cantidad"><input type="number" min="1" max={selected?.cantidadDisponible || 1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} required/></Field>{presentation.condicionDispensa === 'BAJO_RECETA' && <>{misRecetas.length > 1 && <Field label="Tus recetas para este medicamento"><select value={recetaElegida?.codigoExterno ?? ''} onChange={e => setRxCode(e.target.value)}>{!recetaElegida && <option value="">Otro código</option>}{misRecetas.map(r => <option key={r.id} value={r.codigoExterno}>Emitida {dateOnly(r.fechaEmision)} · vence {dateOnly(r.fechaVencimiento)}</option>)}</select></Field>}<Field label="Código de Prescripción" hint={recetaElegida ? `Completado con tu receta vinculada (emitida ${dateOnly(recetaElegida.fechaEmision)}, vence ${dateOnly(recetaElegida.fechaVencimiento)}).` : 'El código debe pertenecer a una Prescripción activa y válida a tu nombre.'}><input maxLength={80} value={rxCode} onChange={e => setRxCode(e.target.value)} placeholder="Ingresá el código de tu receta" required/></Field></>}{!me ? <Alert tone="info">Necesitás iniciar sesión como Usuario para reservar.</Alert> : me.perfil.rol !== 'USUARIO' ? <Alert tone="info">La creación de reservas está disponible solo para cuentas de Usuario.</Alert> : me.suspensionVigente?.vigente ? <Alert>Tu cuenta está suspendida hasta {new Date(me.suspensionVigente.fechaHoraFin).toLocaleDateString('es-AR')}.</Alert> : null}{actionError && <Alert>{actionError}</Alert>}<Button type="submit" disabled={!selected || (me !== null && me.perfil.rol !== 'USUARIO') || Boolean(me?.suspensionVigente?.vigente)} busy={busy}> {me ? 'Confirmar reserva' : 'Ingresar para reservar'} <ArrowRight size={17}/></Button><p className="booking-disclaimer"><Clock3 size={15}/> Si se confirma, verás el plazo exacto para retirar.</p></form></Panel></div></div></>}</div>;
 }

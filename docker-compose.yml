@@ -18,6 +18,8 @@ services:
       # Nunca ejecutar datos de demo automáticamente sobre una base compartida.
       - ./database/02_datos_prueba.sql:/opt/medlink/02_datos_prueba.sql:ro
       - ./database/03_farmacias_reales.sql:/opt/medlink/03_farmacias_reales.sql:ro
+      - ./database/04_operadores_farmacias_reales.sql:/opt/medlink/04_operadores_farmacias_reales.sql:ro
+      - ./database/05_farmacias_gcba_completo.sql:/opt/medlink/05_farmacias_gcba_completo.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

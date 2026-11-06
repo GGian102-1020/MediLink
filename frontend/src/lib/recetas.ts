@@ -57,6 +57,24 @@ export const recetasPropiasApi = {
   },
 };
 
+/**
+ * Recetas propias que hoy pueden usarse para reservar esta presentación:
+ * activas, no vencidas y con unidades disponibles. La más reciente primero.
+ */
+export async function recetasUsablesPara(presentacionId: number, hoy = new Date()): Promise<Prescripcion[]> {
+  const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+  const recetas: Prescripcion[] = [];
+  for (let page = 0; page < 5; page++) {
+    const pagina = await get<Page<Prescripcion>>('/api/me/prescripciones', { page, size: 100 });
+    recetas.push(...pagina.content);
+    if (pagina.last) break;
+  }
+  return recetas
+    .filter(r => r.estado === 'ACTIVA' && r.fechaVencimiento >= fechaHoy
+      && r.items.some(i => i.presentacionId === presentacionId && i.cantidadDisponible > 0))
+    .sort((a, b) => b.fechaEmision.localeCompare(a.fechaEmision) || b.id - a.id);
+}
+
 export async function nombresMedicamentos(recetas: Prescripcion[]) {
   const ids = new Set(recetas.flatMap(receta => receta.items.map(item => item.presentacionId)));
   const resultados = await Promise.allSettled(Array.from(ids, id => get<Presentacion>(`/api/presentaciones/${id}`)));

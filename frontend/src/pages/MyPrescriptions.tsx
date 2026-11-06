@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Alert, Badge, Button, Empty, ErrorState, Field, Loading, PageTitle, Pagination, Panel } from '../components/UI';
 import { dateOnly } from '../lib/format';
 import { formatosReceta, mensajeVinculacion, nombresMedicamentos, recetasPropiasApi, validarArchivoReceta } from '../lib/recetas';
@@ -17,10 +19,11 @@ function mensajeExito(resultado: VinculacionReceta) {
   return 'Receta vinculada correctamente.';
 }
 
-function DatosReceta({ receta, nombres, detalle = false }: {
+function DatosReceta({ receta, nombres, detalle = false, reservar = true }: {
   receta: Prescripcion;
   nombres?: ReadonlyMap<number, string> | null;
   detalle?: boolean;
+  reservar?: boolean;
 }) {
   return <>
     <dl className="receta-ficha">
@@ -34,6 +37,10 @@ function DatosReceta({ receta, nombres, detalle = false }: {
         <strong>{nombres?.get(item.presentacionId) ?? (nombres ? 'Medicamento no disponible en el catálogo' : 'Cargando medicamento…')}</strong>
         <span>{item.descripcionPresentacion}</span>
         <span>{detalle && `Autorizada: ${item.cantidadAutorizada} · `}Disponible: {item.cantidadDisponible}</span>
+        {reservar && receta.estado === 'ACTIVA' && item.cantidadDisponible > 0 && <Link className="btn btn-primary receta-reservar"
+          to={`/presentaciones/${item.presentacionId}`} state={{ codigoReceta: receta.codigoExterno }}>
+          Reservar ahora <ArrowRight size={16}/>
+        </Link>}
       </li>)}
     </ul>
   </>;
@@ -55,7 +62,7 @@ function DetalleReceta({ id }: { id: number }) {
   if (!detalle.data) return null;
   return <div className="receta-detalle">
     <h3>Detalle de la receta</h3>
-    <DatosReceta {...detalle.data} detalle/>
+    <DatosReceta {...detalle.data} detalle reservar={false}/>
   </div>;
 }
 
