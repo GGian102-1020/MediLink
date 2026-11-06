@@ -202,6 +202,20 @@ class FarmaciaStockPostgresTest {
         assertTrue(stocks.disponibilidad(f.presentation()).isEmpty());
         assertEquals("MEDICATION_INACTIVE",assertThrows(ApiException.class,()->adjust(3)).codigo());
     }
+    @Test void availabilityWithLocationReportsCoordinatesAndDistance() throws Exception {
+        adjust(2);
+        // Farmacia en el Obelisco; el usuario esta ~1,1 km al oeste (Congreso).
+        db.update("UPDATE farmacia SET latitud=-34.6037,longitud=-58.3816 WHERE id_farmacia=?",f.pharmacy());
+        var sinUbicacion=stocks.disponibilidad(f.presentation()).getFirst();
+        assertNull(sinUbicacion.distanciaKm());
+        assertEquals(0,new java.math.BigDecimal("-34.6037").compareTo(sinUbicacion.latitud()));
+        var conUbicacion=stocks.disponibilidad(f.presentation(),-34.6092,-58.3922).getFirst();
+        assertEquals(1.15,conUbicacion.distanciaKm(),0.05);
+        assertEquals("VALIDATION_ERROR",assertThrows(ApiException.class,()->stocks.disponibilidad(f.presentation(),-34.6,null)).codigo());
+        assertEquals("VALIDATION_ERROR",assertThrows(ApiException.class,()->stocks.disponibilidad(f.presentation(),-91.0,0.0)).codigo());
+        mvc.perform(get("/api/presentaciones/"+f.presentation()+"/disponibilidad").param("lat","-34.6092").param("lng","-58.3922"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].distanciaKm").isNumber());
+    }
     @Test void expiredReservationIsReleasedExactlyOnceBeforeAbsoluteCount() {
         adjust(0);long reservation=reserve(T,f.presentation(),null);
         adjust(5);adjust(5);

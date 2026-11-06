@@ -66,9 +66,9 @@ Base de datos
 - PostgreSQL
 
 
-Frontend previsto en el MVP (no incluido en este ZIP)
-- React + TypeScript
-- Herramienta de desarrollo frontend: por definir por el equipo
+Frontend de la rama de mapas
+- React + TypeScript + Vite + Leaflet
+- Alcance de esta rama: pantallas públicas, ingreso/registro y detalle de reserva; no contiene las pantallas operativas/administrativas.
 
 Otras herramientas
 - Git
@@ -105,7 +105,12 @@ La configuración incluida permite levantar PostgreSQL mediante Docker Compose. 
 docker compose up -d
 ```
 
-Conexión, cuentas de prueba y cómo resetear la base: ver [database/README.md](database/README.md).
+La base de datos vacía se migra automáticamente mediante Flyway al iniciar la API.
+La carga de cuentas y stock de demostración es **manual y solo para una base local descartable**.
+No se deben cargar seeds en bases de datos compartidas ni utilizar las credenciales ficticias en un entorno expuesto.
+
+Guía de arranque de esta rama: [docs/DEMO_MAPAS_MVP.md](docs/DEMO_MAPAS_MVP.md).
+Esquema existente, bases anteriores y respaldos: [database/README.md](database/README.md).
 
 ## Cuentas y autenticación (backend)
 
@@ -113,13 +118,9 @@ Se agregó el módulo backend de registro, login, JWT, perfil, cambio de contras
 logout y administración de Operadores/Cuentas. Documentación técnica, comandos,
 trazabilidad normativa y pruebas: [CUENTAS_AUTENTICACION.md](CUENTAS_AUTENTICACION.md).
 
-El Docker Compose de desarrollo carga el esquema/datos de prueba en el primer arranque.
-Para ejecutar además la API con HTTPS se usa el perfil opcional `api`, una clave JWT
-local propia en `.env` y Caddy como reverse proxy. **En el primer arranque de la API
-sobre esa base ya cargada, es necesario adoptar explícitamente el esquema compartido
-con Flyway** (`DB_FLYWAY_BASELINE_ON_MIGRATE=true` después de verificar que es v1.4.3).
-No habilitar baseline automáticamente en bases desconocidas ni eliminar el volumen
-para resolver errores de migración. Pasos detallados: [database/README.md](database/README.md).
+Para una instalación **nueva** el esquema se migra con Flyway al iniciar backend, sin baseline.
+Para bases existentes consultar [database/README.md](database/README.md) antes de migrar:
+no habilitar baseline a ciegas ni borrar volúmenes para resolver errores.
 
 
 ## Farmacia y Stock
@@ -134,13 +135,13 @@ en [REFACTORIZACION_TRELLO_SQL.md](REFACTORIZACION_TRELLO_SQL.md).
 El PDF maestro v1.4.3 sigue siendo la única autoridad funcional, no estos README.
 
 
-## Sustitución completa de una copia local (GitHub Desktop)
+## Rama de mapas: parche y demostración
 
-Este ZIP incluye **todos los archivos versionables de esta copia**, no únicamente los modificados, y **no incluye `.git` ni secretos `.env`**. Antes de sustituir la carpeta de trabajo:
+Esta rama puede instalarse mediante `git apply` desde el commit base `ef332860`
+(`IntegracionMapas`). Las instrucciones completas de arranque y los límites de servicios
+públicos de mapas están en [docs/DEMO_MAPAS_MVP.md](docs/DEMO_MAPAS_MVP.md).
 
-1. Creá una copia de seguridad de la carpeta del repositorio, incluidos los archivos ocultos; guardá y revisá cualquier cambio local de tus compañeros.
-2. En GitHub Desktop, trabajá en una rama nueva. **No borres `.git`**: contiene el historial y permite que GitHub Desktop siga reconociendo el repositorio. **No sobrescribas ni compartas `.env`**: contiene configuración/secretos locales y no forma parte del ZIP.
-3. Si querés borrar archivos obsoletos que ya no vienen en el ZIP, quitá solamente los archivos de trabajo, **conservando `.git`, `.env` y cualquier dato local que necesites**. Copiá el contenido de la carpeta `MediLink/` extraída a la raíz del repositorio. Si tu rama evolucionó desde la copia utilizada, compará las diferencias antes de sustituirla.
-4. Revisá eliminaciones y modificaciones en GitHub Desktop. Desde `backend/` ejecutá `mvnw.cmd -B clean test` en Windows; verificá por separado los tests de PostgreSQL que pueden estar omitidos. Después hacé commit.
-
-**Esta distribución no incluye frontend, base de datos física, volumen Docker, archivos compilados, backups ni secretos.** No ejecutes `docker compose down -v` para actualizar código o migraciones: borra el volumen de PostgreSQL.
+**Importante:** el árbol heredado ya tiene `frontend/node_modules` versionado.
+La nueva regla de `.gitignore` evita incorporar dependencias nuevas, pero **no**
+las desversiona automáticamente. Se recomienda retirar ese directorio del índice
+mediante un cambio separado para no mezclar miles de eliminaciones con el parche de mapas.

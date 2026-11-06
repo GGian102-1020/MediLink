@@ -17,6 +17,29 @@ permissions:
   contents: read
 
 jobs:
+  frontend:
+    name: React / TypeScript / Mapas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependencias sin modificar el lock
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck, tests y build
+        working-directory: frontend
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+
   postgres-integration:
     name: Maven + PostgreSQL 16 + Auditoria + Backup
     runs-on: ubuntu-latest

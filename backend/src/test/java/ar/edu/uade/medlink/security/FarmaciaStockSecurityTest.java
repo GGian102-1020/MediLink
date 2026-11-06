@@ -70,7 +70,7 @@ class FarmaciaStockSecurityTest {
         verify(stocks,times(2)).ajustar(eq(1L),eq(2L),any(),any(CurrentAccount.class),any());
     }
     @Test void anonymousAvailabilityIsPublic() throws Exception {
-        when(stocks.disponibilidad(2)).thenReturn(List.of());
+        when(stocks.disponibilidad(2L,null,null)).thenReturn(List.of());
         mvc.perform(get("/api/presentaciones/2/disponibilidad")).andExpect(status().isOk()).andExpect(content().json("[]"));
     }
     @Test void beanValidationRejectsMalformedInputsWithoutCallingService() throws Exception {
