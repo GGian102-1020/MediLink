@@ -27,7 +27,11 @@ interface MediLinkApi {
     suspend fun presentacion(@Path("id") id: Long): PresentacionDto
 
     @GET("api/presentaciones/{id}/disponibilidad")
-    suspend fun disponibilidad(@Path("id") id: Long): List<DisponibilidadDto>
+    suspend fun disponibilidad(
+        @Path("id") id: Long,
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null,
+    ): List<DisponibilidadDto>
 
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): LoginDto

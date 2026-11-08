@@ -224,14 +224,23 @@ data class ReservasState(
     val cancelandoCodigo: String? = null,
     val error: String? = null,
     val ultimaPagina: Boolean = true,
+    val filtro: String = "",
 )
 
 class ReservasVm(private val repository: MediLinkRepository) : ViewModel() {
     private val mutable = MutableStateFlow(ReservasState())
     val state = mutable.asStateFlow()
     private var siguientePagina = 0
+    private var filtro = ""
 
     init { actualizar() }
+
+    fun filtrar(estado: String) {
+        if (estado !in setOf("", "ACTIVA", "COMPLETADA", "CANCELADA", "VENCIDA")) return
+        filtro = estado
+        siguientePagina = 0
+        cargar(limpiar = true)
+    }
 
     fun actualizar() {
         if (mutable.value.cargando || mutable.value.cancelandoCodigo != null) return
@@ -247,10 +256,11 @@ class ReservasVm(private val repository: MediLinkRepository) : ViewModel() {
         viewModelScope.launch {
             mutable.value = mutable.value.copy(cargando = true, error = null)
             try {
-                val page = repository.misReservas(siguientePagina)
+                val page = repository.misReservas(siguientePagina, filtro.ifBlank { null })
                 mutable.value = ReservasState(
                     lista = if (limpiar) page.content else mutable.value.lista + page.content,
                     ultimaPagina = page.last,
+                    filtro = filtro,
                 )
                 siguientePagina++
             } catch (e: CancellationException) {
