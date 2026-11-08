@@ -1,14 +1,29 @@
 package ar.edu.uade.medilink.android.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -20,7 +35,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ar.edu.uade.medilink.android.data.LoginDto
@@ -46,7 +63,7 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
     LaunchedEffect(sesion?.accessToken) {
         perfil = null
         if (sesion != null) {
-            try { perfil = repository.miPerfil() }
+            try { perfil = repository.miPerfil(); error = null }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = mensajeDeError(e) }
         }
@@ -87,43 +104,87 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (sesion == null) {
-            Encabezado("Mi cuenta", "Iniciá sesión para ver tus datos.")
-            Button(onClick = onLogin) { Text("Iniciar sesión") }
+            HeroPanel("TU CUENTA", "Bienvenido a MediLink",
+                "Ingresá para consultar tus datos y gestionar las reservas de tu cuenta.",
+                Icons.Default.AccountCircle)
+            Button(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }
+            NotaInformativa("Podés explorar medicamentos sin iniciar sesión. Para reservar necesitás una cuenta de paciente.")
         } else {
-            Encabezado("Mi perfil", "Cuenta y estado actualizados por el servidor.")
             val p = perfil?.perfil ?: sesion.perfil
-            Text("Nombre: ${p.nombre} ${p.apellido}")
-            Text("Correo: ${p.correo}")
-            Text("Rol: ${p.rol}")
-            Text("Estado de cuenta: ${p.estadoCuenta}")
-            p.farmaciaId?.let { Text("Farmacia asignada: #$it") }
+            val iniciales = ((p.nombre.take(1)) + p.apellido.take(1)).uppercase().ifBlank { "ML" }
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(64.dp).background(MaterialTheme.colorScheme.primaryContainer,
+                            CircleShape), contentAlignment = Alignment.Center) {
+                            Text(iniciales, style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text("Mi cuenta", style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary)
+                            Text("${p.nombre} ${p.apellido}", style = MaterialTheme.typography.titleLarge)
+                            Text(p.correo, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        EstadoPildora(p.estadoCuenta)
+                        EstadoPildora(p.rol)
+                    }
+                }
+            }
+            SeccionTitulo("Datos personales", "Información consultada al servidor")
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
+                    DatoFila("Nombre completo", "${p.nombre} ${p.apellido}")
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    DatoFila("Correo electrónico", p.correo)
+                    p.farmaciaId?.let {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        DatoFila("Farmacia asignada", "Sucursal #$it")
+                    }
+                }
+            }
             perfil?.suspensionVigente?.takeIf { it.vigente }?.let {
-                Text("Suspensión hasta ${it.fechaHoraFin}: ${it.motivo}")
+                AvisoError("Suspensión hasta ${it.fechaHoraFin}: ${it.motivo}")
             }
             AvisoError(error)
-            mensaje?.let { Text(it) }
+            mensaje?.let { NotaInformativa(it) }
             OutlinedButton(onClick = {
                 scope.launch {
                     try { perfil = repository.miPerfil(); error = null }
                     catch (e: CancellationException) { throw e }
                     catch (e: Exception) { error = mensajeDeError(e) }
                 }
-            }) { Text("Actualizar perfil") }
-            Button(onClick = { error = null; editandoClave = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Cambiar contraseña")
+            }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Text("  Actualizar perfil")
             }
-            OutlinedButton(enabled = !cerrando, onClick = {
+            SeccionTitulo("Seguridad y acceso")
+            AccesoTarjeta("Cambiar contraseña", "Actualizá la clave de acceso a tu cuenta",
+                Icons.Default.Lock, onClick = { error = null; editandoClave = true })
+            TextButton(enabled = !cerrando, onClick = {
                 cerrando = true
                 scope.launch {
                     try { repository.logout() } catch (e: CancellationException) { throw e }
                     catch (_: Exception) { /* se descarta el JWT local */ }
                     finally { cerrando = false }
                 }
-            }) { Text("Cerrar sesión") }
-            Text("La sesión está en memoria. Al cerrar por completo la app, se requiere nuevo ingreso.")
+            }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Logout, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error)
+                Text("  Cerrar sesión", color = MaterialTheme.colorScheme.error)
+            }
+            NotaInformativa("Tu sesión se mantiene únicamente en memoria. Si cerrás por completo la app, tendrás que volver a ingresar.")
         }
     }
 }

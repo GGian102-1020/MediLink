@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,23 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.filled.LocalPharmacy
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import ar.edu.uade.medilink.android.ui.theme.MediLinkTheme
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -26,12 +44,11 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,7 +95,15 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MediLinkApp() }
+        setContent {
+            val modoOscuro = isSystemInDarkTheme()
+            SideEffect {
+                val barraSistema = WindowCompat.getInsetsController(window, window.decorView)
+                barraSistema.isAppearanceLightStatusBars = !modoOscuro
+                barraSistema.isAppearanceLightNavigationBars = !modoOscuro
+            }
+            MediLinkApp()
+        }
     }
 }
 
@@ -98,49 +123,83 @@ private fun MediLinkApp() {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val ruta = backStack?.destination?.route.orEmpty()
-    val colores = if (androidx.compose.foundation.isSystemInDarkTheme()) {
-        darkColorScheme(primary = Color(0xFF78D6C9), secondary = Color(0xFFAACCC7))
-    } else lightColorScheme(primary = Color(0xFF006B60), secondary = Color(0xFF526560))
     val barra = when (rol) {
-        "USUARIO" -> listOf(DestinoBarra("catalogo", "Buscar", Icons.Default.Search),
-            DestinoBarra("panel", "Inicio", Icons.Default.Home),
-            DestinoBarra("reservas", "Reservas", Icons.Default.List),
-            DestinoBarra("perfil", "Cuenta", Icons.Default.AccountCircle))
-        "OPERADOR" -> listOf(DestinoBarra("panel", "Inicio", Icons.Default.Home),
-            DestinoBarra("operacion/reservas", "Reservas", Icons.Default.List),
-            DestinoBarra("operacion/stock", "Stock", Icons.Default.Settings),
-            DestinoBarra("operacion/movimientos", "Movimientos", Icons.Default.List),
-            DestinoBarra("perfil", "Cuenta", Icons.Default.AccountCircle))
-        "ADMINISTRADOR" -> listOf(DestinoBarra("panel", "Inicio", Icons.Default.Home),
-            DestinoBarra("admin/menu", "Gestión", Icons.Default.Settings),
+        "USUARIO" -> listOf(DestinoBarra("panel", "Inicio", Icons.Default.Home),
             DestinoBarra("catalogo", "Buscar", Icons.Default.Search),
-            DestinoBarra("perfil", "Cuenta", Icons.Default.AccountCircle))
+            DestinoBarra("reservas", "Reservas", Icons.Default.ReceiptLong),
+            DestinoBarra("perfil", "Cuenta", Icons.Default.Person))
+        "OPERADOR" -> listOf(DestinoBarra("panel", "Inicio", Icons.Default.Home),
+            DestinoBarra("operacion/reservas", "Reservas", Icons.Default.ReceiptLong),
+            DestinoBarra("operacion/stock", "Stock", Icons.Default.Inventory2),
+            DestinoBarra("operacion/movimientos", "Historial", Icons.Default.List),
+            DestinoBarra("perfil", "Cuenta", Icons.Default.Person))
+        "ADMINISTRADOR" -> listOf(DestinoBarra("panel", "Inicio", Icons.Default.Home),
+            DestinoBarra("admin/menu", "Gestión", Icons.Default.AdminPanelSettings),
+            DestinoBarra("catalogo", "Buscar", Icons.Default.Search),
+            DestinoBarra("perfil", "Cuenta", Icons.Default.Person))
         else -> listOf(DestinoBarra("inicio", "Inicio", Icons.Default.Home),
             DestinoBarra("catalogo", "Buscar", Icons.Default.Search),
-            DestinoBarra("perfil", "Cuenta", Icons.Default.AccountCircle))
+            DestinoBarra("perfil", "Cuenta", Icons.Default.Person))
     }
 
-    MaterialTheme(colorScheme = colores) {
+    val principales = barra.map { it.ruta }.toSet()
+    val rutaPrincipal = ruta in principales
+    val seleccionActual = when {
+        ruta.startsWith("admin/") -> "admin/menu"
+        ruta.startsWith("operacion/") -> ruta
+        ruta.startsWith("reserva/") -> "reservas"
+        ruta.startsWith("presentaciones/") || ruta.startsWith("disponibilidad/") || ruta.startsWith("mapa/") -> "catalogo"
+        else -> ruta
+    }
+    MediLinkTheme {
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                CenterAlignedTopAppBar(title = { Text("MediLink") }, navigationIcon = {
-                    if (nav.previousBackStackEntry != null && barra.none { it.ruta == ruta }) {
-                        IconButton(onClick = { nav.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                CenterAlignedTopAppBar(
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                            ) {
+                                Icon(Icons.Default.LocalPharmacy, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(9.dp).size(20.dp))
+                            }
+                            Spacer(Modifier.width(9.dp))
+                            Text("MediLink", style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold)
                         }
-                    }
-                })
+                    },
+                    navigationIcon = {
+                        if (!rutaPrincipal && nav.previousBackStackEntry != null) {
+                            IconButton(onClick = { nav.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                            }
+                        }
+                    },
+                )
             },
             bottomBar = {
-                NavigationBar {
-                    barra.forEach { dest ->
-                        NavigationBarItem(selected = ruta == dest.ruta,
-                            onClick = { nav.navigate(dest.ruta) {
-                                launchSingleTop = true
-                                popUpTo("catalogo") { saveState = false }
-                            } },
-                            icon = { Icon(dest.icono, contentDescription = dest.titulo) },
-                            label = { Text(dest.titulo) })
+                if (rutaPrincipal) {
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 3.dp) {
+                        barra.forEach { dest ->
+                            NavigationBarItem(
+                                selected = seleccionActual == dest.ruta,
+                                onClick = { nav.navigate(dest.ruta) {
+                                    launchSingleTop = true
+                                    restoreState = true
+                                    popUpTo("catalogo") { saveState = true }
+                                } },
+                                icon = { Icon(dest.icono, contentDescription = null) },
+                                label = { Text(dest.titulo) },
+                                alwaysShowLabel = true,
+                            )
+                        }
                     }
                 }
             },

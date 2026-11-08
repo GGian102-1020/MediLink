@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -116,7 +118,7 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Reservas de farmacia #$farmaciaId", "Consulta, retiro y cancelación operativa")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -129,9 +131,11 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
         AvisoError(error)
         aviso?.let { Text(it) }
         listado?.content?.forEach { r ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("${r.codigoVisible} · ${r.estado}")
+                    Text(r.codigoVisible, style = MaterialTheme.typography.titleMedium)
+                    EstadoPildora(r.estado)
                     Text("${r.medicamentoNombreSnapshot} · ${r.presentacionDescripcionSnapshot}")
                     Text("Usuario: ${r.usuarioNombre.orEmpty()} ${r.usuarioApellido.orEmpty()}")
                     Text("Cantidad: ${r.cantidad} · ${r.fechaHoraCreacion}")
@@ -218,14 +222,15 @@ fun StockFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long) {
         }) { Text("Actualizar stock") } },
         dismissButton = { TextButton(onClick = { confirmar = false }) { Text("Volver") } },
     )
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Stock de farmacia #$farmaciaId", "Saldo disponible y ajustes auditados")
         AvisoError(error)
         mensaje?.let { Text(it) }
         OutlinedButton(onClick = { revision++ }) { Text("Actualizar") }
         listado?.content?.forEach { s ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Presentación #${s.presentacionId}: ${s.cantidadDisponible} unidades")
                     Text("Actualización: ${s.fechaHoraActualizacion}")
@@ -266,7 +271,7 @@ fun MovimientosFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long) 
         catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = mensajeDeError(e) }
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Movimientos #$farmaciaId", "Auditoría de cambios de stock")
         AvisoError(error)
@@ -281,7 +286,8 @@ fun MovimientosFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long) 
             OutlinedButton(onClick = { revision++ }) { Text("Actualizar") }
         }
         movimientos?.content?.forEach { m ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("${m.fechaHora} · ${m.tipo}")
                     Text("Saldo: ${m.cantidadAnterior} → ${m.cantidadNueva} (${m.delta})")

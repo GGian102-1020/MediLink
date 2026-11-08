@@ -13,6 +13,18 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalPharmacy
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,26 +58,49 @@ fun PanelPaciente(repository: MediLinkRepository, onCatalogo: () -> Unit,
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = mensajeDeError(e) }
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Encabezado("Hola, ${perfil?.perfil?.nombre ?: "bienvenido"}", "Tu panel personal de MediLink")
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        .padding(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        HeroPanel("MI MEDILINK", "Hola, ${perfil?.perfil?.nombre ?: "bienvenido"}",
+            "Consultá medicamentos, encontrá una farmacia y seguí tus reservas.",
+            Icons.Default.LocalPharmacy)
         perfil?.suspensionVigente?.takeIf { it.vigente }?.let {
             AvisoError("Tu cuenta está suspendida hasta ${it.fechaHoraFin}: ${it.motivo}")
         }
-        Text("Reservas en la página: ${reservas.size}")
-        Text("Reservas activas en la página: ${reservas.count { it.estado == "ACTIVA" }}")
-        cantidadCatalogo?.let { Text("Medicamentos del catálogo: $it") }
-        Button(onClick = onCatalogo) { Text("Buscar medicamentos") }
-        OutlinedButton(onClick = onReservas) { Text("Ver todas mis reservas") }
-        OutlinedButton(onClick = { revision++ }) { Text("Actualizar panel") }
+        SeccionTitulo("Tu actividad", "Reservas de la primera página consultada")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MetricaTarjeta("${reservas.count { it.estado == "ACTIVA" }}", "Reservas activas",
+                Icons.Default.ReceiptLong, Modifier.weight(1f))
+            MetricaTarjeta((cantidadCatalogo ?: "—").toString(), "Medicamentos",
+                Icons.Default.Medication, Modifier.weight(1f))
+        }
+        SeccionTitulo("Accesos rápidos")
+        AccesoTarjeta("Buscar medicamentos", "Encontrá disponibilidad cerca tuyo",
+            Icons.Default.Search, onCatalogo)
+        AccesoTarjeta("Mis reservas", "Consultá estados y códigos de retiro",
+            Icons.Default.ReceiptLong, onReservas)
         AvisoError(error)
-        reservas.take(5).forEach { r ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("${r.codigoVisible} · ${r.estado}")
-                    Text("${r.medicamentoNombreSnapshot} · ${r.farmaciaNombreSnapshot}")
+        SeccionTitulo("Reservas recientes")
+        if (reservas.isEmpty() && error == null) {
+            VacioEstado("Aún sin reservas", "Cuando hagas una reserva, vas a poder seguirla desde acá.")
+        }
+        reservas.take(3).forEach { r ->
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(r.codigoVisible, style = MaterialTheme.typography.titleMedium)
+                        EstadoPildora(r.estado)
+                    }
+                    Text(r.medicamentoNombreSnapshot, style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium)
+                    Text(r.farmaciaNombreSnapshot, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall)
                 }
             }
+        }
+        OutlinedButton(onClick = { revision++ }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Refresh, contentDescription = null)
+            Text("  Actualizar panel")
         }
     }
 }

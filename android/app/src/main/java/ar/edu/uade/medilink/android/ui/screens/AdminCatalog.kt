@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -194,11 +196,12 @@ fun AdminCatalogScreen(repository: MediLinkRepository, section: AdminSection,
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado(section.titulo, "Administración · búsqueda, creación y estados")
         AvisoError(error)
-        exito?.let { Text(it) }
+        exito?.let { NotaInformativa(it) }
+        SeccionTitulo("Buscar y filtrar", "Encontrá registros por sus datos y estado")
         section.filters.forEach { campo ->
             CampoFormulario(campo, filtros[campo.clave].orEmpty()) { filtros[campo.clave] = it }
         }
@@ -241,9 +244,10 @@ fun AdminCatalogScreen(repository: MediLinkRepository, section: AdminSection,
             OutlinedButton(onClick = { formularioAbierto = false }) { Text("Cancelar edición") }
         }
 
-        Text("Página ${page + 1} · Total ${lista?.totalElements ?: 0}")
+        SeccionTitulo("Registros", "Página ${page + 1} · Total ${lista?.totalElements ?: 0}")
         lista?.content?.forEach { row ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     val id = row.number(section.idField)
                     val titulo = when (section) {
@@ -251,8 +255,8 @@ fun AdminCatalogScreen(repository: MediLinkRepository, section: AdminSection,
                         AdminSection.OPERADORES -> "${row.string("nombre")} ${row.string("apellido")}"
                         else -> row.string("nombre")
                     }
-                    Text("#$id · $titulo")
-                    Text("Estado: ${row.string(section.estadoField)}")
+                    Text("#$id · $titulo", style = MaterialTheme.typography.titleMedium)
+                    EstadoPildora(row.string(section.estadoField))
                     when (section) {
                         AdminSection.FARMACIAS -> {
                             Text(row.string("direccion"))

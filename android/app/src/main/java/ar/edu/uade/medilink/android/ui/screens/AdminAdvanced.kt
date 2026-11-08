@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -91,7 +93,7 @@ fun AdminUsuariosScreen(repository: MediLinkRepository, onDetalle: (Long) -> Uni
             dismissButton = { TextButton(onClick = { pendiente = null }) { Text("Volver") } },
         )
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Usuarios", "Cuentas, historial y suspensiones")
         AvisoError(error)
@@ -102,9 +104,10 @@ fun AdminUsuariosScreen(repository: MediLinkRepository, onDetalle: (Long) -> Uni
             Text("Aplicar filtros")
         }
         result?.content?.forEach { row ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${row.string("nombre")} ${row.string("apellido")}")
+                    Text("${row.string("nombre")} ${row.string("apellido")}", style = MaterialTheme.typography.titleMedium)
                     Text("${row.string("correo")} · ${row.string("estadoCuenta")}")
                     OutlinedButton(onClick = { onDetalle(row.number("usuarioId")) }) {
                         Text("Reservas y suspensiones")
@@ -144,7 +147,7 @@ fun AdminUsuarioDetalleScreen(repository: MediLinkRepository, usuarioId: Long) {
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = mensajeDeError(e) }
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Usuario #$usuarioId", "Historial administrativo")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,7 +160,8 @@ fun AdminUsuarioDetalleScreen(repository: MediLinkRepository, usuarioId: Long) {
                 filtro = it; page = 0
             }
             reservas?.content?.forEach { r ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("${r.codigoVisible} · ${r.estado}")
                         Text("${r.medicamentoNombreSnapshot} · ${r.farmaciaNombreSnapshot}")
@@ -166,7 +170,8 @@ fun AdminUsuarioDetalleScreen(repository: MediLinkRepository, usuarioId: Long) {
                 }
             }
         } else suspensiones?.content?.forEach { s ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Suspensión #${s.id} · ${if (s.vigente) "Vigente" else "Histórica"}")
                     Text("${s.fechaHoraInicio} → ${s.fechaHoraFin}")
@@ -234,7 +239,7 @@ fun AdminPrescripcionesScreen(repository: MediLinkRepository) {
             dismissButton = { TextButton(onClick = { pendienteAnular = null }) { Text("Volver") } },
         )
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Prescripciones simuladas", "Administración de recetas de demostración")
         AvisoError(error)
@@ -289,7 +294,8 @@ fun AdminPrescripcionesScreen(repository: MediLinkRepository) {
             }) { Text("Guardar prescripción") }
         }
         lista?.content?.forEach { row ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${row.string("codigoExterno")} · ${row.string("estado")}")
                     Text("ID usuario: ${row.number("usuarioId")}")
@@ -338,7 +344,7 @@ fun AdminAuditoriaScreen(repository: MediLinkRepository) {
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = mensajeDeError(e) }
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Auditoría", "Trazabilidad de operaciones y cambios del sistema")
         AvisoError(error)
@@ -365,7 +371,8 @@ fun AdminAuditoriaScreen(repository: MediLinkRepository) {
             Text("Limpiar filtros")
         }
         lista?.content?.forEach { row ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${row.string("fechaHora")} · ${row.string("accion")}")
                     Text("${row.string("tipoEntidad")} #${row.string("entidadId")}")
