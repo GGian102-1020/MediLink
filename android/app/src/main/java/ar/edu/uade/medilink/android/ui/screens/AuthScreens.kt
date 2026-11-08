@@ -29,6 +29,7 @@ fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var correo by rememberSaveable { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
+    var verClave by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.inicioExitoso) {
         if (state.inicioExitoso) onSuccess()
     }
@@ -37,16 +38,18 @@ fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Encabezado("Iniciar sesión", "Usá tu cuenta de paciente de MediLink.")
+        Encabezado("Iniciar sesión", "Pacientes, operadores y administradores.")
         OutlinedTextField(
             value = correo, onValueChange = { correo = it }, label = { Text("Correo") },
             singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = contrasena, onValueChange = { contrasena = it }, label = { Text("Contraseña") },
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (verClave) androidx.compose.ui.text.input.VisualTransformation.None
+                else PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
         )
+        OutlinedButton(onClick = { verClave = !verClave }) { Text(if (verClave) "Ocultar contraseña" else "Mostrar contraseña") }
         AvisoError(state.error)
         Button(
             onClick = { vm.login(correo, contrasena) },
@@ -65,6 +68,8 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit) {
     var apellido by rememberSaveable { mutableStateOf("") }
     var correo by rememberSaveable { mutableStateOf("") }
     var clave by remember { mutableStateOf("") }
+    var repetir by remember { mutableStateOf("") }
+    var verClave by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -89,13 +94,21 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit) {
             )
             OutlinedTextField(
                 value = clave, onValueChange = { clave = it }, label = { Text("Contraseña") },
-                visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (verClave) androidx.compose.ui.text.input.VisualTransformation.None
+                else PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
             )
+            OutlinedTextField(
+                value = repetir, onValueChange = { repetir = it }, label = { Text("Repetir contraseña") },
+                visualTransformation = if (verClave) androidx.compose.ui.text.input.VisualTransformation.None
+                else PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedButton(onClick = { verClave = !verClave }) { Text(if (verClave) "Ocultar contraseñas" else "Mostrar contraseñas") }
+            if (repetir.isNotBlank() && repetir != clave) AvisoError("Las contraseñas no coinciden.")
             AvisoError(state.error)
             Button(
                 onClick = { vm.registrar(nombre, apellido, correo, clave) },
                 enabled = !state.cargando && nombre.isNotBlank() && apellido.isNotBlank() &&
-                    correo.isNotBlank() && clave.isNotBlank(),
+                    correo.isNotBlank() && clave.isNotBlank() && clave == repetir,
             ) { Text(if (state.cargando) "Registrando..." else "Registrarse") }
         }
     }

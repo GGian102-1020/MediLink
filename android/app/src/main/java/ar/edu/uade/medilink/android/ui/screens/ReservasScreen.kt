@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -25,7 +28,7 @@ import ar.edu.uade.medilink.android.data.ReservaDto
 import ar.edu.uade.medilink.android.ui.viewmodel.ReservasVm
 
 @Composable
-fun ReservasScreen(vm: ReservasVm) {
+fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var aCancelar by remember { mutableStateOf<ReservaDto?>(null) }
 
@@ -53,6 +56,16 @@ fun ReservasScreen(vm: ReservasVm) {
     ) {
         item { Encabezado("Mis reservas", "Consultá tus reservas y sus estados actualizados.") }
         item { OutlinedButton(onClick = vm::actualizar, enabled = !state.cargando) { Text("Actualizar") } }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                listOf("" to "Todas", "ACTIVA" to "Activas", "COMPLETADA" to "Completadas",
+                    "CANCELADA" to "Canceladas", "VENCIDA" to "Vencidas").forEach { (value, label) ->
+                    OutlinedButton(onClick = { vm.filtrar(value) },
+                        enabled = !state.cargando && state.filtro != value) { Text(label) }
+                }
+            }
+        }
         item { AvisoError(state.error) }
         items(state.lista, key = { it.id }) { reserva ->
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -66,6 +79,7 @@ fun ReservasScreen(vm: ReservasVm) {
                     Text(reserva.farmaciaDireccionSnapshot)
                     Text("Cantidad: ${reserva.cantidad} · Estado: ${reserva.estado}")
                     Text("Vencimiento: ${reserva.fechaHoraVencimiento}")
+                    OutlinedButton(onClick = { onDetalle(reserva.codigoVisible) }) { Text("Ver detalle") }
                     if (reserva.estado == "ACTIVA") {
                         Button(
                             onClick = { aCancelar = reserva },

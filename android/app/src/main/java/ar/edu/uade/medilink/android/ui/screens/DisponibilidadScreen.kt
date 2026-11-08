@@ -34,6 +34,7 @@ fun DisponibilidadScreen(
     logueado: Boolean,
     onLogin: () -> Unit,
     onReservaCreada: () -> Unit,
+    onMapa: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var farmaciaElegida by rememberSaveable { mutableStateOf(-1L) }
@@ -59,6 +60,7 @@ fun DisponibilidadScreen(
         OutlinedButton(onClick = vm::actualizar, enabled = !state.cargando && !state.reservando) {
             Text("Actualizar disponibilidad")
         }
+        OutlinedButton(onClick = onMapa) { Text("Mapa, ubicación y rutas") }
         AvisoError(state.error)
         if (state.cargando) IndicadorCargando()
         if (state.farmacias.isEmpty() && !state.cargando && state.error == null) {

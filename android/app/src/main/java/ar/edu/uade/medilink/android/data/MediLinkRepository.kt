@@ -23,6 +23,9 @@ class SessionStore {
 }
 
 class MediLinkRepository(val session: SessionStore = SessionStore()) {
+    /** Origen geográfico solo en memoria; no se persiste en disco ni se comparte sin acción del usuario. */
+    val origen = MutableStateFlow<PuntoGeo?>(null)
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -43,26 +46,25 @@ class MediLinkRepository(val session: SessionStore = SessionStore()) {
         }
         .build()
 
-    private val api = Retrofit.Builder()
+    private val retrofit = Retrofit.Builder()
         .baseUrl(BuildConfig.BASE_URL)
         .client(client)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
-        .create(MediLinkApi::class.java)
+
+    private val api = retrofit.create(MediLinkApi::class.java)
+    val parity = retrofit.create(ParityApi::class.java)
 
     suspend fun medicamentos(nombre: String, pagina: Int) =
         api.medicamentos(nombre.ifBlank { null }, pagina, 20)
 
     suspend fun presentaciones(id: Long, pagina: Int) = api.presentaciones(id, pagina, 20)
     suspend fun presentacion(id: Long) = api.presentacion(id)
-    suspend fun disponibilidad(id: Long) = api.disponibilidad(id)
+    suspend fun disponibilidad(id: Long, lat: Double? = null, lng: Double? = null) =
+        api.disponibilidad(id, lat, lng)
 
     suspend fun login(correo: String, clave: String) {
         val response = api.login(LoginRequest(correo.trim(), clave))
-        if (response.perfil.rol != "USUARIO") {
-            // La app de esta etapa es solo para pacientes; no se almacena el token.
-            throw IllegalArgumentException("Esta version es solo para cuentas de pacientes.")
-        }
         session.set(response)
     }
 
@@ -78,13 +80,17 @@ class MediLinkRepository(val session: SessionStore = SessionStore()) {
             }
         } finally {
             session.clear()
+            origen.value = null
         }
     }
 
     suspend fun reservar(body: CrearReservaRequest, claveIdempotencia: String) =
         api.crearReserva(claveIdempotencia, body)
 
-    suspend fun misReservas(pagina: Int) = api.misReservas(pagina, 20)
+    suspend fun misReservas(pagina: Int, estado: String? = null) = parity.reservasUsuario(estado, pagina)
+    suspend fun miPerfil() = parity.me()
+    suspend fun cambiarClave(actual: String, nueva: String) = parity.cambiarClave(CambiarClaveRequest(actual, nueva))
+    suspend fun detalleReserva(codigo: String) = parity.detalleUsuario(codigo)
     suspend fun cancelar(codigo: String) = api.cancelar(codigo)
 }
 
