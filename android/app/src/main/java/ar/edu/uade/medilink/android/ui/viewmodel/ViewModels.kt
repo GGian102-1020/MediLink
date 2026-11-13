@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import ar.edu.uade.medilink.android.data.CrearReservaRequest
+import ar.edu.uade.medilink.android.data.DatosPersonales
 import ar.edu.uade.medilink.android.data.DisponibilidadDto
 import ar.edu.uade.medilink.android.data.IntentoReserva
 import ar.edu.uade.medilink.android.data.MedicamentoDto
@@ -213,6 +214,35 @@ class AuthVm(private val repository: MediLinkRepository) : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 mutable.value = AuthState(error = mensajeDeError(e))
+            }
+        }
+    }
+
+    /** Crea la cuenta de paciente e inicia sesión con las mismas credenciales. */
+    fun registrarYEntrar(
+        nombre: String, apellido: String, correo: String, clave: String,
+        datos: DatosPersonales? = null,
+    ) {
+        if (mutable.value.cargando) return
+        viewModelScope.launch {
+            mutable.value = AuthState(cargando = true)
+            try {
+                repository.registro(nombre, apellido, correo, clave, datos)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mutable.value = AuthState(error = mensajeDeError(e))
+                return@launch
+            }
+            try {
+                repository.login(correo, clave)
+                mutable.value = AuthState(inicioExitoso = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // La cuenta existe: se informa y el usuario puede ingresar desde el login.
+                mutable.value = AuthState(registroExitoso = true,
+                    error = "Tu cuenta se creó, pero no pudimos iniciar sesión: ${mensajeDeError(e)}")
             }
         }
     }

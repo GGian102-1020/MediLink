@@ -41,8 +41,18 @@ public class AccountRepository {
             Long.class, email, hash, rol, Timestamp.from(instant));
     }
     public long newUser(long accountId, String nombre, String apellido) {
-        return db.queryForObject("INSERT INTO usuario (id_cuenta, nombre, apellido) VALUES (?, ?, ?) RETURNING id_usuario",
-            Long.class, accountId, nombre, apellido);
+        return newUser(accountId, nombre, apellido, AuthDtos.DatosPersonales.VACIOS);
+    }
+    public long newUser(long accountId, String nombre, String apellido, AuthDtos.DatosPersonales datos) {
+        return db.queryForObject("INSERT INTO usuario (id_cuenta, nombre, apellido, dni, fecha_nacimiento, " +
+                "telefono, obra_social, numero_afiliado) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id_usuario",
+            Long.class, accountId, nombre, apellido, datos.dni(),
+            datos.fechaNacimiento() == null ? null : java.sql.Date.valueOf(datos.fechaNacimiento()),
+            datos.telefono(), datos.obraSocial(), datos.numeroAfiliado());
+    }
+    public boolean dniExists(String dni) {
+        return Boolean.TRUE.equals(db.queryForObject(
+            "SELECT EXISTS (SELECT 1 FROM usuario WHERE dni = ?)", Boolean.class, dni));
     }
     public CuentaPerfilDTO perfil(long id) {
         String sql = "SELECT c.id_cuenta, c.correo, c.rol::text AS rol, c.estado::text AS estado, " +

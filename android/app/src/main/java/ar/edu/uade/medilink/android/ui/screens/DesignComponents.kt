@@ -1,6 +1,21 @@
 package ar.edu.uade.medilink.android.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.input.VisualTransformation
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +54,36 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ar.edu.uade.medilink.android.ui.theme.MediColors
 
-/** Piezas visuales reutilizables para pacientes, operadores y administración. */
+/** Pares de círculos que se cruzan; la intersección queda "calada" (estilo del login). */
+@Composable
+fun CirculosMarca(modifier: Modifier = Modifier, escala: Float = 1f) {
+    val pares = remember {
+        // x, y (fracción del ancho), radio (fracción del ancho), ángulo del segundo círculo.
+        listOf(
+            floatArrayOf(0.02f, 0.05f, 0.11f, 20f), floatArrayOf(0.40f, 0.02f, 0.10f, 110f),
+            floatArrayOf(0.88f, 0.00f, 0.12f, 200f), floatArrayOf(0.20f, 0.36f, 0.10f, 300f),
+            floatArrayOf(0.62f, 0.28f, 0.09f, 40f), floatArrayOf(0.95f, 0.30f, 0.10f, 150f),
+            floatArrayOf(0.05f, 0.62f, 0.11f, 250f), floatArrayOf(0.48f, 0.62f, 0.10f, 330f),
+            floatArrayOf(0.84f, 0.66f, 0.11f, 70f), floatArrayOf(0.26f, 0.90f, 0.10f, 180f),
+            floatArrayOf(0.70f, 0.95f, 0.09f, 280f), floatArrayOf(1.00f, 1.00f, 0.10f, 10f),
+        )
+    }
+    val colores = listOf(Color(0xFF26457A), Color(0xFF1B5470), Color(0xFF2B4F8F))
+    Canvas(modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
+        val w = size.width
+        pares.forEachIndexed { i, p ->
+            val radio = p[2] * w * escala
+            val c1 = Offset(p[0] * w, p[1] * w * 1.6f * escala)
+            val rad = Math.toRadians(p[3].toDouble())
+            val c2 = c1 + Offset((cos(rad) * radio * 1.2f).toFloat(), (sin(rad) * radio * 1.2f).toFloat())
+            val color = colores[i % colores.size]
+            drawCircle(color, radio, c1, blendMode = BlendMode.Xor)
+            drawCircle(color, radio, c2, blendMode = BlendMode.Xor)
+        }
+    }
+}
+
+/** Panel destacado de cada sección: azul noche con los círculos de la marca. */
 @Composable
 fun HeroPanel(
     etiqueta: String,
@@ -49,34 +93,74 @@ fun HeroPanel(
     modifier: Modifier = Modifier,
     contenido: (@Composable () -> Unit)? = null,
 ) {
-    val oscuro = MaterialTheme.colorScheme.background.red < 0.2f
-    val fondo = if (oscuro) Color(0xFF225F55) else MediColors.Forest
-    Box(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(fondo, if (oscuro) Color(0xFF146D61) else MediColors.Teal)))
-            .padding(22.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Box(modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(topEnd = 56.dp, topStart = 24.dp,
+        bottomStart = 24.dp, bottomEnd = 24.dp)).background(MediColors.Noche)) {
+        CirculosMarca(Modifier.matchParentSize().alpha(0.55f), escala = 0.8f)
+        Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
-                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.16f)),
+                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(Color.White),
                     contentAlignment = Alignment.Center,
-                ) { Icon(icono, contentDescription = null, tint = Color.White) }
-                Text(etiqueta.uppercase(), color = Color(0xFFD4F5E9),
-                    style = MaterialTheme.typography.labelMedium, letterSpacing = 1.3.sp)
+                ) { Icon(icono, contentDescription = null, tint = MediColors.Teal) }
+                Text(etiqueta.uppercase(), color = MediColors.Aqua,
+                    style = MaterialTheme.typography.labelMedium, letterSpacing = 1.6.sp)
             }
-            Text(titulo, color = Color.White, style = MaterialTheme.typography.headlineMedium)
-            Text(descripcion, color = Color(0xFFE2F5EF), style = MaterialTheme.typography.bodyMedium)
+            Text(titulo, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.3).sp, lineHeight = 32.sp)
+            Text(descripcion, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
             contenido?.invoke()
         }
     }
 }
 
+/**
+ * Campo de texto con el estilo del login: relleno gris, esquinas redondeadas y sin línea.
+ * Acepta los mismos parámetros que se usaban de OutlinedTextField.
+ */
+@Composable
+fun CampoTexto(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    label: (@Composable () -> Unit)? = null,
+    placeholder: (@Composable () -> Unit)? = null,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    supportingText: (@Composable () -> Unit)? = null,
+    isError: Boolean = false,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    singleLine: Boolean = false,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    minLines: Int = 1,
+    shape: Shape = RoundedCornerShape(18.dp),
+) {
+    val campo = if (MaterialTheme.colorScheme.surface.red < 0.3f) MaterialTheme.colorScheme.surfaceVariant
+        else MediColors.CampoGris
+    TextField(
+        value = value, onValueChange = onValueChange, modifier = modifier, enabled = enabled,
+        readOnly = readOnly, label = label, placeholder = placeholder, leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon, supportingText = supportingText, isError = isError,
+        visualTransformation = visualTransformation, keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions, singleLine = singleLine, maxLines = maxLines, minLines = minLines,
+        shape = shape,
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = campo, unfocusedContainerColor = campo, errorContainerColor = campo,
+            disabledContainerColor = campo.copy(alpha = 0.6f),
+            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+            errorIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
+            focusedLabelColor = MediColors.Teal,
+        ),
+    )
+}
+
 @Composable
 fun SeccionTitulo(titulo: String, descripcion: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(titulo, style = MaterialTheme.typography.titleLarge)
+        Text(titulo, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
         if (!descripcion.isNullOrBlank()) {
             Text(descripcion, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall)
@@ -115,8 +199,8 @@ fun AccesoTarjeta(
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                Icon(icono, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                .background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
+                Icon(icono, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(titulo, style = MaterialTheme.typography.titleMedium)
@@ -125,7 +209,7 @@ fun AccesoTarjeta(
                     overflow = TextOverflow.Ellipsis)
             }
             Icon(Icons.Default.ArrowForward, contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                tint = MediColors.Teal, modifier = Modifier.size(20.dp))
         }
     }
 }

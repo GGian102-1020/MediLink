@@ -1,0 +1,19 @@
+# Override local: usa la MISMA base del proyecto principal (Desktop\MedLink,
+# volumen Docker "medlink_pgdata") en lugar del volumen propio de esta copia.
+# No correr al mismo tiempo que el contenedor "medlink-db" del proyecto principal
+# (dos Postgres sobre el mismo volumen corrompen datos).
+#
+# Esa base fue creada por scripts SQL (sin Flyway): el baseline adopta V1 y
+# aplica V2-V4, que son aditivas (unaccent, indice auditoria, lat/long NULL).
+#
+# docker compose -f docker-compose.yml -f android/compose.dev.yml \
+#   -f android/compose.coexist.yml -f android/compose.projectdb.yml --profile api up -d
+services:
+  backend:
+    environment:
+      DB_FLYWAY_BASELINE_ON_MIGRATE: "true"
+
+volumes:
+  pgdata:
+    external: true
+    name: medlink_pgdata

@@ -10,7 +10,23 @@ public final class AuthDtos {
         @NotBlank String nombre,
         @NotBlank String apellido,
         @NotBlank String correo,
-        @NotNull String contrasena) { }
+        @NotNull String contrasena,
+        String dni,
+        java.time.LocalDate fechaNacimiento,
+        String telefono,
+        String obraSocial,
+        String numeroAfiliado) {
+        /** Registro solo con los datos obligatorios (clientes anteriores). */
+        public RegisterRequest(String nombre, String apellido, String correo, String contrasena) {
+            this(nombre, apellido, correo, contrasena, null, null, null, null, null);
+        }
+    }
+
+    /** Datos personales opcionales del paciente, ya normalizados. */
+    public record DatosPersonales(String dni, java.time.LocalDate fechaNacimiento, String telefono,
+                                  String obraSocial, String numeroAfiliado) {
+        public static final DatosPersonales VACIOS = new DatosPersonales(null, null, null, null, null);
+    }
 
     public record LoginRequest(
         @NotBlank String correo,

@@ -68,8 +68,19 @@ class MediLinkRepository(val session: SessionStore = SessionStore()) {
         session.set(response)
     }
 
-    suspend fun registro(nombre: String, apellido: String, correo: String, clave: String) {
-        api.registro(RegisterRequest(nombre.trim(), apellido.trim(), correo.trim(), clave))
+    suspend fun registro(
+        nombre: String, apellido: String, correo: String, clave: String,
+        datos: DatosPersonales? = null,
+    ) {
+        api.registro(RegisterRequest(
+            nombre = nombre.trim(), apellido = apellido.trim(), correo = correo.trim(), contrasena = clave,
+            dni = datos?.dni?.filter(Char::isDigit),
+            fechaNacimiento = datos?.fechaNacimiento?.toString(),
+            telefono = datos?.telefono?.trim()?.ifBlank { null },
+            obraSocial = datos?.obraSocial?.trim()?.ifBlank { null },
+            numeroAfiliado = datos?.numeroAfiliado?.trim()?.ifBlank { null }
+                ?.takeIf { !datos.obraSocial.isNullOrBlank() },
+        ))
     }
 
     suspend fun logout() {

@@ -14,7 +14,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -173,7 +172,7 @@ fun AdminCatalogScreen(repository: MediLinkRepository, section: AdminSection,
             text = {
                 Column {
                     Text("Acción auditada que afecta al registro #${fila.number(section.idField)}")
-                    OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo obligatorio") })
+                    CampoTexto(motivo, { motivo = it }, label = { Text("Motivo obligatorio") })
                 }
             },
             confirmButton = { TextButton(enabled = !ocupado && motivo.isNotBlank(), onClick = {
@@ -305,7 +304,7 @@ fun CampoFormulario(campo: CampoAdmin, valor: String, onValue: (String) -> Unit)
     if (campo.opciones.isNotEmpty()) {
         ComboSimple(campo.titulo, listOf("") + campo.opciones, valor, onValue)
     } else {
-        OutlinedTextField(value = valor, onValueChange = onValue,
+        CampoTexto(value = valor, onValueChange = onValue,
             label = { Text(campo.titulo + if (campo.obligatorio) " *" else "") },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
             visualTransformation = if (campo.clave == "contrasenaInicial")

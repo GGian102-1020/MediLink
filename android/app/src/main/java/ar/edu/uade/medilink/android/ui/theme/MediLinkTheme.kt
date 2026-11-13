@@ -12,52 +12,62 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
-/** Sistema visual compartido; no cambia endpoints, sesión ni reglas de negocio. */
+/**
+ * Paleta tomada del logo MediLink: azul marino de "Med", la cruz azul→celeste
+ * y el verde agua de "link". No cambia endpoints, sesión ni reglas de negocio.
+ */
 object MediColors {
-    val Forest = Color(0xFF113F3D)
-    val Teal = Color(0xFF08786D)
-    val Mint = Color(0xFFD8F0E8)
-    val Ink = Color(0xFF172C2B)
-    val Muted = Color(0xFF617572)
-    val Canvas = Color(0xFFF6F8F5)
-    val Gold = Color(0xFFF6C779)
+    val Navy = Color(0xFF004EA1)      // "Med"
+    val Blue = Color(0xFF0675DD)      // brazo izquierdo de la cruz
+    val Sky = Color(0xFF14ADFB)       // brazo superior
+    val Teal = Color(0xFF00A39B)      // "link" (oscurecido apenas para contraste AA)
+    val Aqua = Color(0xFF04D7BD)      // brazo derecho
+    val IceBlue = Color(0xFFE4F0FD)
+    val Ink = Color(0xFF14233A)
+    val Muted = Color(0xFF5E6B7D)
+    val Canvas = Color(0xFFF5F8FC)
+    val Field = Color(0xFFF1F4F8)     // inputs tipo píldora del template
+    val Noche = Color(0xFF0D1B33)     // fondo de encabezados y barras (estilo del login)
+    val CampoGris = Color(0xFFE5E8ED) // campos de texto grises del login
 }
 
 private val Light = lightColorScheme(
-    primary = MediColors.Teal,
+    // Botones y acentos principales en azul noche, como el botón del login.
+    primary = Color(0xFF13294B),
     onPrimary = Color.White,
-    primaryContainer = MediColors.Mint,
-    onPrimaryContainer = MediColors.Forest,
-    secondary = MediColors.Forest,
+    primaryContainer = MediColors.IceBlue,
+    onPrimaryContainer = MediColors.Navy,
+    secondary = MediColors.Teal,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE7F0EC),
-    onSecondaryContainer = MediColors.Forest,
-    tertiary = Color(0xFF8C562B),
+    secondaryContainer = Color(0xFFDDF6F3),
+    onSecondaryContainer = Color(0xFF00504B),
+    tertiary = MediColors.Navy,
     background = MediColors.Canvas,
     onBackground = MediColors.Ink,
     surface = Color.White,
     onSurface = MediColors.Ink,
-    surfaceVariant = Color(0xFFEDF2EF),
+    surfaceVariant = Color(0xFFEDF2F8),
     onSurfaceVariant = MediColors.Muted,
-    outline = Color(0xFFB6C9C2),
-    outlineVariant = Color(0xFFDDE7E1),
+    outline = Color(0xFFB9C6D6),
+    outlineVariant = Color(0xFFDDE5EF),
 )
 
 private val Dark = darkColorScheme(
-    primary = Color(0xFF81D9C3),
-    onPrimary = Color(0xFF003F37),
-    primaryContainer = Color(0xFF125B51),
-    onPrimaryContainer = Color(0xFFCEF2E3),
-    secondary = Color(0xFFAAD4C8),
-    onSecondary = Color(0xFF193D36),
-    background = Color(0xFF101D1C),
-    onBackground = Color(0xFFE7F0EC),
-    surface = Color(0xFF192927),
-    onSurface = Color(0xFFE7F0EC),
-    surfaceVariant = Color(0xFF2B403C),
-    onSurfaceVariant = Color(0xFFB5C7C1),
-    outline = Color(0xFF728A83),
-    outlineVariant = Color(0xFF354D46),
+    primary = Color(0xFF8CC4FF),
+    onPrimary = Color(0xFF00315F),
+    primaryContainer = Color(0xFF0B4A8C),
+    onPrimaryContainer = Color(0xFFD6E8FF),
+    secondary = Color(0xFF5EE0CF),
+    onSecondary = Color(0xFF003732),
+    tertiary = Color(0xFFA9C8F5),
+    background = Color(0xFF0E1726),
+    onBackground = Color(0xFFE4ECF7),
+    surface = Color(0xFF172234),
+    onSurface = Color(0xFFE4ECF7),
+    surfaceVariant = Color(0xFF26344A),
+    onSurfaceVariant = Color(0xFFB4C2D4),
+    outline = Color(0xFF6F8299),
+    outlineVariant = Color(0xFF33445C),
 )
 
 private val MediShapes = Shapes(

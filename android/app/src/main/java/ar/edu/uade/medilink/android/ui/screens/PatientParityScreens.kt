@@ -64,7 +64,7 @@ fun PanelPaciente(repository: MediLinkRepository, onCatalogo: () -> Unit,
             "Consultá medicamentos, encontrá una farmacia y seguí tus reservas.",
             Icons.Default.LocalPharmacy)
         perfil?.suspensionVigente?.takeIf { it.vigente }?.let {
-            AvisoError("Tu cuenta está suspendida hasta ${it.fechaHoraFin}: ${it.motivo}")
+            AvisoError("Tu cuenta está suspendida hasta ${fechaLegible(it.fechaHoraFin)}: ${it.motivo}")
         }
         SeccionTitulo("Tu actividad", "Reservas de la primera página consultada")
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -102,59 +102,5 @@ fun PanelPaciente(repository: MediLinkRepository, onCatalogo: () -> Unit,
             Icon(Icons.Default.Refresh, contentDescription = null)
             Text("  Actualizar panel")
         }
-    }
-}
-
-@Composable
-fun DetalleReservaPaciente(repository: MediLinkRepository, codigo: String, onVolver: () -> Unit) {
-    val scope = rememberCoroutineScope()
-    var reserva by remember(codigo) { mutableStateOf<ReservaDto?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var revision by remember { mutableStateOf(0) }
-    var confirmacion by remember { mutableStateOf(false) }
-    var procesando by remember { mutableStateOf(false) }
-    LaunchedEffect(codigo, revision) {
-        try { reserva = repository.detalleReserva(codigo); error = null }
-        catch (e: CancellationException) { throw e }
-        catch (e: Exception) { error = mensajeDeError(e) }
-    }
-    if (confirmacion) AlertDialog(
-        onDismissRequest = { if (!procesando) confirmacion = false },
-        title = { Text("Cancelar reserva") },
-        text = { Text("La reserva $codigo dejará de estar activa. El servidor gestiona el stock.") },
-        confirmButton = { TextButton(enabled = !procesando, onClick = {
-            scope.launch {
-                procesando = true
-                try { repository.cancelar(codigo); confirmacion = false; revision++ }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { error = mensajeDeError(e); confirmacion = false }
-                finally { procesando = false }
-            }
-        }) { Text("Confirmar cancelación") } },
-        dismissButton = { TextButton(onClick = { confirmacion = false }) { Text("Volver") } },
-    )
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Encabezado("Reserva $codigo", "Información actualizada por el servidor")
-        AvisoError(error)
-        reserva?.let { r ->
-            Text("Estado: ${r.estado}")
-            Text("Medicamento: ${r.medicamentoNombreSnapshot}")
-            Text("Presentación: ${r.presentacionDescripcionSnapshot}")
-            Text("Cantidad: ${r.cantidad} · ${r.condicionDispensa}")
-            Text("Farmacia: ${r.farmaciaNombreSnapshot}")
-            Text("Dirección: ${r.farmaciaDireccionSnapshot}")
-            Text("Creación: ${r.fechaHoraCreacion}")
-            Text("Vencimiento: ${r.fechaHoraVencimiento}")
-            if (r.estado == "ACTIVA") Text("Tiempo restante informado: ${r.segundosRestantes / 60} minutos")
-            r.fechaHoraCancelacion?.let { Text("Cancelación: $it") }
-            r.fechaHoraRetiro?.let { Text("Retiro: $it") }
-            r.causaCancelacion?.let { Text("Causa: $it") }
-            r.motivoCancelacion?.let { Text("Motivo: $it") }
-            r.prescripcionCodigo?.let { Text("Prescripción: $it") }
-            if (r.estado == "ACTIVA") Button(onClick = { confirmacion = true }) { Text("Cancelar reserva") }
-        }
-        OutlinedButton(onClick = { revision++ }) { Text("Actualizar") }
-        OutlinedButton(onClick = onVolver) { Text("Volver a mis reservas") }
     }
 }

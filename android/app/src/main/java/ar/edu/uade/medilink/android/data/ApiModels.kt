@@ -69,6 +69,21 @@ data class RegisterRequest(
     val apellido: String,
     val correo: String,
     val contrasena: String,
+    val dni: String? = null,
+    /** Formato ISO yyyy-MM-dd. */
+    val fechaNacimiento: String? = null,
+    val telefono: String? = null,
+    val obraSocial: String? = null,
+    val numeroAfiliado: String? = null,
+)
+
+/** Datos personales del paciente que se piden en el registro. */
+data class DatosPersonales(
+    val dni: String,
+    val fechaNacimiento: java.time.LocalDate,
+    val telefono: String? = null,
+    val obraSocial: String? = null,
+    val numeroAfiliado: String? = null,
 )
 
 data class CrearReservaRequest(

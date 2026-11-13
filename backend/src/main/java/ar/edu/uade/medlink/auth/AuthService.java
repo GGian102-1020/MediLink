@@ -55,15 +55,54 @@ public class AuthService {
         String nombre = name(request.nombre());
         String apellido = name(request.apellido());
         initialPassword(request.contrasena());
+        DatosPersonales datos = personalData(request, java.time.LocalDate.now(clock.withZone(ARGENTINA)));
         if (repository.byEmail(correo).isPresent())
             throw ApiException.conflict("EMAIL_ALREADY_EXISTS","Ya existe una cuenta con ese correo.");
+        if (datos.dni() != null && repository.dniExists(datos.dni()))
+            throw dniConflict();
         try {
             long id = repository.newAccount(correo,passwords.encode(request.contrasena()),"USUARIO",clock.instant());
-            repository.newUser(id,nombre,apellido);
+            repository.newUser(id,nombre,apellido,datos);
             return repository.userProfile(id);
         } catch (DuplicateKeyException ex) {
+            String detail = String.valueOf(ex.getMessage());
+            if (detail.contains("ux_usuario_dni")) throw dniConflict();
             throw ApiException.conflict("EMAIL_ALREADY_EXISTS","Ya existe una cuenta con ese correo.");
         }
+    }
+
+    private static final java.time.ZoneId ARGENTINA = java.time.ZoneId.of("America/Argentina/Buenos_Aires");
+
+    private static ApiException dniConflict() {
+        return ApiException.conflict("DNI_ALREADY_EXISTS","Ya existe una cuenta con ese DNI.");
+    }
+
+    /** Valida y normaliza los datos personales opcionales del registro. */
+    static DatosPersonales personalData(RegisterRequest request, java.time.LocalDate today) {
+        String dni = blankToNull(request.dni());
+        if (dni != null) {
+            dni = dni.replace(".", "").replace(" ", "");
+            if (!dni.matches("[0-9]{7,8}")) throw ApiException.validation("DNI inválido: deben ser 7 u 8 números.");
+        }
+        var nacimiento = request.fechaNacimiento();
+        if (nacimiento != null && (nacimiento.isAfter(today) || nacimiento.isBefore(today.minusYears(120))))
+            throw ApiException.validation("Fecha de nacimiento inválida.");
+        String telefono = blankToNull(request.telefono());
+        if (telefono != null) {
+            telefono = telefono.replaceAll("[\\s()-]", "");
+            if (!telefono.matches("\\+?[0-9]{6,15}")) throw ApiException.validation("Teléfono inválido.");
+        }
+        String obraSocial = blankToNull(request.obraSocial());
+        if (obraSocial != null && obraSocial.length() > 80)
+            throw ApiException.validation("Obra social inválida.");
+        String afiliado = blankToNull(request.numeroAfiliado());
+        if (afiliado != null && (obraSocial == null || afiliado.length() > 30))
+            throw ApiException.validation("Número de afiliado inválido.");
+        return new DatosPersonales(dni, nacimiento, telefono, obraSocial, afiliado);
+    }
+
+    private static String blankToNull(String raw) {
+        return raw == null || raw.isBlank() ? null : raw.strip();
     }
     // BCrypt uses at most 72 UTF-8 bytes. Apply the same byte limit to every
     // supplied password, including login and the current password on change.

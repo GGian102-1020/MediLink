@@ -14,7 +14,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,7 +74,7 @@ fun AdminUsuariosScreen(repository: MediLinkRepository, onDetalle: (Long) -> Uni
             title = { Text(if (activa) "Deshabilitar cuenta" else "Reactivar cuenta") },
             text = { Column {
                 Text("Cuenta #${usuario.number("cuentaId")}. Se exige motivo registrado en auditoría.")
-                OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo") })
+                CampoTexto(motivo, { motivo = it }, label = { Text("Motivo") })
             } },
             confirmButton = { TextButton(enabled = !ocupado && motivo.isNotBlank(), onClick = {
                 scope.launch {
@@ -97,7 +96,7 @@ fun AdminUsuariosScreen(repository: MediLinkRepository, onDetalle: (Long) -> Uni
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Usuarios", "Cuentas, historial y suspensiones")
         AvisoError(error)
-        OutlinedTextField(correo, { correo = it }, label = { Text("Filtrar por correo") },
+        CampoTexto(correo, { correo = it }, label = { Text("Filtrar por correo") },
             modifier = Modifier.fillMaxWidth())
         ComboSimple("Estado", listOf("", "ACTIVA", "DESHABILITADA"), estado) { estado = it }
         Button(onClick = { correoAplicado = correo.trim(); estadoAplicado = estado; page = 0; revision++ }) {
@@ -165,7 +164,7 @@ fun AdminUsuarioDetalleScreen(repository: MediLinkRepository, usuarioId: Long) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("${r.codigoVisible} · ${r.estado}")
                         Text("${r.medicamentoNombreSnapshot} · ${r.farmaciaNombreSnapshot}")
-                        Text("${r.fechaHoraCreacion} · ${r.cantidad} unidades")
+                        Text("${fechaLegible(r.fechaHoraCreacion)} · ${r.cantidad} unidades")
                     }
                 }
             }
@@ -174,7 +173,7 @@ fun AdminUsuarioDetalleScreen(repository: MediLinkRepository, usuarioId: Long) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Suspensión #${s.id} · ${if (s.vigente) "Vigente" else "Histórica"}")
-                    Text("${s.fechaHoraInicio} → ${s.fechaHoraFin}")
+                    Text("${fechaLegible(s.fechaHoraInicio)} → ${fechaLegible(s.fechaHoraFin)}")
                     Text(s.motivo)
                 }
             }
@@ -222,7 +221,7 @@ fun AdminPrescripcionesScreen(repository: MediLinkRepository) {
             title = { Text("Anular prescripción") },
             text = { Column {
                 Text("Código ${row.string("codigoExterno")}. Esta acción quedará auditada.")
-                OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo") })
+                CampoTexto(motivo, { motivo = it }, label = { Text("Motivo") })
             } },
             confirmButton = { TextButton(enabled = !ocupado && motivo.isNotBlank(), onClick = {
                 scope.launch {
@@ -245,7 +244,7 @@ fun AdminPrescripcionesScreen(repository: MediLinkRepository) {
         AvisoError(error)
         aviso?.let { Text(it) }
         listOf("usuarioId" to "ID usuario", "codigoExterno" to "Código", "estado" to "Estado").forEach { (k, label) ->
-            OutlinedTextField(filtros[k].orEmpty(), { filtros[k] = it }, label = { Text(label) },
+            CampoTexto(filtros[k].orEmpty(), { filtros[k] = it }, label = { Text(label) },
                 modifier = Modifier.fillMaxWidth())
         }
         Button(onClick = {
@@ -253,17 +252,17 @@ fun AdminPrescripcionesScreen(repository: MediLinkRepository) {
         }) { Text("Filtrar") }
         OutlinedButton(onClick = { mostrarForm = !mostrarForm }) { Text("Crear prescripción") }
         if (mostrarForm) {
-            OutlinedTextField(codigo, { codigo = it }, label = { Text("Código externo") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(usuarioId, { usuarioId = it }, label = { Text("ID usuario") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(emision, { emision = it }, label = { Text("Emisión (AAAA-MM-DD)") },
+            CampoTexto(codigo, { codigo = it }, label = { Text("Código externo") }, modifier = Modifier.fillMaxWidth())
+            CampoTexto(usuarioId, { usuarioId = it }, label = { Text("ID usuario") }, modifier = Modifier.fillMaxWidth())
+            CampoTexto(emision, { emision = it }, label = { Text("Emisión (AAAA-MM-DD)") },
                 modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(vencimiento, { vencimiento = it }, label = { Text("Vencimiento (AAAA-MM-DD)") },
+            CampoTexto(vencimiento, { vencimiento = it }, label = { Text("Vencimiento (AAAA-MM-DD)") },
                 modifier = Modifier.fillMaxWidth())
             items.forEachIndexed { index, item ->
                 Text("Ítem ${index + 1}")
-                OutlinedTextField(item.first, { items[index] = it to item.second },
+                CampoTexto(item.first, { items[index] = it to item.second },
                     label = { Text("ID de presentación") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(item.second, { items[index] = item.first to it },
+                CampoTexto(item.second, { items[index] = item.first to it },
                     label = { Text("Cantidad autorizada") }, modifier = Modifier.fillMaxWidth())
                 if (items.size > 1) OutlinedButton(onClick = { items.removeAt(index) }) { Text("Quitar ítem") }
             }
@@ -349,7 +348,7 @@ fun AdminAuditoriaScreen(repository: MediLinkRepository) {
         Encabezado("Auditoría", "Trazabilidad de operaciones y cambios del sistema")
         AvisoError(error)
         campos.forEach { clave ->
-            OutlinedTextField(filtros[clave].orEmpty(), { filtros[clave] = it },
+            CampoTexto(filtros[clave].orEmpty(), { filtros[clave] = it },
                 label = { Text(if (clave in listOf("desde", "hasta")) "$clave (ISO 8601 con zona)" else clave) },
                 modifier = Modifier.fillMaxWidth())
         }
@@ -374,7 +373,7 @@ fun AdminAuditoriaScreen(repository: MediLinkRepository) {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${row.string("fechaHora")} · ${row.string("accion")}")
+                    Text("${fechaLegible(row.string("fechaHora"))} · ${row.string("accion")}")
                     Text("${row.string("tipoEntidad")} #${row.string("entidadId")}")
                     Text("Actor ${row.string("actorNombre")} · Rol ${row.string("rol")}")
                     OutlinedButton(onClick = { seleccionado = row }) { Text("Detalle de auditoría") }

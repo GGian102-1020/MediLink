@@ -26,9 +26,10 @@ val screenPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)
 @Composable
 fun Encabezado(titulo: String, subtitulo: String) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 5.dp)) {
-        Text("MEDILINK", style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary, letterSpacing = 1.5.sp)
-        Text(titulo, style = MaterialTheme.typography.headlineMedium)
+        Text("MEDILINK", style = MaterialTheme.typography.labelMedium,
+            color = ar.edu.uade.medilink.android.ui.theme.MediColors.Teal, letterSpacing = 1.8.sp)
+        Text(titulo, fontSize = 30.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+            letterSpacing = (-0.4).sp, color = MaterialTheme.colorScheme.onSurface)
         Text(subtitulo, style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

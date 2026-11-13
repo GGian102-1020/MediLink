@@ -14,7 +14,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -138,12 +137,12 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
                     EstadoPildora(r.estado)
                     Text("${r.medicamentoNombreSnapshot} · ${r.presentacionDescripcionSnapshot}")
                     Text("Usuario: ${r.usuarioNombre.orEmpty()} ${r.usuarioApellido.orEmpty()}")
-                    Text("Cantidad: ${r.cantidad} · ${r.fechaHoraCreacion}")
+                    Text("Cantidad: ${r.cantidad} · ${fechaLegible(r.fechaHoraCreacion)}")
                     OutlinedButton(onClick = { seleccionado = r.codigoVisible }) { Text("Ver y gestionar") }
                 }
             }
         }
-        OutlinedTextField(value = codigoManual, onValueChange = { codigoManual = it },
+        CampoTexto(value = codigoManual, onValueChange = { codigoManual = it },
             label = { Text("Buscar reserva por código") }, modifier = Modifier.fillMaxWidth())
         Button(onClick = { seleccionado = codigoManual.trim() }, enabled = codigoManual.isNotBlank()) {
             Text("Buscar código")
@@ -152,8 +151,8 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
             Encabezado("Detalle ${r.codigoVisible}", r.estado)
             Text("Medicamento: ${r.medicamentoNombreSnapshot} · ${r.presentacionDescripcionSnapshot}")
             Text("Usuario: ${r.usuarioNombre.orEmpty()} ${r.usuarioApellido.orEmpty()}")
-            Text("Creada: ${r.fechaHoraCreacion} · Vence: ${r.fechaHoraVencimiento}")
-            r.fechaHoraRetiro?.let { Text("Retirada: $it") }
+            Text("Creada: ${fechaLegible(r.fechaHoraCreacion)} · Vence: ${fechaLegible(r.fechaHoraVencimiento)}")
+            r.fechaHoraRetiro?.let { Text("Retirada: ${fechaLegible(it)}") }
             r.causaCancelacion?.let { Text("Causa: $it") }
             r.motivoCancelacion?.let { Text("Motivo: $it") }
             if (r.estado == "ACTIVA") {
@@ -162,10 +161,10 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
                 ComboSimple("Causa", causasOperacion.filter { it != "ERROR_ADMINISTRATIVO" || rol == "ADMINISTRADOR" },
                     causa) { causa = it }
                 if (causa == "STOCK_INCONSISTENTE") {
-                    OutlinedTextField(stockReal, { stockReal = it },
+                    CampoTexto(stockReal, { stockReal = it },
                         label = { Text("Stock libre real") }, modifier = Modifier.fillMaxWidth())
                 } else {
-                    OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo") },
+                    CampoTexto(motivo, { motivo = it }, label = { Text("Motivo") },
                         modifier = Modifier.fillMaxWidth())
                 }
                 if (causa == "OTRA_CAUSA" || causa == "ERROR_ADMINISTRATIVO") {
@@ -233,7 +232,7 @@ fun StockFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Presentación #${s.presentacionId}: ${s.cantidadDisponible} unidades")
-                    Text("Actualización: ${s.fechaHoraActualizacion}")
+                    Text("Actualización: ${fechaLegible(s.fechaHoraActualizacion)}")
                     OutlinedButton(onClick = {
                         presentacionId = s.presentacionId.toString(); cantidad = s.cantidadDisponible.toString()
                     }) { Text("Ajustar este stock") }
@@ -246,11 +245,11 @@ fun StockFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long) {
         }
         Text("Página ${pagina + 1} · Total ${listado?.totalElements ?: 0}")
         Encabezado("Nuevo ajuste", "Se permite crear el saldo de una presentación no registrada")
-        OutlinedTextField(presentacionId, { presentacionId = it }, label = { Text("ID de presentación") },
+        CampoTexto(presentacionId, { presentacionId = it }, label = { Text("ID de presentación") },
             modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(cantidad, { cantidad = it }, label = { Text("Cantidad disponible") },
+        CampoTexto(cantidad, { cantidad = it }, label = { Text("Cantidad disponible") },
             modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo de ajuste") },
+        CampoTexto(motivo, { motivo = it }, label = { Text("Motivo de ajuste") },
             modifier = Modifier.fillMaxWidth())
         Button(enabled = !ocupado && presentacionId.toLongOrNull()?.let { it > 0 } == true &&
             cantidad.toIntOrNull()?.let { it >= 0 } == true && motivo.isNotBlank(),
@@ -275,7 +274,7 @@ fun MovimientosFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long) 
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Encabezado("Movimientos #$farmaciaId", "Auditoría de cambios de stock")
         AvisoError(error)
-        OutlinedTextField(filtro, { filtro = it }, label = { Text("ID de presentación (opcional)") },
+        CampoTexto(filtro, { filtro = it }, label = { Text("ID de presentación (opcional)") },
             modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
@@ -289,7 +288,7 @@ fun MovimientosFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long) 
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("${m.fechaHora} · ${m.tipo}")
+                    Text("${fechaLegible(m.fechaHora)} · ${m.tipo}")
                     Text("Saldo: ${m.cantidadAnterior} → ${m.cantidadNueva} (${m.delta})")
                     m.reservaCodigo?.let { Text("Reserva: $it") }
                     m.motivo?.let { Text("Motivo: $it") }

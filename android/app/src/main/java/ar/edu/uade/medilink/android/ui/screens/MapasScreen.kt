@@ -24,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -236,7 +235,7 @@ fun MapasScreen(repository: MediLinkRepository, presentacionId: Long) {
                 }
             } else permiso.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
         }, enabled = !ocupado) { Text("Usar mi ubicación (opcional)") }
-        OutlinedTextField(direccion, { direccion = it }, label = { Text("Dirección en CABA") },
+        CampoTexto(direccion, { direccion = it }, label = { Text("Dirección en CABA") },
             modifier = Modifier.fillMaxWidth())
         OutlinedButton(enabled = !ocupado && direccion.trim().length >= 3, onClick = {
             scope.launch {

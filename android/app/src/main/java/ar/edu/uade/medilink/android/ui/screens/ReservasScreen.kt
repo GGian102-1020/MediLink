@@ -105,7 +105,7 @@ fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         Text(reserva.farmaciaNombreSnapshot, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text("Cantidad: ${reserva.cantidad} · Vence: ${reserva.fechaHoraVencimiento}",
+                    Text("Cantidad: ${reserva.cantidad} · Vence: ${fechaLegible(reserva.fechaHoraVencimiento)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Button(onClick = { onDetalle(reserva.codigoVisible) }, modifier = Modifier.fillMaxWidth()) {

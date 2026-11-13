@@ -25,7 +25,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,11 +74,11 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
             title = { Text("Cambiar contraseña") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(actual, { actual = it }, label = { Text("Contraseña actual") },
+                    CampoTexto(actual, { actual = it }, label = { Text("Contraseña actual") },
                         visualTransformation = PasswordVisualTransformation())
-                    OutlinedTextField(nueva, { nueva = it }, label = { Text("Nueva contraseña") },
+                    CampoTexto(nueva, { nueva = it }, label = { Text("Nueva contraseña") },
                         visualTransformation = PasswordVisualTransformation())
-                    OutlinedTextField(repetida, { repetida = it }, label = { Text("Repetir contraseña") },
+                    CampoTexto(repetida, { repetida = it }, label = { Text("Repetir contraseña") },
                         visualTransformation = PasswordVisualTransformation())
                     AvisoError(error)
                 }
@@ -155,7 +154,7 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
                 }
             }
             perfil?.suspensionVigente?.takeIf { it.vigente }?.let {
-                AvisoError("Suspensión hasta ${it.fechaHoraFin}: ${it.motivo}")
+                AvisoError("Suspensión hasta ${fechaLegible(it.fechaHoraFin)}: ${it.motivo}")
             }
             AvisoError(error)
             mensaje?.let { NotaInformativa(it) }

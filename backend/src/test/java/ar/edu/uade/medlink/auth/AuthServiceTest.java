@@ -41,13 +41,45 @@ class AuthServiceTest {
         when(accounts.userProfile(21L)).thenReturn(new UsuarioPerfilDTO(7,21,"Ana","Paz","User@Example.test","ACTIVA","USUARIO"));
         var response=service.register(new RegisterRequest(" Ana ","Paz "," User@Example.test ","Password123!"));
         assertEquals(7,response.usuarioId());
-        verify(accounts).newUser(21,"Ana","Paz");
+        verify(accounts).newUser(21,"Ana","Paz",DatosPersonales.VACIOS);
+    }
+    @Test void registrationNormalizesAndStoresPersonalData() {
+        when(accounts.byEmail("ana@t.test")).thenReturn(Optional.empty());
+        when(accounts.dniExists("30123456")).thenReturn(false);
+        when(encoder.encode("Password123!")).thenReturn("$2a$valid");
+        when(accounts.newAccount(eq("ana@t.test"),eq("$2a$valid"),eq("USUARIO"),any())).thenReturn(21L);
+        var nacimiento = java.time.LocalDate.of(1990, 5, 20);
+        service.register(new RegisterRequest("Ana","Paz","ana@t.test","Password123!",
+            "30.123.456", nacimiento, "11 4567-8900", " OSDE ", "123/45"));
+        verify(accounts).newUser(21,"Ana","Paz",
+            new DatosPersonales("30123456", nacimiento, "1145678900", "OSDE", "123/45"));
+    }
+    @Test void personalDataValidationRejectsInvalidValues() {
+        var hoy = java.time.LocalDate.of(2026, 11, 12);
+        assertThrows(ApiException.class, () -> AuthService.personalData(
+            new RegisterRequest("A","B","a@t.test","x","123",null,null,null,null), hoy));
+        assertThrows(ApiException.class, () -> AuthService.personalData(
+            new RegisterRequest("A","B","a@t.test","x",null,hoy.plusDays(1),null,null,null), hoy));
+        assertThrows(ApiException.class, () -> AuthService.personalData(
+            new RegisterRequest("A","B","a@t.test","x",null,null,"abc",null,null), hoy));
+        assertThrows(ApiException.class, () -> AuthService.personalData(
+            new RegisterRequest("A","B","a@t.test","x",null,null,null,null,"999"), hoy));
+        assertEquals(DatosPersonales.VACIOS, AuthService.personalData(
+            new RegisterRequest("A","B","a@t.test","x"," ",null,"",null,null), hoy));
+    }
+    @Test void duplicateDniRejectsCreation() {
+        when(accounts.byEmail("n@t.test")).thenReturn(Optional.empty());
+        when(accounts.dniExists("30123456")).thenReturn(true);
+        var e=assertThrows(ApiException.class,()->service.register(new RegisterRequest("A","B","n@t.test",
+            "Password123!","30123456",null,null,null,null)));
+        assertEquals("DNI_ALREADY_EXISTS",e.codigo());
+        verify(accounts,never()).newAccount(anyString(),anyString(),anyString(),any());
     }
     @Test void duplicateEmailRejectsCreation() {
         when(accounts.byEmail("x@a.test")).thenReturn(Optional.of(new Account(1,"x@a.test","hash","USUARIO","ACTIVA",0)));
         var e=assertThrows(ApiException.class,()->service.register(new RegisterRequest("A","B","x@a.test","Password123!")));
         assertEquals("EMAIL_ALREADY_EXISTS",e.codigo());
-        verify(accounts,never()).newUser(anyLong(),anyString(),anyString());
+        verify(accounts,never()).newUser(anyLong(),anyString(),anyString(),any());
     }
     @Test void rejectsWrongCredentialsAndDisabledAccounts() {
         when(accounts.byEmail("x@a.test")).thenReturn(Optional.of(new Account(1,"x@a.test","hash","USUARIO","DESHABILITADA",0)));

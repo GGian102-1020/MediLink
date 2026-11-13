@@ -28,7 +28,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -117,12 +116,12 @@ fun DisponibilidadScreen(
                         NotaInformativa("Iniciá sesión con una cuenta de paciente para confirmar la reserva.")
                         Button(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }
                     } else {
-                        OutlinedTextField(value = cantidad,
+                        CampoTexto(value = cantidad,
                             onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) cantidad = it },
                             label = { Text("Cantidad (máximo ${seleccion.cantidadDisponible})") },
                             singleLine = true, modifier = Modifier.fillMaxWidth())
                         if (bajoReceta) {
-                            OutlinedTextField(value = prescripcion, onValueChange = { prescripcion = it },
+                            CampoTexto(value = prescripcion, onValueChange = { prescripcion = it },
                                 label = { Text("Código de prescripción demo") },
                                 singleLine = true, modifier = Modifier.fillMaxWidth())
                         }
