@@ -66,9 +66,10 @@ Base de datos
 - PostgreSQL
 
 
-Frontend de la rama de mapas
-- React + TypeScript + Vite + Leaflet
-- Alcance de esta rama: pantallas públicas, ingreso/registro y detalle de reserva; no contiene las pantallas operativas/administrativas.
+Clientes actuales
+- **Android** (`android/`): aplicación nativa Kotlin + Jetpack Compose para búsqueda, disponibilidad y reservas.
+- **Web** (`frontend/`): landing pública React + Vite con inicio, explicación y enlace de descarga Android. No ofrece login, catálogo, reservas, operaciones ni administración web, ni consume la API.
+- **Descarga Android**: depende de una release pública firmada y con backend HTTPS real; consultar [`frontend/README.md`](frontend/README.md).
 
 Otras herramientas
 - Git
@@ -80,19 +81,21 @@ Otras herramientas
 
 Arquitectura
 
-El proyecto utilizará una arquitectura basada en:
+La landing web se publica como **sitio estático**, independiente de la API. La funcionalidad de MediLink se concentra en la app Android:
 
-Frontend React
+```text
+Landing pública (React + Vite) → enlace de descarga Android
+
+App Android (Kotlin + Compose)
       ↓
-   REST API
-      ↓
-Spring Boot
+   REST API (Spring Boot)
       ↓
 Service / Lógica de negocio
       ↓
-Spring Data JPA / JdbcTemplate (según módulo)
+Spring Data JPA / JdbcTemplate
       ↓
 PostgreSQL
+```
 
 
 
@@ -109,7 +112,7 @@ La base de datos vacía se migra automáticamente mediante Flyway al iniciar la 
 La carga de cuentas y stock de demostración es **manual y solo para una base local descartable**.
 No se deben cargar seeds en bases de datos compartidas ni utilizar las credenciales ficticias en un entorno expuesto.
 
-Guía de arranque de esta rama: [docs/DEMO_MAPAS_MVP.md](docs/DEMO_MAPAS_MVP.md).
+Guías vigentes: [frontend/README.md](frontend/README.md) para la landing y [android/README.md](android/README.md) para Android. La demostración histórica de mapas se documenta en [docs/DEMO_MAPAS_MVP.md](docs/DEMO_MAPAS_MVP.md).
 Esquema existente, bases anteriores y respaldos: [database/README.md](database/README.md).
 
 ## Cuentas y autenticación (backend)
