@@ -1,6 +1,0 @@
-# Sobrescritura exclusivamente para desarrollo Android local.
-# El backend NO se expone en 0.0.0.0 ni en la red local.
-services:
-  backend:
-    ports:
-      - "127.0.0.1:18081:8081"

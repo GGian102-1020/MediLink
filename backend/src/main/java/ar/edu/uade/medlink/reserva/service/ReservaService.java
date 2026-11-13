@@ -62,6 +62,9 @@ public class ReservaService {
         for (int i=0;i<chars.length;i++) chars[i]=BASE32[RANDOM.nextInt(BASE32.length)];
         return new String(chars);
     }
+    /** Six-digit pickup PIN from a CSPRNG; only the owning patient ever sees it. */
+    private static String nextPin() { return String.format("%06d",RANDOM.nextInt(1_000_000)); }
+    public static final int MAX_PIN_ATTEMPTS=5;
     private static void positive(Long id) { if (id==null || id<=0) throw ApiException.validation("Identificador inválido."); }
 
     public record Creation(ReservaDTO dto, boolean suspended) { }
@@ -139,12 +142,12 @@ public class ReservaService {
                 INSERT INTO reserva (codigo_visible,id_usuario,id_farmacia,id_presentacion,id_item_prescripcion,
                     cantidad,estado_persistido,fecha_hora_creacion,fecha_hora_vencimiento,
                     farmacia_nombre_snapshot,farmacia_direccion_snapshot,medicamento_nombre_snapshot,
-                    presentacion_descripcion_snapshot)
-                VALUES (?,?,?,?,?,?,'ACTIVA',?,?,?,?,?,?)
+                    presentacion_descripcion_snapshot,pin_retiro)
+                VALUES (?,?,?,?,?,?,'ACTIVA',?,?,?,?,?,?,?)
                 ON CONFLICT (codigo_visible) DO NOTHING RETURNING id_reserva
                 """,(r,n)->r.getLong(1),candidate,usuario,req.farmaciaId(),req.presentacionId(),item,
                 req.cantidad(),Timestamp.from(t),Timestamp.from(t.plus(Duration.ofHours(4))),
-                product.pharmacy(),product.address(),product.med(),product.presentation());
+                product.pharmacy(),product.address(),product.med(),product.presentation(),nextPin());
             if (!ids.isEmpty()) { visible=candidate; reservation=ids.getFirst(); }
         }
         if (reservation==null) throw new IllegalStateException("No fue posible generar un código aleatorio de Reserva.");
@@ -233,10 +236,15 @@ public class ReservaService {
         cancel(current,ctx,t,"USUARIO","CANCELACION_USUARIO",null,true,null,actor,request);
         return new Outcome(store.get(code,t,"USUARIO"),false);
     }
+    /** Pickup result. A wrong or blocked PIN is reported after commit so the failed-attempt counter persists. */
+    public enum PinCheck { OK, MISSING, WRONG, BLOCKED }
+    public record RetiroOutcome(ReservaDTO dto,boolean expired,PinCheck pin,int remainingAttempts) { }
     @Transactional
-    public Outcome retirar(long pharmacy,String code,CurrentAccount actor,HttpServletRequest request) {
+    public RetiroOutcome retirar(long pharmacy,String code,String suppliedPin,CurrentAccount actor,HttpServletRequest request) {
         requireRole(actor,"OPERADOR");
         scope(pharmacy,actor);
+        if (suppliedPin==null || suppliedPin.isBlank())
+            return new RetiroOutcome(null,false,PinCheck.MISSING,0);
         Instant t=now();
         var target=store.item(code);
         if (target.farmacia()!=pharmacy) throw ApiException.notFound();
@@ -247,7 +255,19 @@ public class ReservaService {
         if (!current.estado().equals("ACTIVA")) throw invalidState();
         if (!current.vencimiento().isAfter(t)) {
             expire(current,ctx,t,request);
-            return new Outcome(store.get(code,t,actor.rol()),true);
+            return new RetiroOutcome(store.get(code,t,actor.rol()),true,PinCheck.OK,0);
+        }
+        var pin=store.pin(current.id());
+        if (pin.failedAttempts()>=MAX_PIN_ATTEMPTS)
+            return new RetiroOutcome(null,false,PinCheck.BLOCKED,0);
+        boolean matches=MessageDigest.isEqual(pin.pin().getBytes(StandardCharsets.UTF_8),
+            suppliedPin.strip().getBytes(StandardCharsets.UTF_8));
+        if (!matches) {
+            db.update("UPDATE reserva SET intentos_pin_fallidos=intentos_pin_fallidos+1 WHERE id_reserva=?",current.id());
+            int remaining=MAX_PIN_ATTEMPTS-(pin.failedAttempts()+1);
+            audit.record(actor.id(),actor.rol(),"CONFIRMAR_RETIRO","RESERVA",current.id(),current.usuario(),
+                "PIN de retiro incorrecto",null,Map.of("intentosPinFallidos",pin.failedAttempts()+1),request);
+            return new RetiroOutcome(null,false,remaining<=0?PinCheck.BLOCKED:PinCheck.WRONG,Math.max(0,remaining));
         }
         int updated=db.update("UPDATE reserva SET estado_persistido='COMPLETADA',fecha_hora_retiro=? " +
             "WHERE id_reserva=? AND estado_persistido='ACTIVA'",Timestamp.from(t),current.id());
@@ -260,7 +280,7 @@ public class ReservaService {
         }
         audit.record(actor.id(),actor.rol(),"CONFIRMAR_RETIRO","RESERVA",current.id(),current.usuario(),null,
             Map.of("estado","ACTIVA"),Map.of("estado","COMPLETADA"),request);
-        return new Outcome(store.get(code,t,actor.rol()),false);
+        return new RetiroOutcome(store.get(code,t,actor.rol()),false,PinCheck.OK,0);
     }
     @Transactional
     public Outcome cancelarOperativa(long pharmacy,String code,CancelacionOperativaRequest cmd,

@@ -109,7 +109,14 @@ public class ReservaStore {
             r.getString("presentacion_descripcion_snapshot"),r.getString("condicion"),
             !view.equals("USUARIO")?r.getString("usuario_nombre"):null,!view.equals("USUARIO")?r.getString("usuario_apellido"):null,
             r.getString("origen_cancelacion"),r.getString("causa_cancelacion"),r.getString("motivo_cancelacion"),
-            view.equals("OPERADOR")?null:r.getString("codigo_rx"));
+            view.equals("OPERADOR")?null:r.getString("codigo_rx"),
+            view.equals("USUARIO") && status.equals("ACTIVA")?r.getString("pin_retiro"):null);
+    }
+    /** PIN state for pickup verification; read under the reservation row lock. */
+    record Pin(String pin, int failedAttempts) { }
+    Pin pin(long reservationId) {
+        return db.queryForObject("SELECT pin_retiro,intentos_pin_fallidos FROM reserva WHERE id_reserva=?",
+            (rs,n)->new Pin(rs.getString(1),rs.getInt(2)),reservationId);
     }
     PageDTO<ReservaDTO> page(String where, List<Object> args, String state, OffsetDateTime from,
         OffsetDateTime to, int page, int size, List<String> sort, Instant t, String view) {

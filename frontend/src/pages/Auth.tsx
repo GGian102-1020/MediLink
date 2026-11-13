@@ -1,43 +1,78 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowRight, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, UserRound, UserRoundPlus } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, KeyRound, Mail, ShieldCheck } from 'lucide-react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { post } from '../lib/api';
-import { Alert, Button, Field, PageTitle, Panel } from '../components/UI';
+import { initials } from '../lib/format';
+import { Alert, Badge, Button, Field, IconButton, PageHeader, Panel } from '../components/UI';
 
 export function LoginPage() {
-  const { me, signIn } = useAuth(); const navigate = useNavigate(); const location = useLocation();
+  const { me, signIn, signOut } = useAuth(); const navigate = useNavigate(); const location = useLocation();
   const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [show, setShow] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError('');
-    try { await signIn(email, password); const from = (location.state as { from?: string } | null)?.from; navigate(from?.startsWith('/') && !from.startsWith('//') ? from : '/panel', { replace: true }); }
-    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo iniciar sesión'); }
+    try {
+      const perfil = await signIn(email, password);
+      if (perfil.rol !== 'OPERADOR') { await signOut(); setError('Este panel es exclusivo para operadores de farmacia.'); return; }
+      const from = (location.state as { from?: string } | null)?.from;
+      navigate(from?.startsWith('/') && !from.startsWith('//') ? from : '/panel', { replace: true });
+    }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo iniciar sesión.'); }
     finally { setBusy(false); }
   }
-  if (me) return <div className="auth-center"><Panel><h2>Ya iniciaste sesión</h2><Link className="btn btn-primary" to="/panel">Ir a mi panel <ArrowRight size={17}/></Link></Panel></div>;
-  return <div className="auth-page"><div className="auth-side"><div className="auth-side-pattern"/><div className="auth-side-content"><div className="auth-side-symbol"><ShieldCheck size={35}/></div><span>UN ESPACIO MÁS SIMPLE PARA TU SALUD</span><h2>Todo conectado.<br/>Todo más cerca.</h2><p>Consultá disponibilidad, seguí tus reservas y gestioná tu experiencia desde un solo lugar.</p><div className="auth-side-bottom">MEDILINK · TU SALUD, MÁS CERCA</div></div></div><div className="auth-form-side"><div className="auth-form-wrap"><div className="auth-form-icon"><LockKeyhole size={25}/></div><div className="eyebrow">BIENVENIDO DE NUEVO</div><h1>Iniciá sesión</h1><p>Ingresá con las credenciales de tu cuenta MediLink.</p><form onSubmit={submit} className="stack-form auth-form"><Field label="Correo electrónico"><div className="input-with-icon"><Mail size={18}/><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@correo.com" autoComplete="username" maxLength={254} required/></div></Field><Field label="Contraseña"><div className="input-with-icon"><KeyRound size={18}/><input type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Ingresá tu contraseña" autoComplete="current-password" required/><button type="button" className="show-password" onClick={() => setShow(v => !v)} aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{show ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></Field>{error && <Alert>{error}</Alert>}<Button type="submit" busy={busy} className="auth-submit">Ingresar a mi cuenta <ArrowRight size={17}/></Button></form><p className="auth-switch">¿Todavía no tenés cuenta? <Link to="/registro">Registrate gratis</Link></p><div className="auth-security"><ShieldCheck size={17}/> Acceso protegido mediante autenticación segura.</div></div></div></div>;
+  if (me?.perfil.rol === 'OPERADOR') return <Navigate to="/panel" replace/>;
+  return <div className="login-screen"><div className="login-card">
+    <div className="login-brand"><img src="/logo-mark.png" alt="MediFind" width={52} height={50}/><h1>Ingresá a MediFind</h1><p>Panel de operadores de farmacia</p></div>
+    <div className="login-box">
+      <form onSubmit={submit} noValidate={false}>
+        <Field label="Correo electrónico"><div className="input-icon"><Mail size={16}/><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="operador@farmacia.com" autoComplete="username" maxLength={254} required autoFocus/></div></Field>
+        <Field label="Contraseña"><div className="input-icon"><KeyRound size={16}/><input type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required style={{ paddingRight: 44 }}/><IconButton className="input-action" label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'} onClick={() => setShow(v => !v)} style={{ width: 32, height: 32 }}>{show ? <EyeOff size={16}/> : <Eye size={16}/>}</IconButton></div></Field>
+        {error && <Alert>{error}</Alert>}
+        <Button type="submit" busy={busy} block>Ingresar</Button>
+      </form>
+    </div>
+    <div className="login-foot"><ShieldCheck size={14}/> Conexión segura · Solo personal autorizado</div>
+  </div></div>;
 }
-export function RegisterPage() {
-  const navigate = useNavigate(); const [form, setForm] = useState({ nombre: '', apellido: '', correo: '', contrasena: '', confirmacion: '' }); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  function set(key: keyof typeof form, value: string) { setForm(v => ({ ...v, [key]: value })); }
-  async function submit(e: FormEvent) {
-    e.preventDefault(); if (form.contrasena !== form.confirmacion) { setError('Las contraseñas no coinciden.'); return; }
-    setBusy(true); setError('');
-    try { await post('/api/auth/register', { nombre: form.nombre.trim(), apellido: form.apellido.trim(), correo: form.correo.trim(), contrasena: form.contrasena }); navigate('/ingresar', { state: { registered: true } }); }
-    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo crear la cuenta.'); }
-    finally { setBusy(false); }
-  }
-  return <div className="registration-wrap"><div className="registration-copy"><div className="eyebrow">TU SALUD, MÁS CERCA</div><h1>Un espacio para <span>cuidarte mejor.</span></h1><p>Creá tu cuenta para reservar medicamentos, consultar tus movimientos y tener todo organizado.</p><div className="registration-benefits"><span><ShieldCheck size={20}/> Reservas seguras</span><span><UserRound size={20}/> Historial personal</span><span><LockKeyhole size={20}/> Acceso protegido</span></div></div><div className="registration-panel"><div className="auth-form-icon"><UserRoundPlus size={25}/></div><h2>Crear una cuenta</h2><p>Completá tus datos para empezar.</p><form className="stack-form" onSubmit={submit}><div className="form-grid"><Field label="Nombre"><input required maxLength={80} value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Tu nombre"/></Field><Field label="Apellido"><input required maxLength={80} value={form.apellido} onChange={e => set('apellido', e.target.value)} placeholder="Tu apellido"/></Field></div><Field label="Correo electrónico"><input type="email" required maxLength={254} autoComplete="email" value={form.correo} onChange={e => set('correo', e.target.value)} placeholder="tu@correo.com"/></Field><Field label="Contraseña"><input type="password" autoComplete="new-password" minLength={8} required value={form.contrasena} onChange={e => set('contrasena', e.target.value)} placeholder="Elegí una contraseña"/></Field><Field label="Confirmar contraseña"><input type="password" autoComplete="new-password" minLength={8} required value={form.confirmacion} onChange={e => set('confirmacion', e.target.value)} placeholder="Repetí tu contraseña"/></Field>{error && <Alert>{error}</Alert>}<Button type="submit" busy={busy}>Crear mi cuenta <ArrowRight size={17}/></Button></form><p className="auth-switch">¿Ya tenés una cuenta? <Link to="/ingresar">Iniciar sesión</Link></p></div></div>;
-}
+
 export function ProfilePage() {
-  const { me, refresh } = useAuth(); const [current, setCurrent] = useState(''); const [next, setNext] = useState(''); const [repeat, setRepeat] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
-  const profile = me?.perfil;
+  const { me, refresh } = useAuth(); const [current, setCurrent] = useState(''); const [next, setNext] = useState(''); const [repeat, setRepeat] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const p = me?.perfil;
+  const mismatch = repeat.length > 0 && next !== repeat;
   async function change(e: FormEvent) {
-    e.preventDefault(); if (next !== repeat) { setError('Las nuevas contraseñas no coinciden.'); return; }
-    setBusy(true); setError(''); setMessage('');
-    try { await post<void>('/api/auth/change-password', { contrasenaActual: current, nuevaContrasena: next }); setCurrent(''); setNext(''); setRepeat(''); setMessage('Contraseña actualizada. Por seguridad, volvé a iniciar sesión cuando se cierre tu sesión actual.'); await refresh(); }
+    e.preventDefault(); if (next !== repeat) { setError('Las contraseñas nuevas no coinciden.'); return; }
+    setBusy(true); setError('');
+    try {
+      await post<void>('/api/auth/change-password', { contrasenaActual: current, nuevaContrasena: next });
+      setCurrent(''); setNext(''); setRepeat('');
+      toast.success('Contraseña actualizada', { description: 'Las demás sesiones abiertas se van a cerrar.' });
+      await refresh();
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'No se pudo cambiar la contraseña.'); }
     finally { setBusy(false); }
   }
-  return <div className="content-narrow"><PageTitle eyebrow="CUENTA / CONFIGURACIÓN" title="Mi perfil" subtitle="Tus datos personales y la seguridad de tu cuenta."/><Panel title="Información de la cuenta"><div className="profile-header"><div className="profile-avatar">{profile?.nombre?.[0]}{profile?.apellido?.[0]}</div><div><h3>{profile?.nombre} {profile?.apellido}</h3><span>{profile?.rol}</span></div></div><div className="info-grid"><div><small>Correo electrónico</small><strong>{profile?.correo}</strong></div><div><small>Estado de cuenta</small><strong>{profile?.estadoCuenta}</strong></div><div><small>ID de cuenta</small><strong>{profile?.cuentaId}</strong></div>{profile?.farmaciaId && <div><small>ID de farmacia</small><strong>{profile.farmaciaId}</strong></div>}</div></Panel><Panel title="Cambiar contraseña" subtitle="Usá una contraseña única y no la compartas."><form className="stack-form" onSubmit={change}><Field label="Contraseña actual"><input type="password" autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)} required/></Field><div className="form-grid"><Field label="Nueva contraseña"><input type="password" autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} required minLength={8}/></Field><Field label="Repetir nueva contraseña"><input type="password" autoComplete="new-password" value={repeat} onChange={e => setRepeat(e.target.value)} required minLength={8}/></Field></div>{error && <Alert>{error}</Alert>}{message && <Alert tone="success">{message}</Alert>}<div><Button busy={busy} type="submit">Actualizar contraseña <ArrowRight size={16}/></Button></div></form></Panel></div>;
+  return <div className="content-narrow">
+    <PageHeader title="Mi cuenta" subtitle="Tus datos y la seguridad de tu acceso."/>
+    <Panel>
+      <div className="panel-body"><div className="profile-card"><span className="avatar lg">{initials(p?.nombre, p?.apellido)}</span><div style={{ minWidth: 0 }}><h2>{p?.nombre} {p?.apellido}</h2><p style={{ overflowWrap: 'anywhere' }}>{p?.correo}</p></div></div></div>
+      <div className="panel-foot"><div className="facts" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+        <div><small>Rol</small><strong>Operador</strong></div>
+        <div><small>Farmacia</small><strong className="num">#{p?.farmaciaId ?? '—'}</strong></div>
+        <div><small>Estado</small><Badge value={p?.estadoCuenta || '—'} tone={['ACTIVA', 'ACTIVO', 'HABILITADA'].includes(p?.estadoCuenta || '') ? 'success' : 'danger'}/></div>
+        <div><small>ID de cuenta</small><strong className="num">{p?.cuentaId}</strong></div>
+      </div></div>
+    </Panel>
+    <Panel title="Cambiar contraseña" subtitle="Usá al menos 8 caracteres. Al cambiarla se cierran tus otras sesiones.">
+      <form className="panel-body stack" onSubmit={change}>
+        <Field label="Contraseña actual"><input type="password" autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)} required/></Field>
+        <div className="form-grid">
+          <Field label="Nueva contraseña"><input type="password" autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} required minLength={8} maxLength={72}/></Field>
+          <Field label="Repetir nueva contraseña" hint={mismatch ? 'No coincide con la nueva contraseña.' : undefined}><input type="password" autoComplete="new-password" value={repeat} onChange={e => setRepeat(e.target.value)} required minLength={8} maxLength={72} aria-invalid={mismatch}/></Field>
+        </div>
+        {error && <Alert>{error}</Alert>}
+        <div><Button busy={busy} type="submit" disabled={mismatch}>Actualizar contraseña</Button></div>
+      </form>
+    </Panel>
+  </div>;
 }

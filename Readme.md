@@ -1,18 +1,9 @@
 # MediLink
 
-> **Verificación local (26/10/2026):** se integró Auditoría sobre los componentes existentes. `mvnw.cmd clean verify`: **124 pruebas aprobadas, 0 fallos, 0 errores y 0 omitidas**, incluidas **35 pruebas PostgreSQL reales** de Auditoría, Catálogo y Farmacia/Stock. Se probaron instalación/adopción Flyway V1..V3 y restauraciones completas en bases separadas. Evidencia, alcance e integraciones pendientes: [AUDITORIA_INFRAESTRUCTURA.md](AUDITORIA_INFRAESTRUCTURA.md). Esto no certifica funcionalidades aún pendientes del MVP ni una ejecución del workflow remoto.
-
-**Documentos vigentes:** [CHANGELOG.md](CHANGELOG.md) · [CORRECCIONES_TRELLO_SQL.md](CORRECCIONES_TRELLO_SQL.md) · [REFACTORIZACION_TRELLO_SQL.md](REFACTORIZACION_TRELLO_SQL.md) · [database/README.md](database/README.md). Los informes obsoletos del 14/10/2026 se retiraron de la copia activa; el historial de Git permite recuperarlos si estaban versionados.
-
-## Auditoría e infraestructura
+**Documentación:** [database/README.md](database/README.md) (base, seeds, backup) · [docs/ARRANQUE.md](docs/ARRANQUE.md) (arranque con Docker) · [CUENTAS_AUTENTICACION.md](CUENTAS_AUTENTICACION.md) (API de cuentas) · [FARMACIA_STOCK.md](FARMACIA_STOCK.md) (API de farmacias y stock) · [docs/SEGURIDAD.md](docs/SEGURIDAD.md) (revisión de seguridad).
 
 `GET /api/admin/auditoria` permite al Administrador consultar registros de todos
-los módulos con filtros, paginación y snapshots seguros. Se reutilizan
-`AuditService`, JWT, errores REST, correlación y los triggers append-only.
-Contrato, pruebas, backup/restauración y revisión del UML:
-[AUDITORIA_INFRAESTRUCTURA.md](AUDITORIA_INFRAESTRUCTURA.md).
-Los cambios están preparados para revisión grupal en `auditoria-infraestructura`;
-no se realizaron commits ni publicaciones automáticas.
+los módulos con filtros, paginación y snapshots seguros (`AuditService`, triggers append-only).
 
 MediLink es un proyecto desarrollado para la materia **Seminario de Integración Profesional** de la carrera de Ingeniería en Informática de UADE.
 
@@ -66,9 +57,11 @@ Base de datos
 - PostgreSQL
 
 
-Frontend de la rama de mapas
-- React + TypeScript + Vite + Leaflet
-- Alcance de esta rama: pantallas públicas, ingreso/registro y detalle de reserva; no contiene las pantallas operativas/administrativas.
+Frontend: panel de operadores
+- React + TypeScript + Vite
+- Alcance de este repo: login y dashboard exclusivo para cuentas con rol OPERADOR (resumen, reservas, retiros/cancelaciones, stock, movimientos y mi cuenta).
+- Al entrar a la URL se muestra el login (`/ingresar`); cuentas que no sean OPERADOR son rechazadas.
+- El backend, la base (Flyway + seeds) y Docker Compose se mantienen completos para que otros clientes consuman la misma API.
 
 Otras herramientas
 - Git
@@ -109,7 +102,7 @@ La base de datos vacía se migra automáticamente mediante Flyway al iniciar la 
 La carga de cuentas y stock de demostración es **manual y solo para una base local descartable**.
 No se deben cargar seeds en bases de datos compartidas ni utilizar las credenciales ficticias en un entorno expuesto.
 
-Guía de arranque de esta rama: [docs/DEMO_MAPAS_MVP.md](docs/DEMO_MAPAS_MVP.md).
+Guía de arranque: [docs/ARRANQUE.md](docs/ARRANQUE.md).
 Esquema existente, bases anteriores y respaldos: [database/README.md](database/README.md).
 
 ## Cuentas y autenticación (backend)
@@ -129,19 +122,4 @@ Las rutas y servicios implementados están en `backend/src/main/java/ar/edu/uade
 y `backend/src/main/java/ar/edu/uade/medlink/stock/`. Contratos, locking, pruebas y
 limitaciones de integración: [FARMACIA_STOCK.md](FARMACIA_STOCK.md).
 
-Las correcciones de alineación con la especificación v1.4.3 están descritas en
-[CORRECCIONES_TRELLO_SQL.md](CORRECCIONES_TRELLO_SQL.md), y las decisiones de limpieza
-en [REFACTORIZACION_TRELLO_SQL.md](REFACTORIZACION_TRELLO_SQL.md).
 El PDF maestro v1.4.3 sigue siendo la única autoridad funcional, no estos README.
-
-
-## Rama de mapas: parche y demostración
-
-Esta rama puede instalarse mediante `git apply` desde el commit base `ef332860`
-(`IntegracionMapas`). Las instrucciones completas de arranque y los límites de servicios
-públicos de mapas están en [docs/DEMO_MAPAS_MVP.md](docs/DEMO_MAPAS_MVP.md).
-
-**Importante:** el árbol heredado ya tiene `frontend/node_modules` versionado.
-La nueva regla de `.gitignore` evita incorporar dependencias nuevas, pero **no**
-las desversiona automáticamente. Se recomienda retirar ese directorio del índice
-mediante un cambio separado para no mezclar miles de eliminaciones con el parche de mapas.

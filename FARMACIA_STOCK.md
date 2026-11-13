@@ -2,7 +2,7 @@
 
 Este archivo describe el código del módulo en el ZIP y **no sustituye** la
 Especificación Maestra v1.4.3 (PDF). El catálogo de Medicamentos/Presentaciones
-se incorporó posteriormente; su estado vigente figura en [CHANGELOG.md](CHANGELOG.md).
+se incorporó posteriormente.
 Las operaciones pendientes de Reservas no se dan por terminadas por la mera existencia de tablas.
 
 ## Implementación

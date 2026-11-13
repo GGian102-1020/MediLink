@@ -1,17 +1,17 @@
 # Base de datos local (PostgreSQL + Docker)
 
-**Rama de mapas (noviembre de 2026):** el archivo `docker-compose.yml` **ya no carga automáticamente**
+**Importante:** el archivo `docker-compose.yml` **ya no carga automáticamente**
 `01_medlink_esquema.sql` ni `02_datos_prueba.sql`. En una base **nueva**, al iniciar
 el backend se crean las tablas mediante Flyway V1-V4. Después de comprobar
 que la API inició correctamente, se puede cargar **manualmente** el seed 02
 **solo en una base de demo descartable**, desde el procedimiento de
-[docs/DEMO_MAPAS_MVP.md](../docs/DEMO_MAPAS_MVP.md).
+[docs/ARRANQUE.md](../docs/ARRANQUE.md).
 
 El volumen anterior es persistente; no eliminarlo ni forzar baseline sin
 identificar primero si existen `flyway_schema_history` y datos que preservar.
 Las indicaciones históricas de adopción Flyway V1 que acompañan al proyecto
 **solo aplican a instalaciones previas creadas con el esquema 01**;
-**no aplican a instalaciones limpias de esta rama**.
+**no aplican a instalaciones limpias**.
 
 ## Requisitos
 - Docker Desktop abierto (o Docker Engine + Compose v2)
@@ -21,12 +21,12 @@ Las indicaciones históricas de adopción Flyway V1 que acompañan al proyecto
 
 ```powershell
 Copy-Item .env.example .env
-# Generar una clave JWT antes de iniciar la API; ver docs/DEMO_MAPAS_MVP.md.
+# Generar una clave JWT antes de iniciar la API; ver docs/ARRANQUE.md.
 docker compose --profile api up -d --build
 ```
 
 PostgreSQL, Adminer y el HTTPS de Caddy se publican solamente en `127.0.0.1`.
-Consultar [docs/DEMO_MAPAS_MVP.md](../docs/DEMO_MAPAS_MVP.md) para generar
+Consultar [docs/ARRANQUE.md](../docs/ARRANQUE.md) para generar
 la clave JWT y cargar los datos de prueba manualmente. Las cuentas del ejemplo
 son públicas y solo sirven para un entorno local descartable.
 
@@ -58,8 +58,7 @@ el índice de historial global por `fecha_hora DESC,id_auditoria DESC`.
 Los índices por actor, usuario relacionado y entidad ya existen en V1.
 No modificar migraciones aplicadas ni borrar el volumen para incorporar V3.
 La instalación nueva y la adopción explícita del esquema con seed fueron
-verificadas en PostgreSQL 16 real. El endpoint y sus permisos están documentados
-en [AUDITORIA_INFRAESTRUCTURA.md](../AUDITORIA_INFRAESTRUCTURA.md).
+verificadas en PostgreSQL 16 real.
 
 ### Backup y restauración (RNF-12 / AC-59)
 
@@ -88,11 +87,7 @@ y comprueba la conexión SQL local antes de copiar SQL o generar el backup.
 Así evita aceptar el servidor temporal de inicialización, cuyo socket se elimina
 antes del arranque definitivo. Timeout predeterminado: 60 s; se puede ajustar
 con `-ReadyTimeoutSeconds`. No se publican puertos nuevos ni se cambian claves.
-Regresión y diagnóstico de GitHub Actions:
-[BACKUP_WORKFLOW_FIX.md](../docs/BACKUP_WORKFLOW_FIX.md).
-Detalle y evidencia real de las restauraciones del 26/10/2026 (16 tablas de
-fixture y 17 de una base con historial Flyway):
-[AUDITORIA_INFRAESTRUCTURA.md](../AUDITORIA_INFRAESTRUCTURA.md).
+La carpeta `evidencias/` se crea automáticamente al ejecutar el script.
 
 ### Comandos manuales de backup/restauración
 

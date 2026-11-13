@@ -2,7 +2,7 @@ import type { ApiErrorBody, Login, Me, Page } from './types';
 
 /** API siempre con mismo origen. Vite reenvía /api en desarrollo; deploy requiere reverse proxy /api. */
 // Se conserva la clave del parche anterior para no cerrar sesiones existentes.
-const SESSION_KEY = 'medlink.demo.token';
+const SESSION_KEY = 'medifind.token';
 let accessToken: string | null = null;
 try { accessToken = sessionStorage.getItem(SESSION_KEY); } catch { /* storage bloqueado */ }
 
@@ -38,13 +38,13 @@ export async function api<T>(path: string, options: RequestInit & { idempotencyK
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
   let response: Response;
   try { response = await fetch(path, { ...init, headers, cache: 'no-store' }); }
-  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediLink. Revisá que la API esté en funcionamiento.'); }
+  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediFind. Revisá que la API esté en funcionamiento.'); }
   if (!response.ok) {
     let err: ApiErrorBody = {};
     try { err = await response.json() as ApiErrorBody; } catch { /* respuesta inesperada */ }
     if (response.status === 401 && accessToken) {
       setAccessToken(null);
-      window.dispatchEvent(new Event('medlink:session-expired'));
+      window.dispatchEvent(new Event('medifind:session-expired'));
     }
     throw new ApiError(response.status, err.codigo || `HTTP_${response.status}`, err.mensaje || `Ocurrió un error (${response.status}).`, err.correlationId);
   }

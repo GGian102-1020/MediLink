@@ -1,41 +1,30 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { ShieldAlert } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
-import { Loading } from './components/UI';
-import { AppLayout, PublicLayout } from './components/Layout';
-import { Home, Catalog, PresentationDetail } from './pages/Public';
-import { LoginPage, RegisterPage, ProfilePage } from './pages/Auth';
-import { Dashboard, MyReservations, ReservationDetail } from './pages/User';
-import { PharmacyReservations, PharmacyStock, StockMovements } from './pages/Operator';
-import { AdminFarmacias, AdminMedicamentos, AdminPresentaciones, AdminOperadores, AdminUsuarios, AdminPrescripciones, AdminAuditoria, AdminUsuarioDetalle } from './pages/Admin';
+import { Button, Empty, Loading } from './components/UI';
+import { AppLayout } from './components/Layout';
+import { LoginPage, ProfilePage } from './pages/Auth';
+import { OperatorDashboard, PharmacyReservations, PharmacyStock, StockMovements } from './pages/Operator';
 
-type Rol = 'USUARIO' | 'OPERADOR' | 'ADMINISTRADOR';
-function Protected({ roles }: { roles?: Rol[] }) {
-  const { me, loading } = useAuth(); const location = useLocation();
-  if (loading) return <Loading text="Restaurando tu sesión…"/>;
-  if (!me) return <Navigate to="/ingresar" state={{ from: location.pathname }} replace/>;
-  if (roles && !roles.includes(me.perfil.rol)) return <Navigate to="/panel" replace/>;
+/** Consola exclusiva para operadores de farmacia. */
+function Protected() {
+  const { me, loading, signOut } = useAuth(); const location = useLocation();
+  if (loading) return <div className="full-center"><Loading text="Restaurando tu sesión…"/></div>;
+  if (!me) return <Navigate to="/ingresar" state={{ from: location.pathname + location.search }} replace/>;
+  if (me.perfil.rol !== 'OPERADOR') return <div className="full-center"><div className="panel" style={{ maxWidth: 400 }}><Empty icon={<ShieldAlert size={20}/>} title="Acceso restringido" detail="Este panel es exclusivo para operadores de farmacia." action={<Button variant="secondary" onClick={() => void signOut()}>Cerrar sesión</Button>}/></div></div>;
   return <AppLayout/>;
 }
-function NotFound() { return <div className="notfound"><span>404</span><h1>No encontramos esta página</h1><p>Puede que el enlace haya cambiado.</p><a href="/">Volver al inicio</a></div>; }
+function NotFound() { return <div className="notfound"><span>404</span><h1>No encontramos esta página</h1><p>Puede que el enlace haya cambiado.</p><a className="btn btn-secondary" href="/panel">Volver al resumen</a></div>; }
 export default function App() {
   return <Routes>
-    <Route element={<PublicLayout/>}>
-      <Route index element={<Home/>}/><Route path="catalogo" element={<Catalog/>}/><Route path="presentaciones/:id" element={<PresentationDetail/>}/>
-      <Route path="ingresar" element={<LoginPage/>}/><Route path="registro" element={<RegisterPage/>}/>
-    </Route>
+    <Route index element={<Navigate to="/panel" replace/>}/>
+    <Route path="ingresar" element={<LoginPage/>}/>
     <Route element={<Protected/>}>
-      <Route path="panel" element={<Dashboard/>}/><Route path="perfil" element={<ProfilePage/>}/>
-    </Route>
-    <Route element={<Protected roles={['USUARIO']}/> }>
-      <Route path="mis-reservas" element={<MyReservations/>}/><Route path="mis-reservas/:codigo" element={<ReservationDetail/>}/>
-    </Route>
-    <Route element={<Protected roles={['OPERADOR', 'ADMINISTRADOR']}/> }>
-      <Route path="operacion/reservas" element={<PharmacyReservations/>}/><Route path="operacion/stock" element={<PharmacyStock/>}/><Route path="operacion/movimientos" element={<StockMovements/>}/>
-      <Route path="farmacias/:farmaciaId/reservas" element={<PharmacyReservations/>}/><Route path="farmacias/:farmaciaId/stock" element={<PharmacyStock/>}/><Route path="farmacias/:farmaciaId/movimientos" element={<StockMovements/>}/>
-    </Route>
-    <Route element={<Protected roles={['ADMINISTRADOR']}/> }>
-      <Route path="admin/farmacias" element={<AdminFarmacias/>}/><Route path="admin/medicamentos" element={<AdminMedicamentos/>}/><Route path="admin/presentaciones" element={<AdminPresentaciones/>}/><Route path="admin/operadores" element={<AdminOperadores/>}/>
-      <Route path="admin/usuarios" element={<AdminUsuarios/>}/><Route path="admin/usuarios/:id" element={<AdminUsuarioDetalle/>}/><Route path="admin/prescripciones" element={<AdminPrescripciones/>}/><Route path="admin/auditoria" element={<AdminAuditoria/>}/>
+      <Route path="panel" element={<OperatorDashboard/>}/>
+      <Route path="operacion/reservas" element={<PharmacyReservations/>}/>
+      <Route path="operacion/stock" element={<PharmacyStock/>}/>
+      <Route path="operacion/movimientos" element={<StockMovements/>}/>
+      <Route path="perfil" element={<ProfilePage/>}/>
     </Route>
     <Route path="*" element={<NotFound/>}/>
   </Routes>;

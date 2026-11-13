@@ -15,8 +15,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh().finally(() => setLoading(false));
     const onExpired = () => setMe(null);
-    window.addEventListener('medlink:session-expired', onExpired);
-    return () => window.removeEventListener('medlink:session-expired', onExpired);
+    window.addEventListener('medifind:session-expired', onExpired);
+    return () => window.removeEventListener('medifind:session-expired', onExpired);
   }, []);
   async function signIn(email: string, password: string) {
     const response = await authApi.login(email.trim(), password);
