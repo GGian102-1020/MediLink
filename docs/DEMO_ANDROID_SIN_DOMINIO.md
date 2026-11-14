@@ -17,23 +17,30 @@ Desde `C:\Users\giuli\Projects\MediLink` en la rama `develop-web`:
 # Comprobar que Docker Desktop esta abierto
  docker info
 # Arrancar el backend y una base con volumen SEPARADO del proyecto principal
-.\scripts\demo\iniciar-demo.ps1
+# Elegimos 18082 porque 18081 esta ocupado en esta PC (puede ser otro puerto libre).
+.\scripts\demo\iniciar-demo.ps1 -Puerto 18082
+$puerto = & .\scripts\demo\puerto-demo.ps1
 # Opcional: catalogo/stock inventados, SIN usuarios con claves conocidas
 .\scripts\demo\cargar-catalogo.ps1
 # Comprobar API en la propia PC
-Invoke-WebRequest http://127.0.0.1:18081/api/health -UseBasicParsing
+Invoke-WebRequest "http://127.0.0.1:$puerto/api/health" -UseBasicParsing
 ```
 
 `iniciar-demo.ps1` crea `.env.demo` en el primer inicio con claves aleatorias
-independientes de `.env`; se excluye de Git y **no se reescribe** luego. Solo
-exponemos `127.0.0.1:18081` en el host. La base no publica puertos y vive en
+independientes de `.env`; se excluye de Git y **mantiene siempre sus claves**; solo se actualiza la linea del puerto si lo elegis. Solo
+exponemos `127.0.0.1:18082` en el host (o el puerto elegido). La base no publica puertos y vive en
 un volumen exclusivo `medilink-demo_datos_demo`. No se modifica `docker-compose.yml`,
 la base de siempre ni el volumen del equipo. El primer build necesita Internet
 y puede demorar por Maven y Docker.
 
-Si el puerto `18081` esta ocupado por otro backend, detenelo con cuidado (sin
-borrar sus datos) antes de usar el entorno aislado. No cambies las credenciales
-de `.env.demo` con el volumen iniciado: PostgreSQL conserva su clave anterior.
+Si el puerto `18081` esta ocupado, NO hace falta detener el otro servicio:
+`iniciar-demo.ps1 -Puerto 18082` lo cambia de forma persistente en `.env.demo`.
+Tambien podes elegir otro puerto libre entre 1024 y 65535. El archivo conserva
+la contrasena de PostgreSQL y la clave JWT originales; el volumen no se borra.
+Para verificar el puerto elegido en cualquier momento: `& .\scripts\demo\puerto-demo.ps1`.
+Sin `-Puerto`, posteriores arranques reutilizan el ultimo puerto guardado.
+No cambies las credenciales de `.env.demo` con el volumen iniciado: PostgreSQL
+conserva su clave anterior.
 
 **Catalogo demo:** las farmacias, nombres y existencias son ficticios, y el SQL
 se puede ejecutar varias veces. Para el login podés registrar un usuario de
@@ -62,10 +69,12 @@ publicas, peligroso si la API queda accesible desde Internet.
 En una **segunda ventana** de PowerShell, deja ejecutandose:
 
 ```powershell
-ngrok http 18081
+Set-Location 'C:\Users\giuli\Projects\MediLink'
+$puerto = & .\scripts\demo\puerto-demo.ps1
+ngrok http $puerto
 ```
 
-ngrok deberia indicar algo como `https://abc123.ngrok-free.dev -> http://localhost:18081`.
+ngrok deberia indicar algo como `https://abc123.ngrok-free.dev -> http://localhost:18082`.
 Esa URL gratuita es de ngrok: **no requiere que compres dominio**.
 
 Volviendo a la primera ventana:
@@ -80,7 +89,7 @@ $api
 Este script compara la respuesta del backend local y la respuesta HTTPS de
 ngrok; no acepta una pagina HTML de error como si fuera la API. Si el tunel
 no aparece en `http://127.0.0.1:4040/api/tunnels`, confirma que ngrok sigue
-abierto en otra ventana y apunta al puerto 18081.
+abierto en otra ventana y apunta al puerto elegido (`$puerto`).
 
 El plan Free de ngrok tiene limites de transferencia y solicitudes; alcanza
 para una demo pequena, no para uso masivo. Puede mostrar una pagina de aviso
@@ -148,7 +157,7 @@ incorporada en el APK. El QR se mantiene identico al publicar otra version.
    correo ficticio. Luego proba una reserva con datos de test si el flujo
    concreto de la app la admite. Evita ingresar recetas o datos clinicos reales.
 6. Apaga ngrok momentaneamente: la app perdera la conexion a la API. Volvelo
-   a prender con `ngrok http 18081`: el hostname de tu cuenta es el mismo.
+   a prender con `ngrok http $puerto`: el hostname de tu cuenta es el mismo.
 
 ## 6. Al terminar la presentacion
 
