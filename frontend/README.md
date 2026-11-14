@@ -31,33 +31,27 @@ por este sitio**. El backend continúa funcionando para los clientes Android.
 
 ## Cómo funciona el botón y el código QR
 
-El botón **«Ver QR y versiones»** de la sección Android abre una ventana accesible con:
+El botón **«Ver QR y versiones»** (o **«Descargar Android con QR»** cuando hay APK)
+abre una ventana accesible con QR local mediante `qrcode.react`, enlace directo y
+opción para copiarlo. Funciona con Escape, clic fuera y teclado. No envía la URL
+a servicios de QR de terceros.
 
-- Un **QR escaneable** que se genera localmente en el navegador con `qrcode.react` (SVG, sin APIs de terceros).
-- Un botón **«Abrir GitHub Releases»** para quienes están mirando la landing desde el celular.
-- Un botón para copiar el enlace, más cierre mediante Escape, clic fuera de la ventana o la cruz.
+**La landing ahora descubre automáticamente si hay APK disponible**, sin redeploy:
 
-**Mientras no haya APK público, el QR solo lleva a GitHub Releases, no descarga ni instala nada.**
-Cuando se configure `VITE_ANDROID_DOWNLOAD_URL`, el QR y el enlace directo apuntarán
-**a esa misma URL HTTPS**, sin necesidad de cambiar código. No es posible escanear
-un QR mostrado en el mismo celular con su propia cámara: en ese caso se usa «Abrir enlace».
+1. Una sola consulta HTTPS a `https://api.github.com/repos/GGian102-1020/MediLink/releases/latest`.
+2. Si la última release pública, estable y no borrador incluye el asset `MediLink-android.apk`
+   en estado `uploaded`, con tamaño mayor que cero, se habilita el enlace permanente:
+   `https://github.com/GGian102-1020/MediLink/releases/latest/download/MediLink-android.apk`.
+3. Si todavía no hay release o no se puede verificar (404, red o límite de GitHub API),
+   se ofrece únicamente la página de GitHub Releases sin simular una descarga.
 
-## Habilitar el botón de descarga de Android
+Se puede definir `VITE_ANDROID_DOWNLOAD_URL` con una URL HTTPS explícita si luego se
+prefiere Google Play u otro canal: **esa configuración reemplaza la detección automática**.
+Para GitHub Releases no configures la variable, dejala vacía. La descarga directa requiere
+**publicar primero un APK release firmado** y un backend accesible públicamente.
 
-1. Preparar y publicar una **versión de producción** de Android: configurar
-   un `BASE_URL` HTTPS real en la variante release, firmar el paquete y probarlo
-   contra el backend publicado. Consultar `../android/README.md` y
-   `../android/app/build.gradle.kts`. **No publicar `app-debug.apk`:** usa
-   `http://localhost:18081/` y depende de `adb reverse`.
-2. Subir el APK firmado a [GitHub Releases](https://github.com/GGian102-1020/MediLink/releases)
-   (o distribuir en Google Play); copiar su URL HTTPS de descarga.
-3. Copiar `.env.example` a `.env.local` y definir `VITE_ANDROID_DOWNLOAD_URL`
-   con la URL de distribución, **sin comillas**. En producción, pasar la misma
-   variable de entorno al proceso de build y volver a ejecutar `npm run build`.
-
-Mientras la variable esté vacía o sea inválida, el botón abre un modal con el QR
-de GitHub Releases y la página explica que todavía no existe una descarga pública. **Configurar la URL
-no genera ni firma un APK**, solo habilita el vínculo a una versión ya publicada.
+Guía completa de publicación, firma segura, GitHub Actions, tag y pruebas desde Android:
+[`../android/RELEASE_ANDROID.md`](../android/RELEASE_ANDROID.md).
 
 ## Alcance de este cambio
 

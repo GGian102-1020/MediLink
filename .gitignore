@@ -28,3 +28,9 @@ frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 frontend/.vite/
+
+# Claves de firma Android: NUNCA versionar material privado
+*.jks
+*.keystore
+*.p12
+*.pfx

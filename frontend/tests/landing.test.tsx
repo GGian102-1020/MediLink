@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import App from '../src/App';
-import { ANDROID_RELEASES_URL, resolveAndroidDownload } from '../src/download';
+import { ANDROID_APK_ASSET, ANDROID_LATEST_APK_URL, ANDROID_RELEASE_API_URL, ANDROID_RELEASES_URL, findPublishedAndroidApk, resolveAndroidDownload } from '../src/download';
 
 describe('Landing pública', () => {
   it('presenta inicio, guía y descarga Android sin rutas ni acciones de la web anterior', () => {
@@ -39,5 +39,41 @@ describe('Destino de distribución Android', () => {
     for (const url of ['javascript:alert(1)', 'http://example.org/app.apk', '//example.org/app.apk', '/app.apk', 'https://user:password@example.org/app.apk', 'no-es-una-url']) {
       expect(resolveAndroidDownload(url).published).toBe(false);
     }
+  });
+});
+
+
+describe('Detección automática del APK firmado en GitHub Releases', () => {
+  const release = (assets: unknown[], extra = {}) => ({
+    draft: false, prerelease: false, assets, ...extra,
+  });
+  const asset = { name: ANDROID_APK_ASSET, size: 12400, state: 'uploaded' };
+  const fetchJson = (body: unknown, status = 200) => ((async (url: string) => {
+    expect(url).toBe(ANDROID_RELEASE_API_URL);
+    return new Response(JSON.stringify(body), { status });
+  }) as unknown as typeof fetch);
+
+  it('resuelve el enlace PERMANENTE de descarga solo con APK en latest release', async () => {
+    expect(await findPublishedAndroidApk(fetchJson(release([asset])))).toEqual({
+      href: ANDROID_LATEST_APK_URL, published: true,
+    });
+    expect(ANDROID_LATEST_APK_URL).toMatch(/releases\/latest\/download\/MediLink-android\.apk$/);
+  });
+
+  it('no habilita descarga en releases vacías, borradores o prereleases', async () => {
+    for (const data of [
+      release([]), release([asset], { draft: true }), release([asset], { prerelease: true }),
+      release([{ ...asset, size: 0 }]), release([{ ...asset, name: 'app-debug.apk' }]),
+      release([{ ...asset, state: 'starter' }]),
+    ]) {
+      expect(await findPublishedAndroidApk(fetchJson(data))).toBeNull();
+    }
+  });
+
+  it('ante 404, limitación API, JSON incorrecto o fallo de red conserva Releases', async () => {
+    expect(await findPublishedAndroidApk(fetchJson({}, 404))).toBeNull();
+    expect(await findPublishedAndroidApk(fetchJson({}, 403))).toBeNull();
+    expect(await findPublishedAndroidApk(fetchJson({ assets: [asset] }))).toBeNull();
+    expect(await findPublishedAndroidApk((async () => { throw new Error('sin red'); }) as typeof fetch)).toBeNull();
   });
 });

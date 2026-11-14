@@ -89,11 +89,11 @@ export function AndroidDownloadDialog({ download, onClose }: Props) {
         </button>
         <div className="qr-symbol" aria-hidden="true"><QrCode size={25} /></div>
         <p className="qr-kicker">MEDILINK PARA ANDROID</p>
-        <h2 id="android-qr-title">{download.published ? 'Llevá MediLink a tu celular' : 'Consultá las versiones de MediLink'}</h2>
+        <h2 id="android-qr-title">{download.published ? 'Llevá MediLink a tu celular' : 'Consultá las descargas de MediLink'}</h2>
         <p id="android-qr-description" className="qr-intro">
           {download.published
-            ? 'Escaneá el código con la cámara de tu celular Android para abrir el enlace de instalación.'
-            : 'Escaneá el código con tu celular para visitar GitHub Releases. La app todavía no tiene una versión pública descargable.'}
+            ? 'Escaneá el QR con tu Android para descargar el APK firmado. Desde el mismo celular, usá el botón de abajo.'
+            : 'Escaneá el QR para consultar GitHub Releases. Todavía no pudimos confirmar un APK público disponible desde esta página.'}
         </p>
         <div className="qr-frame">
           <QRCodeSVG
@@ -111,7 +111,7 @@ export function AndroidDownloadDialog({ download, onClose }: Props) {
         <div className="qr-actions">
           <a className="button qr-open-link" href={download.href} target="_blank" rel="noopener noreferrer">
             <ExternalLink size={18} aria-hidden="true" />
-            {download.published ? 'Abrir enlace de Android' : 'Abrir GitHub Releases'}
+            {download.published ? 'Descargar APK para Android' : 'Abrir GitHub Releases'}
           </a>
           <button className="button qr-copy-link" type="button" onClick={copyLink}>
             {copyStatus === 'copied' ? <Check size={18} aria-hidden="true" /> : <ClipboardCopy size={18} aria-hidden="true" />}
@@ -123,8 +123,8 @@ export function AndroidDownloadDialog({ download, onClose }: Props) {
         </p>
         <p className="qr-security-note"><ShieldCheck size={16} aria-hidden="true" />
           {download.published
-            ? 'El QR apunta al enlace HTTPS configurado para la app.'
-            : 'El QR no descarga una app: solo abre GitHub Releases hasta que haya una publicación.'}
+            ? 'El QR abre el enlace HTTPS de descarga. Android puede solicitar permiso para instalar aplicaciones de esta fuente.'
+            : 'Este QR abre GitHub Releases. Solo se muestra un enlace directo al APK cuando podemos verificarlo.'}
         </p>
       </div>
     </div>

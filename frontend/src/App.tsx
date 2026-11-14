@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowDown,
   ArrowRight,
@@ -15,9 +15,9 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { AndroidDownloadDialog } from './components/AndroidDownloadDialog';
-import { resolveAndroidDownload } from './download';
+import { findPublishedAndroidApk, resolveAndroidDownload, type AndroidDownload } from './download';
 
-const download = resolveAndroidDownload(import.meta.env.VITE_ANDROID_DOWNLOAD_URL);
+const configuredDownload = resolveAndroidDownload(import.meta.env.VITE_ANDROID_DOWNLOAD_URL);
 
 const steps = [
   {
@@ -49,7 +49,7 @@ function Brand({ light = false }: { light?: boolean }) {
   );
 }
 
-function DownloadButton({ onClick, isOpen }: { onClick: () => void; isOpen: boolean }) {
+function DownloadButton({ onClick, isOpen, published }: { onClick: () => void; isOpen: boolean; published: boolean }) {
   return (
     <button
       className="button button-white"
@@ -60,7 +60,7 @@ function DownloadButton({ onClick, isOpen }: { onClick: () => void; isOpen: bool
       aria-expanded={isOpen}
     >
       <QrCode size={20} aria-hidden="true" />
-      <span>{download.published ? 'Ver QR para descargar' : 'Ver QR y versiones'}</span>
+      <span>{published ? 'Descargar Android con QR' : 'Ver QR y versiones'}</span>
       <ArrowRight size={19} aria-hidden="true" />
     </button>
   );
@@ -100,7 +100,20 @@ function PhonePreview() {
 
 export default function App() {
   const [isQrOpen, setQrOpen] = useState(false);
+  const [download, setDownload] = useState<AndroidDownload>(configuredDownload);
+  const [checkingRelease, setCheckingRelease] = useState(!configuredDownload.published);
   const closeQr = useCallback(() => setQrOpen(false), []);
+
+  useEffect(() => {
+    if (configuredDownload.published) return;
+    let active = true;
+    void findPublishedAndroidApk().then((found) => {
+      if (!active) return;
+      if (found) setDownload(found);
+      setCheckingRelease(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   return (
     <>
@@ -164,11 +177,13 @@ export default function App() {
                 <p className="download-kicker"><Smartphone size={17} aria-hidden="true" /> PENSADA PARA ANDROID</p>
                 <h2 id="download-title">Todo MediLink.<br /><span>En tu bolsillo.</span></h2>
                 <p>La experiencia completa está en la app: buscá, consultá disponibilidad y administrá tus reservas desde tu teléfono.</p>
-                <DownloadButton onClick={() => setQrOpen(true)} isOpen={isQrOpen} />
+                <DownloadButton onClick={() => setQrOpen(true)} isOpen={isQrOpen} published={download.published} />
                 {download.published ? (
-                  <p className="download-status"><Check size={17} aria-hidden="true" /> El QR y el botón de la ventana usarán el mismo enlace de Android.</p>
+                  <p className="download-status"><Check size={17} aria-hidden="true" /> El APK Android está publicado: escaneá el QR o descargalo desde el teléfono.</p>
                 ) : (
-                  <p className="download-status"><ShieldCheck size={17} aria-hidden="true" /> La versión pública todavía no está disponible. Consultá GitHub Releases para ver cuándo se publique.</p>
+                  <p className="download-status" role="status"><ShieldCheck size={17} aria-hidden="true" /> {checkingRelease
+                    ? 'Comprobando si ya hay una versión Android para descargar…'
+                    : 'No hay un APK público verificado por la landing. Consultá GitHub Releases para ver las versiones.'}</p>
                 )}
               </div>
               <div className="download-art" aria-hidden="true">

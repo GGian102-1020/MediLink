@@ -1,0 +1,137 @@
+name: Publicar MediLink Android (APK firmado)
+
+# Push de tag: funciona desde develop-web sin agregar el workflow a main.
+# Ej.: android-v0.2.0, apuntando al commit probado en develop-web.
+on:
+  push:
+    tags:
+      - 'android-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'GGian102-1020/MediLink'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Solo este job puede crear un GitHub Release.
+    steps:
+      - name: Checkout del tag (historial necesario para comprobar develop-web)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirmar que el tag apunta a develop-web y coincide con Android
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin refs/heads/develop-web:refs/remotes/origin/develop-web
+          git merge-base --is-ancestor HEAD origin/develop-web || {
+            echo 'ERROR: el tag no apunta a un commit de develop-web.' >&2
+            exit 1
+          }
+          if [[ ! "$RELEASE_TAG" =~ ^android-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo 'ERROR: usar tags android-vX.Y.Z (sin sufijos).' >&2
+            exit 1
+          fi
+          expected="${RELEASE_TAG#android-v}"
+          configured="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' android/app/build.gradle.kts | head -n 1)"
+          if [[ "$configured" != "$expected" ]]; then
+            echo "ERROR: versionName ($configured) no coincide con el tag ($expected)." >&2
+            exit 1
+          fi
+          echo "Release validada: $RELEASE_TAG (commit $(git rev-parse --short HEAD))"
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar SDK Android 36 y build-tools 36
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Preparar keystore privado fuera del repositorio
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MEDILINK_RELEASE_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_BASE64" ]]; then
+            echo 'ERROR: falta el secreto MEDILINK_RELEASE_KEYSTORE_BASE64.' >&2
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/medilink-release.p12"
+          chmod 600 "$RUNNER_TEMP/medilink-release.p12"
+          test -s "$RUNNER_TEMP/medilink-release.p12"
+
+      - name: Comprobar que la API publicada responde por HTTPS
+        env:
+          MEDILINK_API_BASE_URL: ${{ vars.MEDILINK_API_BASE_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # La validación de HTTPS/hostname se hace también en Gradle.
+          if [[ ! "$MEDILINK_API_BASE_URL" =~ ^https://[^/]+/.*/?$ ]] && \
+             [[ ! "$MEDILINK_API_BASE_URL" =~ ^https://[^/]+/$ ]]; then
+            echo 'ERROR: configurar MEDILINK_API_BASE_URL como https://host-publico/.' >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 20 \
+            "${MEDILINK_API_BASE_URL}api/health" > /dev/null
+          echo 'API /api/health accesible desde Internet.'
+
+      - name: Probar y compilar APK release firmado
+        working-directory: android
+        env:
+          MEDILINK_API_BASE_URL: ${{ vars.MEDILINK_API_BASE_URL }}
+          MEDILINK_RELEASE_KEYSTORE_FILE: ${{ runner.temp }}/medilink-release.p12
+          MEDILINK_RELEASE_STORE_PASSWORD: ${{ secrets.MEDILINK_RELEASE_STORE_PASSWORD }}
+          MEDILINK_RELEASE_KEY_ALIAS: ${{ secrets.MEDILINK_RELEASE_KEY_ALIAS }}
+          MEDILINK_RELEASE_KEY_PASSWORD: ${{ secrets.MEDILINK_RELEASE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon
+
+      - name: Verificar firma y preparar APK estable + checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk='android/app/build/outputs/apk/release/app-release.apk'
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk"
+          mkdir -p android-release
+          cp "$apk" android-release/MediLink-android.apk
+          (cd android-release && sha256sum MediLink-android.apk > MediLink-android.apk.sha256)
+
+      - name: Publicar GitHub Release (latest) con APK verificable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'ERROR: la release ya existe. No se sobrescriben APKs publicados.' >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            android-release/MediLink-android.apk \
+            android-release/MediLink-android.apk.sha256 \
+            --verify-tag --latest \
+            --title "MediLink Android ${RELEASE_TAG#android-v}" \
+            --notes "APK Android firmado para MediLink. Requiere Android 8.0 o posterior. Verificá el hash SHA-256 del archivo adjunto antes de distribuirlo."
