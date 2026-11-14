@@ -16,8 +16,9 @@ La API REST existente es la fuente de verdad para stock, sesiones y reservas.
 - Pruebas unitarias del mecanismo de idempotencia.
 
 No incluye mapas embebidos, ubicación GPS, operadores, administración, alertas push ni un
-servidor desplegado públicamente. La variante release usa una API pública HTTPS real y firma privada **solo** si están
-configuradas las variables necesarias; de lo contrario, `assembleRelease` se detiene.
+servidor desplegado públicamente. La variante release se puede **descargar e instalar sin backend**,
+pero login, catálogo y reservas necesitan uno para funcionar. `assembleRelease` exige siempre
+**firma privada**; `MEDILINK_API_BASE_URL` es opcional y, si existe, debe ser HTTPS válida.
 Ver [`RELEASE_ANDROID.md`](RELEASE_ANDROID.md) para publicar el APK firmado y enlazarlo al QR.
 
 ## Requisitos Windows
@@ -73,8 +74,8 @@ Repetir `adb reverse` luego de reiniciar el emulador o desconectar el USB.
 
 Si estas usando la demo aislada con otro puerto de Windows (por ejemplo 18082),
 el telefono debug sigue escuchando 18081. Ajusta **solo el destino** de adb reverse:
-`& $adb reverse tcp:18081 tcp:18082`. El APK release no usa adb reverse;
-accede a la API HTTPS de ngrok configurada para su publicacion.
+`& $adb reverse tcp:18081 tcp:18082`. El APK release no usa adb reverse; si no hay API pública configurada, se instala
+pero sus operaciones online no podrán conectarse.
 
 ### Datos de demo (solo si corresponde)
 
@@ -122,16 +123,16 @@ pruebas en el equipo con el SDK Android instalado.
 
 ## Distribución pública con QR
 
-El proceso reproducible para firmar un APK, comprobar que el backend HTTPS funciona,
-publicarlo en GitHub Releases con un nombre fijo y habilitar automáticamente la descarga
+El proceso reproducible para firmar y publicar un APK universitario **sin backend**,
+con un nombre fijo en GitHub Releases y habilitar automáticamente la descarga
 por QR desde `develop-web` está en [RELEASE_ANDROID.md](RELEASE_ANDROID.md). No compartir
 `app-debug.apk`, `keystore` ni credenciales en repositorios públicos.
 
 ## Universidad: APK descargable sin comprar dominio
 
-La publicacion por QR puede usar un backend temporal en tu propia PC mediante
-**ngrok Free + Docker aislado**. Segui la guia
+Para **descargar e instalar** el APK desde el QR no se requiere ngrok ni Docker:
+segui directamente [RELEASE_ANDROID.md](RELEASE_ANDROID.md). Si mas adelante
+queres probar login, catalogo y reservas con backend local desde otro celular,
+esa es una tarea aparte: podes seguir la guia opcional
 [Demo Android sin dominio](../docs/DEMO_ANDROID_SIN_DOMINIO.md).
-La URL de ngrok es HTTPS estable y se incorpora al APK firmado. La app solo
-podra usar la API mientras la PC y el tunel sigan encendidos. No usar datos
-personales reales en la demostracion.
+No usar datos personales reales en la demostracion.

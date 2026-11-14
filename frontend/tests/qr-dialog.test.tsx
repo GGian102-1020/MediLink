@@ -27,6 +27,7 @@ describe('Ventana de descarga Android por QR', () => {
     expect(html).toContain('Código QR del enlace de Android');
     expect(html).toContain(`href="${url}"`);
     expect(html).toContain('Descargar APK para Android');
+    expect(html).toContain('El APK se puede instalar sin backend');
     expect(html).not.toContain('todavía no tiene una versión pública');
   });
 

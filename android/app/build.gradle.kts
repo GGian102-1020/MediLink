@@ -5,8 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
-// El cliente debug sigue usando adb reverse. La variante release solo se distribuye
-// con backend HTTPS real y firma del responsable (nunca claves en el repositorio).
+// Debug usa adb reverse. La variante release se puede DISTRIBUIR sin un servidor
+// para la entrega universitaria; funciones online necesitan API luego.
+// La firma privada sigue siendo obligatoria (nunca claves en Git).
 val releaseApiUrl = providers.environmentVariable("MEDILINK_API_BASE_URL").orNull?.trim().orEmpty()
 val releaseStoreFile = providers.environmentVariable("MEDILINK_RELEASE_KEYSTORE_FILE").orNull.orEmpty()
 val releaseStorePassword = providers.environmentVariable("MEDILINK_RELEASE_STORE_PASSWORD").orNull.orEmpty()
@@ -59,8 +60,8 @@ android {
         }
         release {
             isMinifyEnabled = false
-            // Durante Gradle Sync se permite el marcador de posición, pero
-            // validateReleaseDistribution bloquea cualquier APK release sin URL real.
+            // Sin API configurada se compila un APK instalable de demostración;
+            // .invalid es un dominio reservado que NO representa un servidor operativo.
             val url = if (isPublicHttpsApiBase(releaseApiUrl)) releaseApiUrl else "https://api.example.invalid/"
             buildConfigField("String", "BASE_URL", "\"${url.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
             if (hasSigning) signingConfig = signingConfigs.getByName("medilinkRelease")
@@ -112,12 +113,15 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }
 
-// Validación obligatoria también cuando se compila localmente con assembleRelease:
-// nunca publicar por accidente un APK sin firma o ligado a un backend ficticio.
+// Firma obligatoria también para builds locales. No se exige servidor externo:
+// la edición universitaria se puede instalar sin conexión, pero sus operaciones
+// online (login, catálogo, reservas) requieren una API disponible.
+// Si se configura una API, la URL debe ser HTTPS válida; nunca se hace fallback
+// silencioso desde una URL mal escrita hacia el modo sin servidor.
 val validateReleaseDistribution = tasks.register("validateReleaseDistribution") {
     doLast {
-        check(isPublicHttpsApiBase(releaseApiUrl)) {
-            "MEDILINK_API_BASE_URL debe ser una URL HTTPS publica real, terminada en /"
+        check(releaseApiUrl.isBlank() || isPublicHttpsApiBase(releaseApiUrl)) {
+            "MEDILINK_API_BASE_URL (si se configura) debe ser HTTPS, valida y terminar en /"
         }
         check(hasSigning && file(releaseStoreFile).isFile) {
             "Faltan MEDILINK_RELEASE_KEYSTORE_FILE / STORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD"

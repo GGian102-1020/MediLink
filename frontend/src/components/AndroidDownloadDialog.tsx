@@ -123,7 +123,7 @@ export function AndroidDownloadDialog({ download, onClose }: Props) {
         </p>
         <p className="qr-security-note"><ShieldCheck size={16} aria-hidden="true" />
           {download.published
-            ? 'El QR abre el enlace HTTPS de descarga. Android puede solicitar permiso para instalar aplicaciones de esta fuente.'
+            ? 'El APK se puede instalar sin backend. Para login, catálogo o reservas necesitarás que el servidor esté disponible. Android puede solicitar permiso para instalar esta aplicación.'
             : 'Este QR abre GitHub Releases. Solo se muestra un enlace directo al APK cuando podemos verificarlo.'}
         </p>
       </div>

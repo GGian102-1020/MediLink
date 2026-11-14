@@ -179,7 +179,7 @@ export default function App() {
                 <p>La experiencia completa está en la app: buscá, consultá disponibilidad y administrá tus reservas desde tu teléfono.</p>
                 <DownloadButton onClick={() => setQrOpen(true)} isOpen={isQrOpen} published={download.published} />
                 {download.published ? (
-                  <p className="download-status"><Check size={17} aria-hidden="true" /> El APK Android está publicado: escaneá el QR o descargalo desde el teléfono.</p>
+                  <p className="download-status"><Check size={17} aria-hidden="true" /> APK disponible para descargar e instalar. Las funciones de login, stock y reservas necesitan un servidor activo.</p>
                 ) : (
                   <p className="download-status" role="status"><ShieldCheck size={17} aria-hidden="true" /> {checkingRelease
                     ? 'Comprobando si ya hay una versión Android para descargar…'

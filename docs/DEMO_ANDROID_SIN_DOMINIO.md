@@ -1,4 +1,8 @@
-# MediLink para la facultad: QR + APK + backend sin dominio ni hosting
+# Demo CON backend desde un celular (opcional: Docker + ngrok)
+
+Para **solo descargar e instalar el APK mediante QR**, no necesitás ni Docker ni ngrok.
+Seguí `android/RELEASE_ANDROID.md`. Esta guía es únicamente para las funciones en línea
+de Android cuando quieran habilitarlas durante una demostración.
 
 Esta guia usa **ngrok Free (HTTPS con dominio de desarrollo estable)** y una base
 PostgreSQL **aislada** en Docker Desktop. La landing y el APK siguen estando en
@@ -135,8 +139,9 @@ Set-Location 'C:\Users\giuli\Projects\MediLink'
 ```
 
 El script pide confirmar `PUBLICAR`, sube un tag y GitHub Actions compila,
-firma y publica el APK en Releases. Mientras Actions corre, deja abiertos
-Docker y ngrok: comprueba la salud de la API publica. **No crea un servidor
+firma y publica el APK en Releases. **El workflow no verifica la disponibilidad
+del backend**; Docker y ngrok solo deben quedar abiertos cuando quieras usar
+funcionalidades online desde otros celulares. **No crea un servidor
 permanente**. Al finalizar, consulta:
 
 - https://github.com/GGian102-1020/MediLink/actions
