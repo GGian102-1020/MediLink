@@ -51,7 +51,9 @@ if (-not $api.StartsWith('https://') -or -not $api.EndsWith('/')) {
 }
 try {
     $health = Invoke-WebRequest -UseBasicParsing -Uri ($api + 'api/health') -TimeoutSec 20
-    if ($health.StatusCode -ne 200) { throw "HTTP $($health.StatusCode)" }
+    if ($health.StatusCode -ne 200 -or $health.Content -notmatch 'MediLink API funcionando') {
+        throw 'La respuesta HTTPS no corresponde al backend de MediLink.'
+    }
 } catch { throw "La API no responde desde este equipo: $_" }
 Write-Host 'OK: firma registrada y backend HTTPS accesible.'
 

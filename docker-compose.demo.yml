@@ -1,0 +1,43 @@
+# Entorno aislado para demostraciones universitarias.
+# No reutiliza volumenes, contenedores ni credenciales del docker-compose principal.
+# SOLO la API queda publicada en el loopback de Windows para ngrok.
+name: medilink-demo
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: medlink
+      POSTGRES_USER: medlink
+      POSTGRES_PASSWORD: ${MEDILINK_DEMO_DB_PASSWORD:?Falta MEDILINK_DEMO_DB_PASSWORD en .env.demo}
+      TZ: America/Argentina/Buenos_Aires
+      PGTZ: America/Argentina/Buenos_Aires
+    volumes:
+      - datos_demo:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medlink -d medlink"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/medlink
+      DB_USER: medlink
+      DB_PASSWORD: ${MEDILINK_DEMO_DB_PASSWORD:?Falta MEDILINK_DEMO_DB_PASSWORD en .env.demo}
+      JWT_SECRET_BASE64: ${MEDILINK_DEMO_JWT_SECRET_BASE64:?Falta MEDILINK_DEMO_JWT_SECRET_BASE64 en .env.demo}
+      DB_FLYWAY_BASELINE_ON_MIGRATE: "false"
+      SERVER_PORT: "8081"
+      MEDLINK_CORS_ALLOWED_ORIGINS: ""
+    ports:
+      - "127.0.0.1:18081:8081"
+
+volumes:
+  datos_demo:

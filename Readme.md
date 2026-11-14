@@ -148,3 +148,12 @@ públicos de mapas están en [docs/DEMO_MAPAS_MVP.md](docs/DEMO_MAPAS_MVP.md).
 La nueva regla de `.gitignore` evita incorporar dependencias nuevas, pero **no**
 las desversiona automáticamente. Se recomienda retirar ese directorio del índice
 mediante un cambio separado para no mezclar miles de eliminaciones con el parche de mapas.
+
+### Demo universitaria: QR Android sin dominio
+
+Para distribuir el APK por GitHub Releases y conectar Android con el backend
+en tu PC a traves de una URL HTTPS gratuita de ngrok, consulta
+[docs/DEMO_ANDROID_SIN_DOMINIO.md](docs/DEMO_ANDROID_SIN_DOMINIO.md).
+Usa una base de datos aislada con datos ficticios; no requiere contratar un
+servidor ni registrar dominio. La API solo estara disponible mientras mantengas
+Docker y el tunel encendidos.

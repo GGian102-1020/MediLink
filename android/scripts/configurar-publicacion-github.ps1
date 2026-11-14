@@ -46,7 +46,7 @@ if (-not [Uri]::TryCreate($ApiBaseUrl, [UriKind]::Absolute, [ref]$uri) -or
     $uri.Host -notmatch '\.' -or
     $uri.Host -match '(\.invalid|\.example|\.test|\.local|\.localhost)$' -or
     $uri.UserInfo -or $uri.Query -or $uri.Fragment) {
-    throw 'ApiBaseUrl debe ser HTTPS con dominio publico y terminar en / (ej.: https://api.midominio.com/).'
+    throw 'ApiBaseUrl debe ser una URL HTTPS accesible, terminada en /. Para facultad sirve el hostname gratuito de ngrok.'
 }
 
 & gh auth status
@@ -55,7 +55,9 @@ Assert-ExternalSuccess 'Primero inicia sesion con gh auth login.'
 # Sin un backend accesible no es util distribuir la app.
 try {
     $health = Invoke-WebRequest -Uri ($ApiBaseUrl + 'api/health') -UseBasicParsing -TimeoutSec 20
-    if ($health.StatusCode -ne 200) { throw "Respuesta HTTP $($health.StatusCode)" }
+    if ($health.StatusCode -ne 200 -or $health.Content -notmatch 'MediLink API funcionando') {
+        throw 'La respuesta no corresponde a /api/health de MediLink.'
+    }
 } catch {
     throw "La API no responde en $($ApiBaseUrl)api/health. No se configuro la publicacion: $_"
 }

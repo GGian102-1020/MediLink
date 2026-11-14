@@ -90,9 +90,15 @@ jobs:
             echo 'ERROR: configurar MEDILINK_API_BASE_URL como https://host-publico/.' >&2
             exit 1
           fi
-          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 20 \
-            "${MEDILINK_API_BASE_URL}api/health" > /dev/null
-          echo 'API /api/health accesible desde Internet.'
+          health=$(curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 20 \
+            -H 'User-Agent: MediLink-Release-Check/1.0' \
+            -H 'ngrok-skip-browser-warning: true' \
+            "${MEDILINK_API_BASE_URL}api/health")
+          if [[ "$health" != 'MediLink API funcionando' ]]; then
+            echo 'ERROR: la URL HTTPS no devolvio el contenido esperado de /api/health.' >&2
+            exit 1
+          fi
+          echo 'API /api/health accesible desde Internet y contenido correcto.'
 
       - name: Probar y compilar APK release firmado
         working-directory: android
