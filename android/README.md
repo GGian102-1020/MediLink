@@ -16,8 +16,9 @@ La API REST existente es la fuente de verdad para stock, sesiones y reservas.
 - Pruebas unitarias del mecanismo de idempotencia.
 
 No incluye mapas embebidos, ubicación GPS, operadores, administración, alertas push ni un
-servidor desplegado públicamente. No está preparado para publicar la variante release:
-`https://api.example.invalid/` es un marcador de posición deliberado.
+servidor desplegado públicamente. La variante release usa una API pública HTTPS real y firma privada **solo** si están
+configuradas las variables necesarias; de lo contrario, `assembleRelease` se detiene.
+Ver [`RELEASE_ANDROID.md`](RELEASE_ANDROID.md) para publicar el APK firmado y enlazarlo al QR.
 
 ## Requisitos Windows
 
@@ -113,3 +114,10 @@ Set-Location .\android
 Probar además registro/login, reservas y cancelación en un emulador con un backend
 encendido. Esta entrega es código de integración; se requiere una compilación y
 pruebas en el equipo con el SDK Android instalado.
+
+## Distribución pública con QR
+
+El proceso reproducible para firmar un APK, comprobar que el backend HTTPS funciona,
+publicarlo en GitHub Releases con un nombre fijo y habilitar automáticamente la descarga
+por QR desde `develop-web` está en [RELEASE_ANDROID.md](RELEASE_ANDROID.md). No compartir
+`app-debug.apk`, `keystore` ni credenciales en repositorios públicos.

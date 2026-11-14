@@ -1,8 +1,32 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+// El cliente debug sigue usando adb reverse. La variante release solo se distribuye
+// con backend HTTPS real y firma del responsable (nunca claves en el repositorio).
+val releaseApiUrl = providers.environmentVariable("MEDILINK_API_BASE_URL").orNull?.trim().orEmpty()
+val releaseStoreFile = providers.environmentVariable("MEDILINK_RELEASE_KEYSTORE_FILE").orNull.orEmpty()
+val releaseStorePassword = providers.environmentVariable("MEDILINK_RELEASE_STORE_PASSWORD").orNull.orEmpty()
+val releaseKeyAlias = providers.environmentVariable("MEDILINK_RELEASE_KEY_ALIAS").orNull.orEmpty()
+val releaseKeyPassword = providers.environmentVariable("MEDILINK_RELEASE_KEY_PASSWORD").orNull.orEmpty()
+val hasSigning = listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+    .all { it.isNotBlank() }
+
+fun isPublicHttpsApiBase(raw: String): Boolean = try {
+    val uri = URI(raw)
+    val host = uri.host?.lowercase().orEmpty()
+    uri.scheme.equals("https", ignoreCase = true) &&
+        host.contains('.') &&
+        !host.matches(Regex("[0-9.]+")) &&
+        listOf(".invalid", ".example", ".test", ".localhost", ".local", ".internal").none { host.endsWith(it) } &&
+        host != "example.com" && host != "localhost" &&
+        uri.userInfo == null && uri.query == null && uri.fragment == null &&
+        raw.endsWith('/')
+} catch (_: Exception) { false }
+
 
 android {
     namespace = "ar.edu.uade.medilink.android"
@@ -13,8 +37,19 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 2
-        versionName = "0.2.0-experimental"
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasSigning) {
+            create("medilinkRelease") {
+                storeFile = file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -24,9 +59,11 @@ android {
         }
         release {
             isMinifyEnabled = false
-            // El endpoint real debe configurarse antes de distribuir la app.
-            // Este dominio reservado evita publicar por error un entorno de desarrollo.
-            buildConfigField("String", "BASE_URL", "\"https://api.example.invalid/\"")
+            // Durante Gradle Sync se permite el marcador de posición, pero
+            // validateReleaseDistribution bloquea cualquier APK release sin URL real.
+            val url = if (isPublicHttpsApiBase(releaseApiUrl)) releaseApiUrl else "https://api.example.invalid/"
+            buildConfigField("String", "BASE_URL", "\"${url.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+            if (hasSigning) signingConfig = signingConfigs.getByName("medilinkRelease")
         }
     }
 
@@ -73,4 +110,20 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+}
+
+// Validación obligatoria también cuando se compila localmente con assembleRelease:
+// nunca publicar por accidente un APK sin firma o ligado a un backend ficticio.
+val validateReleaseDistribution = tasks.register("validateReleaseDistribution") {
+    doLast {
+        check(isPublicHttpsApiBase(releaseApiUrl)) {
+            "MEDILINK_API_BASE_URL debe ser una URL HTTPS publica real, terminada en /"
+        }
+        check(hasSigning && file(releaseStoreFile).isFile) {
+            "Faltan MEDILINK_RELEASE_KEYSTORE_FILE / STORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD"
+        }
+    }
+}
+tasks.matching { it.name in setOf("preReleaseBuild", "assembleRelease", "bundleRelease") }.configureEach {
+    dependsOn(validateReleaseDistribution)
 }

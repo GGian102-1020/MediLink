@@ -69,7 +69,7 @@ Base de datos
 Clientes actuales
 - **Android** (`android/`): aplicación nativa Kotlin + Jetpack Compose para búsqueda, disponibilidad y reservas.
 - **Web** (`frontend/`): landing pública React + Vite con inicio, explicación y enlace de descarga Android. No ofrece login, catálogo, reservas, operaciones ni administración web, ni consume la API.
-- **Descarga Android**: depende de una release pública firmada y con backend HTTPS real; consultar [`frontend/README.md`](frontend/README.md).
+- **Descarga Android**: QR con detección automática del APK firmado en GitHub Releases. Para configurar backend HTTPS, clave de firma y publicación por tag en `develop-web`, consultar [`android/RELEASE_ANDROID.md`](android/RELEASE_ANDROID.md).
 
 Otras herramientas
 - Git

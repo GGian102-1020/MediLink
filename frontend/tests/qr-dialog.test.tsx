@@ -15,8 +15,8 @@ describe('Ventana de descarga Android por QR', () => {
     expect(html).toContain('<svg');
     expect(html).toContain('Código QR de GitHub Releases de MediLink');
     expect(html).toContain(`href="${ANDROID_RELEASES_URL}"`);
-    expect(html).toContain('todavía no tiene una versión pública descargable');
-    expect(html).toContain('El QR no descarga una app');
+    expect(html).toContain('no pudimos confirmar un APK público disponible');
+    expect(html).toContain('Este QR abre GitHub Releases');
     expect(html).toContain('aria-label="Cerrar código QR"');
     expect(html).toContain('Copiar enlace');
   });
@@ -26,7 +26,7 @@ describe('Ventana de descarga Android por QR', () => {
     const html = renderDialog(url);
     expect(html).toContain('Código QR del enlace de Android');
     expect(html).toContain(`href="${url}"`);
-    expect(html).toContain('Abrir enlace de Android');
+    expect(html).toContain('Descargar APK para Android');
     expect(html).not.toContain('todavía no tiene una versión pública');
   });
 
