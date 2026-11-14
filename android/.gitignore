@@ -1,0 +1,13 @@
+# Archivos generados por Android Studio y Gradle
+.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+*.hprof
+captures/
+.externalNativeBuild/
+.cxx/
+.idea/
+*.iml
+# NO ignorar gradle/wrapper/gradle-wrapper.jar (se anade tras verificar su SHA256).

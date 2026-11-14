@@ -1,0 +1,7 @@
+# Override local: permite correr esta copia junto a otra copia de MediLink
+# que ya usa el nombre "medlink-db" y el puerto 5432.
+services:
+  db:
+    container_name: medlink-db-android
+    ports: !override
+      - "127.0.0.1:5433:5432"
