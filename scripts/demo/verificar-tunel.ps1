@@ -3,25 +3,26 @@
 Devuelve exclusivamente la URL HTTPS publica por stdout para permitir:
 $api = & .\scripts\demo\verificar-tunel.ps1
 Los mensajes de diagnostico se muestran mediante Write-Host.
-El agente ngrok debe estar ejecutandose en otra terminal: ngrok http 18081
+El agente ngrok debe estar ejecutandose en otra terminal: ngrok http <puerto-demo>
 #>
 $ErrorActionPreference = 'Stop'
+$hostPort = [int](& (Join-Path $PSScriptRoot 'puerto-demo.ps1'))
 try {
-    $local = Invoke-WebRequest -Uri 'http://127.0.0.1:18081/api/health' -UseBasicParsing -TimeoutSec 8
+    $local = Invoke-WebRequest -Uri "http://127.0.0.1:$hostPort/api/health" -UseBasicParsing -TimeoutSec 8
     if ($local.StatusCode -ne 200 -or $local.Content -notmatch 'MediLink API funcionando') {
         throw 'Respuesta incorrecta del backend local.'
     }
-} catch { throw "El backend no responde correctamente en localhost:18081. Ejecuta iniciar-demo.ps1. $_" }
+} catch { throw "El backend no responde correctamente en localhost:$hostPort. Ejecuta iniciar-demo.ps1. $_" }
 
 try { $info = Invoke-RestMethod -Uri 'http://127.0.0.1:4040/api/tunnels' -TimeoutSec 8 }
-catch { throw 'No se encontro ngrok local en el puerto 4040. Abre otra terminal y ejecuta: ngrok http 18081' }
+catch { throw "No se encontro ngrok local en el puerto 4040. Abre otra terminal y ejecuta: ngrok http $hostPort" }
 
 $candidates = @($info.tunnels | Where-Object {
     $_.public_url -like 'https://*' -and
-    $_.config.addr -match '(^|:)18081(/|$)'
+    ([string]$_.config.addr) -match ('(^|:)' + $hostPort + '(/|$)')
 })
 if ($candidates.Count -ne 1) {
-    throw 'No se encontro UN unico tunel HTTPS hacia el puerto 18081. Revisa ngrok http 18081.'
+    throw "No se encontro UN unico tunel HTTPS hacia el puerto $hostPort. Revisa ngrok http $hostPort."
 }
 $api = ([string]$candidates[0].public_url).TrimEnd('/') + '/'
 $uri = [Uri]$api

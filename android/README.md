@@ -71,6 +71,11 @@ al backend local por `adb reverse`. HTTP hacia `localhost` está habilitado sola
 de red de `src/debug`; los demás destinos HTTP están bloqueados. El puerto del host se publica solo en `127.0.0.1`, no en la LAN.
 Repetir `adb reverse` luego de reiniciar el emulador o desconectar el USB.
 
+Si estas usando la demo aislada con otro puerto de Windows (por ejemplo 18082),
+el telefono debug sigue escuchando 18081. Ajusta **solo el destino** de adb reverse:
+`& $adb reverse tcp:18081 tcp:18082`. El APK release no usa adb reverse;
+accede a la API HTTPS de ngrok configurada para su publicacion.
+
 ### Datos de demo (solo si corresponde)
 
 Un PostgreSQL nuevo tiene las tablas por Flyway, pero no necesariamente datos de
