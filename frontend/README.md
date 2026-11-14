@@ -48,7 +48,7 @@ a servicios de QR de terceros.
 Se puede definir `VITE_ANDROID_DOWNLOAD_URL` con una URL HTTPS explícita si luego se
 prefiere Google Play u otro canal: **esa configuración reemplaza la detección automática**.
 Para GitHub Releases no configures la variable, dejala vacía. La descarga directa requiere
-**publicar primero un APK release firmado** y un backend accesible públicamente.
+**publicar primero un APK release firmado**. No se necesita backend para **descargar ni instalar**; login, catálogo y reservas sí necesitan un servidor. Revisá `../android/RELEASE_ANDROID.md`.
 
 Guía completa de publicación, firma segura, GitHub Actions, tag y pruebas desde Android:
 [`../android/RELEASE_ANDROID.md`](../android/RELEASE_ANDROID.md).

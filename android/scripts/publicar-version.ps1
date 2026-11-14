@@ -44,18 +44,16 @@ foreach ($name in @('MEDILINK_RELEASE_KEYSTORE_BASE64', 'MEDILINK_RELEASE_STORE_
                     'MEDILINK_RELEASE_KEY_ALIAS', 'MEDILINK_RELEASE_KEY_PASSWORD')) {
     if ($secretNames -notcontains $name) { throw "Falta el secreto $name. Ejecuta configurar-publicacion-github.ps1." }
 }
-$api = (& gh variable get MEDILINK_API_BASE_URL -R $repo).Trim()
-Assert-Ok 'Falta la variable MEDILINK_API_BASE_URL.'
-if (-not $api.StartsWith('https://') -or -not $api.EndsWith('/')) {
-    throw 'MEDILINK_API_BASE_URL debe ser HTTPS y terminar en /.'
+# NO se requiere API ni ngrok para publicar el instalador universitario.
+# Si existe MEDILINK_API_BASE_URL se incorpora al APK; si falta, es solo instalable.
+$apiVariables = @(& gh variable list -R $repo --json name --jq '.[].name')
+Assert-Ok 'No se pudo consultar las variables de GitHub.'
+if ($apiVariables -contains 'MEDILINK_API_BASE_URL') {
+    Write-Host 'Aviso: hay una API configurada en GitHub. El APK intentara conectarse a ella.'
+} else {
+    Write-Host 'Modo universidad: el APK podra descargarse e instalarse SIN backend publico.'
+    Write-Host 'Atencion: login, catalogo y reservas requieren un backend cuando se usen.'
 }
-try {
-    $health = Invoke-WebRequest -UseBasicParsing -Uri ($api + 'api/health') -TimeoutSec 20
-    if ($health.StatusCode -ne 200 -or $health.Content -notmatch 'MediLink API funcionando') {
-        throw 'La respuesta HTTPS no corresponde al backend de MediLink.'
-    }
-} catch { throw "La API no responde desde este equipo: $_" }
-Write-Host 'OK: firma registrada y backend HTTPS accesible.'
 
 # git ls-remote devuelve 0 incluso sin coincidencias: comprobar su salida.
 $existing = & git ls-remote --tags origin "refs/tags/$tag"

@@ -1,4 +1,4 @@
-name: Publicar MediLink Android (APK firmado)
+name: Publicar MediLink Android (APK universitario firmado)
 
 # Push de tag: funciona desde develop-web sin agregar el workflow a main.
 # Ej.: android-v0.2.0, apuntando al commit probado en develop-web.
@@ -78,27 +78,17 @@ jobs:
           chmod 600 "$RUNNER_TEMP/medilink-release.p12"
           test -s "$RUNNER_TEMP/medilink-release.p12"
 
-      - name: Comprobar que la API publicada responde por HTTPS
+      - name: Informar modo de distribución
         env:
           MEDILINK_API_BASE_URL: ${{ vars.MEDILINK_API_BASE_URL }}
         shell: bash
         run: |
           set -euo pipefail
-          # La validación de HTTPS/hostname se hace también en Gradle.
-          if [[ ! "$MEDILINK_API_BASE_URL" =~ ^https://[^/]+/.*/?$ ]] && \
-             [[ ! "$MEDILINK_API_BASE_URL" =~ ^https://[^/]+/$ ]]; then
-            echo 'ERROR: configurar MEDILINK_API_BASE_URL como https://host-publico/.' >&2
-            exit 1
+          if [[ -z "$MEDILINK_API_BASE_URL" ]]; then
+            echo '::notice::APK universitario SIN backend. Se puede descargar e instalar, pero login, catalogo y reservas no funcionaran sin API.'
+          else
+            echo '::notice::APK con API configurada. Gradle valida HTTPS, pero la disponibilidad del servidor NO queda garantizada.'
           fi
-          health=$(curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 20 \
-            -H 'User-Agent: MediLink-Release-Check/1.0' \
-            -H 'ngrok-skip-browser-warning: true' \
-            "${MEDILINK_API_BASE_URL}api/health")
-          if [[ "$health" != 'MediLink API funcionando' ]]; then
-            echo 'ERROR: la URL HTTPS no devolvio el contenido esperado de /api/health.' >&2
-            exit 1
-          fi
-          echo 'API /api/health accesible desde Internet y contenido correcto.'
 
       - name: Probar y compilar APK release firmado
         working-directory: android
@@ -140,4 +130,4 @@ jobs:
             android-release/MediLink-android.apk.sha256 \
             --verify-tag --latest \
             --title "MediLink Android ${RELEASE_TAG#android-v}" \
-            --notes "APK Android firmado para MediLink. Requiere Android 8.0 o posterior. Verificá el hash SHA-256 del archivo adjunto antes de distribuirlo."
+            --notes "**Versión universitaria de MediLink para Android 8.0+.** APK firmado, descargable e instalable desde el QR de la landing. **La descarga e instalación no requieren un backend.** Si la aplicación se compiló sin una API HTTPS configurada, las funciones en línea (inicio de sesión, catálogo, reservas) no estarán operativas: no es una versión de producción ni debe usarse con datos reales. El archivo .sha256 permite comprobar la integridad. Las futuras actualizaciones requieren la misma clave de firma."

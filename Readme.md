@@ -69,7 +69,7 @@ Base de datos
 Clientes actuales
 - **Android** (`android/`): aplicación nativa Kotlin + Jetpack Compose para búsqueda, disponibilidad y reservas.
 - **Web** (`frontend/`): landing pública React + Vite con inicio, explicación y enlace de descarga Android. No ofrece login, catálogo, reservas, operaciones ni administración web, ni consume la API.
-- **Descarga Android**: QR con detección automática del APK firmado en GitHub Releases. Para configurar backend HTTPS, clave de firma y publicación por tag en `develop-web`, consultar [`android/RELEASE_ANDROID.md`](android/RELEASE_ANDROID.md).
+- **Descarga Android**: QR con detección automática del APK firmado en GitHub Releases. Para firmar el APK universitario y publicarlo por tag en `develop-web` **sin servidor ni dominio**, consultar [`android/RELEASE_ANDROID.md`](android/RELEASE_ANDROID.md).
 
 Otras herramientas
 - Git
@@ -149,11 +149,13 @@ La nueva regla de `.gitignore` evita incorporar dependencias nuevas, pero **no**
 las desversiona automáticamente. Se recomienda retirar ese directorio del índice
 mediante un cambio separado para no mezclar miles de eliminaciones con el parche de mapas.
 
-### Demo universitaria: QR Android sin dominio
+### APK descargable por QR sin servidor (facultad)
 
-Para distribuir el APK por GitHub Releases y conectar Android con el backend
-en tu PC a traves de una URL HTTPS gratuita de ngrok, consulta
-[docs/DEMO_ANDROID_SIN_DOMINIO.md](docs/DEMO_ANDROID_SIN_DOMINIO.md).
-Usa una base de datos aislada con datos ficticios; no requiere contratar un
-servidor ni registrar dominio. La API solo estara disponible mientras mantengas
-Docker y el tunel encendidos.
+Para **publicar, descargar e instalar** Android desde la landing solo hace
+falta una GitHub Release con el APK firmado; no se necesita dominio,
+Docker ni ngrok. Guia: [android/RELEASE_ANDROID.md](android/RELEASE_ANDROID.md).
+
+Solo para demostrar las **funciones online** desde otra red, ver la opcion
+separada [docs/DEMO_ANDROID_SIN_DOMINIO.md](docs/DEMO_ANDROID_SIN_DOMINIO.md).
+La descarga funciona aunque el backend no este encendido; login, catalogo y
+reservas no.
