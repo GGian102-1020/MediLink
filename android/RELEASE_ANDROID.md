@@ -24,13 +24,16 @@ la firma con `apksigner`, calcula SHA-256 y crea una GitHub Release pública con
 
 ## Antes del primer release (REQUISITOS REALES)
 
-1. **Desplegar el backend** en un dominio HTTPS accesible desde teléfonos Android y desde
-   GitHub Actions. Debe funcionar `GET https://tu-api.example.com/api/health` (el ejemplo **NO
-   es una URL real**, no lo configures literalmente). Debe tener acceso a su base de datos,
-   secretos JWT de producción, datos correctos y configuración segura. **Este parche no
-   despliega el backend ni crea una base de datos pública.**
+1. **Contar con un endpoint HTTPS accesible** desde Android y GitHub Actions. NO hace
+   falta comprar dominio: para entrega universitaria podes correr la API y BD
+   aisladas en tu computadora y publicarla temporalmente con **ngrok Free**, que
+   asigna un hostname HTTPS estable. Guia paso a paso:
+   [`docs/DEMO_ANDROID_SIN_DOMINIO.md`](../docs/DEMO_ANDROID_SIN_DOMINIO.md).
+   Alternativamente, una API alojada permanentemente tambien es compatible.
+   Debe funcionar `GET https://tu-host-https/api/health`. Si es una demo,
+   mantenela con datos ficticios y no expongas bases clinicas reales.
 2. **Probar la app Android** conectada a ese backend. Validar registro, login, catálogo,
-   reservas y conexión desde una red móvil externa. Si no hay backend real, **no publicar**:
+   reservas y conexión desde una red móvil externa. Si no hay backend accesible, **no publicar**:
    la descarga se haría, pero la app no podría funcionar correctamente.
 3. Tener Java 17+, `keytool`, Android SDK 36, GitHub CLI autenticado (`gh auth login`),
    y permisos para gestionar Actions, Variables, Secrets y Releases del repo
@@ -44,8 +47,10 @@ la firma con `apksigner`, calcula SHA-256 y crea una GitHub Release pública con
 Desde `C:\Users\giuli\Projects\MediLink` en la rama `develop-web`:
 
 ```powershell
-# Reemplazar por el dominio REAL de la API. Debe terminar en /.
-$api = 'https://api.TU-DOMINIO-REAL.com/'
+# Para universidad, iniciar ngrok sobre la API local y dejarlo abierto.
+# La URL resultante NO requiere dominio propio.
+$api = & .\scripts\demo\verificar-tunel.ps1
+# O, si tenes hosting externo: $api = 'https://tu-host-https/'
 
 # El script comprueba /api/health, crea una clave PKCS12 privada FUERA del repo
 # (solo si no existe) y carga 4 secretos + la variable HTTPS en GitHub.
@@ -117,8 +122,9 @@ Para verificar la integridad del APK descargado, comparar su SHA-256 con el arch
 - **El workflow no se ejecutó:** confirmar que se subió un tag `android-vX.Y.Z`, que apunta a
   `develop-web`, que Actions está habilitado en el repositorio y que el workflow está presente
   en el commit del tag. Tags no ejecutan workflows de otras ramas.
-- **Falla en API/health:** todavía falta publicar o configurar la API real. No usar `localhost`,
-  IPs de red privada ni `example.invalid` en distribución.
+- **Falla en API/health:** revisar que Docker, ngrok y la PC esten encendidos
+  (para demo), o que la API alojada responda. No usar `localhost`, IPs de red
+  privada ni `example.invalid` en una version distribuida.
 - **Falla `validateReleaseDistribution`:** secret o variable faltante, keystore inválido o
   URL de API no pública. Esta falla es intencional: **no existe fallback a firma debug**.
 - **Falla al crear Release:** revisar que GitHub Actions permita escribir en Releases (token
@@ -136,3 +142,10 @@ crear la imagen (se genera localmente con `qrcode.react`). La web solo consulta 
 públicos de GitHub Releases; no consume la API REST clínica. Para distribución real, revisar
 la política de datos, privacidad, disponibilidad, seguridad del backend y la calidad funcional
 de Android antes de habilitar a usuarios finales.
+
+## Demostracion sin dominio ni hosting
+
+En la facultad, **no es obligatorio montar una infraestructura de produccion**.
+Usa la guia de [Docker aislado + ngrok Free](../docs/DEMO_ANDROID_SIN_DOMINIO.md).
+GitHub aloja el APK; ngrok solo da conectividad HTTPS temporal a la API. Si
+la PC se apaga, el APK se sigue descargando, pero la app no accede al backend.

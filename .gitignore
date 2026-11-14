@@ -34,3 +34,6 @@ frontend/.vite/
 *.keystore
 *.p12
 *.pfx
+
+# Credenciales aisladas para demostraciones universitarias via ngrok
+.env.demo

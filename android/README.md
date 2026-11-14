@@ -121,3 +121,12 @@ El proceso reproducible para firmar un APK, comprobar que el backend HTTPS funci
 publicarlo en GitHub Releases con un nombre fijo y habilitar automáticamente la descarga
 por QR desde `develop-web` está en [RELEASE_ANDROID.md](RELEASE_ANDROID.md). No compartir
 `app-debug.apk`, `keystore` ni credenciales en repositorios públicos.
+
+## Universidad: APK descargable sin comprar dominio
+
+La publicacion por QR puede usar un backend temporal en tu propia PC mediante
+**ngrok Free + Docker aislado**. Segui la guia
+[Demo Android sin dominio](../docs/DEMO_ANDROID_SIN_DOMINIO.md).
+La URL de ngrok es HTTPS estable y se incorpora al APK firmado. La app solo
+podra usar la API mientras la PC y el tunel sigan encendidos. No usar datos
+personales reales en la demostracion.
