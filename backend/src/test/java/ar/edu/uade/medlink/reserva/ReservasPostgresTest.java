@@ -128,14 +128,43 @@ class ReservasPostgresTest {
     }
     @Test void operatorCompletesWithoutRedeductingStock() {
         var r=created(1);
-        assertEquals("COMPLETADA",reservations.retirar(f.pharmacy(),r.codigoVisible(),f.operatorActor(),null).dto().estado());
+        assertEquals("COMPLETADA",reservations.retirar(f.pharmacy(),r.codigoVisible(),r.pinRetiro(),f.operatorActor(),null).dto().estado());
         assertEquals(9,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
         assertEquals(1,count("SELECT count(*) FROM auditoria WHERE accion='CONFIRMAR_RETIRO' AND entidad_id=?",r.id()));
+    }
+    @Test void pickupPinIsOnlyVisibleToThePatient() {
+        var r=created(1);
+        assertTrue(r.pinRetiro().matches("\\d{6}"));
+        assertNull(reservations.detalleFarmacia(f.pharmacy(),r.codigoVisible(),f.operatorActor()).pinRetiro());
+        assertNull(reservations.deFarmacia(f.pharmacy(),null,null,null,0,20,List.of(),f.operatorActor()).content().getFirst().pinRetiro());
+        assertEquals(r.pinRetiro(),reservations.propia(r.codigoVisible(),f.userActor()).pinRetiro());
+    }
+    @Test void wrongOrMissingPinDoesNotCompleteAndCountsAttempts() {
+        var r=created(1);
+        String wrong=r.pinRetiro().equals("000000")?"111111":"000000";
+        assertEquals(ReservaService.PinCheck.MISSING,reservations.retirar(f.pharmacy(),r.codigoVisible(),null,f.operatorActor(),null).pin());
+        var result=reservations.retirar(f.pharmacy(),r.codigoVisible(),wrong,f.operatorActor(),null);
+        assertEquals(ReservaService.PinCheck.WRONG,result.pin());
+        assertEquals(ReservaService.MAX_PIN_ATTEMPTS-1,result.remainingAttempts());
+        assertEquals("ACTIVA",reservations.propia(r.codigoVisible(),f.userActor()).estado());
+        assertEquals(1,count("SELECT intentos_pin_fallidos FROM reserva WHERE id_reserva=?",r.id()));
+        assertEquals(9,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+    }
+    @Test void pinIsBlockedAfterMaxAttemptsEvenWithTheRightPin() {
+        var r=created(1);
+        String wrong=r.pinRetiro().equals("000000")?"111111":"000000";
+        ReservaService.RetiroOutcome last=null;
+        for (int i=0;i<ReservaService.MAX_PIN_ATTEMPTS;i++)
+            last=reservations.retirar(f.pharmacy(),r.codigoVisible(),wrong,f.operatorActor(),null);
+        assertEquals(ReservaService.PinCheck.BLOCKED,last.pin());
+        assertEquals(ReservaService.PinCheck.BLOCKED,
+            reservations.retirar(f.pharmacy(),r.codigoVisible(),r.pinRetiro(),f.operatorActor(),null).pin());
+        assertEquals("ACTIVA",reservations.propia(r.codigoVisible(),f.userActor()).estado());
     }
     @Test void adminCannotCompleteButCanCancelOperativelyWithoutRestitution() {
         var r=created(1);
         assertEquals("FORBIDDEN",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
-            ()->reservations.retirar(f.pharmacy(),r.codigoVisible(),f.adminActor(),null)).codigo());
+            ()->reservations.retirar(f.pharmacy(),r.codigoVisible(),r.pinRetiro(),f.adminActor(),null)).codigo());
         var canceled=reservations.cancelarOperativa(f.pharmacy(),r.codigoVisible(),
             new CancelacionOperativaRequest("PRODUCTO_NO_DISPONIBLE","Dañado",null,null),f.adminActor(),null);
         assertEquals("CANCELADA",canceled.dto().estado());
@@ -248,7 +277,7 @@ class ReservasPostgresTest {
         var second=reservations.crear(rxCmd(rx,3),key(),f.userActor(),null).dto();
         // Existing authorization survives later annulment (RN-29).
         db.update("UPDATE prescripcion SET estado='ANULADA' WHERE id_prescripcion=?",rx.prescription());
-        reservations.retirar(f.pharmacy(),second.codigoVisible(),f.operatorActor(),null);
+        reservations.retirar(f.pharmacy(),second.codigoVisible(),second.pinRetiro(),f.operatorActor(),null);
         assertEquals(0,count("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_item_prescripcion=?",rx.item()));
         assertEquals(3,count("SELECT cantidad_utilizada FROM item_prescripcion WHERE id_item_prescripcion=?",rx.item()));
         assertEquals(7,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",rx.stock()));
@@ -325,7 +354,7 @@ class ReservasPostgresTest {
         assertEquals("FORBIDDEN",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,()->
             reservations.historialAdmin(f.user(),null,null,null,0,20,List.of(),f.operatorActor())).codigo());
         assertEquals("FORBIDDEN",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,()->
-            reservations.retirar(f.pharmacy(),r.codigoVisible(),f.adminActor(),null)).codigo());
+            reservations.retirar(f.pharmacy(),r.codigoVisible(),"000000",f.adminActor(),null)).codigo());
     }
     @Test void inconsistentStockCorrectionRespectsPendingExpiry() {
         var active=created(1);

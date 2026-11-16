@@ -31,6 +31,7 @@ import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.data.MovimientoStockDto
 import ar.edu.uade.medilink.android.data.PageDto
 import ar.edu.uade.medilink.android.data.ReservaDto
+import ar.edu.uade.medilink.android.data.RetiroPinRequest
 import ar.edu.uade.medilink.android.data.StockDto
 import ar.edu.uade.medilink.android.data.mensajeDeError
 import kotlinx.coroutines.CancellationException
@@ -54,6 +55,7 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
     var restitucion by remember { mutableStateOf("RESTITUIR") }
     var stockReal by remember { mutableStateOf("0") }
     var confirmando by remember { mutableStateOf<String?>(null) }
+    var pinRetiro by remember { mutableStateOf("") }
     var ocupado by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var aviso by remember { mutableStateOf<String?>(null) }
@@ -78,17 +80,25 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
     val confirmar = confirmando
     if (confirmar != null) {
         AlertDialog(
-            onDismissRequest = { if (!ocupado) confirmando = null },
+            onDismissRequest = { if (!ocupado) { confirmando = null; pinRetiro = "" } },
             title = { Text(if (confirmar == "retiro") "Confirmar retiro" else "Cancelación operativa") },
-            text = { Text(if (confirmar == "retiro")
-                "Se marcará la reserva ${detalle?.codigoVisible} como COMPLETADA."
-                else "El servidor aplicará la política de stock correspondiente a $causa.") },
-            confirmButton = { TextButton(enabled = !ocupado && detalle != null, onClick = {
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(if (confirmar == "retiro")
+                        "Pedile al paciente su PIN de 6 dígitos para completar la reserva ${detalle?.codigoVisible}."
+                        else "El servidor aplicará la política de stock correspondiente a $causa.")
+                    if (confirmar == "retiro") {
+                        CampoTexto(pinRetiro, { valor -> pinRetiro = valor.filter { it.isDigit() }.take(6) },
+                            label = { Text("PIN de retiro") }, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = { TextButton(enabled = !ocupado && detalle != null && (confirmar != "retiro" || pinRetiro.length == 6), onClick = {
                 val r = detalle ?: return@TextButton
                 scope.launch {
                     ocupado = true; error = null; aviso = null
                     try {
-                        if (confirmar == "retiro") repository.parity.retirar(farmaciaId, r.codigoVisible)
+                        if (confirmar == "retiro") repository.parity.retirar(farmaciaId, r.codigoVisible, RetiroPinRequest(pinRetiro))
                         else {
                             val real = if (causa == "STOCK_INCONSISTENTE")
                                 stockReal.toIntOrNull()?.takeIf { it >= 0 }
@@ -105,15 +115,15 @@ fun ReservasFarmaciaScreen(repository: MediLinkRepository, farmaciaId: Long, rol
                                     cantidadStockReal = real,
                                 ))
                         }
-                        confirmando = null
+                        confirmando = null; pinRetiro = ""
                         aviso = "Operación registrada correctamente."
                         revision++
                     } catch (e: CancellationException) { throw e }
-                    catch (e: Exception) { error = mensajeDeError(e); confirmando = null; revision++ }
+                    catch (e: Exception) { error = mensajeDeError(e); confirmando = null; pinRetiro = ""; revision++ }
                     finally { ocupado = false }
                 }
             }) { Text("Confirmar") } },
-            dismissButton = { TextButton(onClick = { confirmando = null }) { Text("Volver") } },
+            dismissButton = { TextButton(onClick = { confirmando = null; pinRetiro = "" }) { Text("Volver") } },
         )
     }
 

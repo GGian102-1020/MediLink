@@ -185,6 +185,13 @@ private fun ComprobanteReserva(r: ReservaDto, onActualizar: () -> Unit) {
             }
             Text(r.codigoVisible, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold,
                 fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+            if (r.estado == "ACTIVA" && !r.pinRetiro.isNullOrBlank()) {
+                Text("PIN DE RETIRO · MOSTRALO AL OPERADOR", color = MediColors.Aqua,
+                    style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                Text(r.pinRetiro, color = Color.White, fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                    letterSpacing = 4.sp)
+            }
             Canvas(Modifier.fillMaxWidth().height(1.dp)) {
                 drawLine(Color.White.copy(alpha = 0.3f), Offset.Zero, Offset(size.width, 0f), strokeWidth = 2f,
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
@@ -213,7 +220,7 @@ private fun mensajeEstado(r: ReservaDto, restantes: Long): Pair<String, String> 
             h > 0 -> "Te quedan ${h} h ${m} min para retirarlo"
             else -> "Te quedan $m min para retirarlo"
         }
-        tiempo to "Mostrá este código en la farmacia antes del ${fechaLegible(r.fechaHoraVencimiento)}."
+        tiempo to "Mostrá el código y el PIN en la farmacia antes del ${fechaLegible(r.fechaHoraVencimiento)}."
     }
     "COMPLETADA" -> "Ya retiraste tu medicamento" to "Retirado el ${fechaLegible(r.fechaHoraRetiro)}."
     "CANCELADA" -> "Esta reserva fue cancelada" to "Cancelada el ${fechaLegible(r.fechaHoraCancelacion)}."

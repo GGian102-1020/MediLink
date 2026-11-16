@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useAuth } from './context/AuthContext';
 import { Loading } from './components/UI';
 import { AppLayout, PublicLayout } from './components/Layout';
@@ -6,7 +7,8 @@ import { Home, Catalog, PresentationDetail } from './pages/Public';
 import { LoginPage, RegisterPage, ProfilePage } from './pages/Auth';
 import { Dashboard, MyReservations, ReservationDetail } from './pages/User';
 import { MyPrescriptions } from './pages/MyPrescriptions';
-import { PharmacyReservations, PharmacyStock, StockMovements } from './pages/Operator';
+import { OperatorDashboard, PharmacyReservations, PharmacyStock, StockMovements } from './pages/Operator';
+import { PharmacyReservations as LegacyReservations, PharmacyStock as LegacyStock, StockMovements as LegacyMovements } from './pages/OperatorLegacy';
 import { AdminFarmacias, AdminMedicamentos, AdminPresentaciones, AdminOperadores, AdminUsuarios, AdminPrescripciones, AdminAuditoria, AdminUsuarioDetalle } from './pages/Admin';
 
 type Rol = 'USUARIO' | 'OPERADOR' | 'ADMINISTRADOR';
@@ -17,6 +19,15 @@ function Protected({ roles }: { roles?: Rol[] }) {
   if (roles && !roles.includes(me.perfil.rol)) return <Navigate to="/panel" replace/>;
   return <AppLayout/>;
 }
+function DashboardHome() {
+  const { me } = useAuth();
+  return me?.perfil.rol === 'OPERADOR' ? <OperatorDashboard/> : <Dashboard/>;
+}
+/** Los administradores conservan las pantallas operativas preexistentes. */
+function Operation({ current: Current, legacy: Legacy }: { current: () => ReactNode; legacy: () => ReactNode }) {
+  const { me } = useAuth();
+  return me?.perfil.rol === 'OPERADOR' ? <Current/> : <Legacy/>;
+}
 function NotFound() { return <div className="notfound"><span>404</span><h1>No encontramos esta página</h1><p>Puede que el enlace haya cambiado.</p><a href="/">Volver al inicio</a></div>; }
 export default function App() {
   return <Routes>
@@ -25,15 +36,15 @@ export default function App() {
       <Route path="ingresar" element={<LoginPage/>}/><Route path="registro" element={<RegisterPage/>}/>
     </Route>
     <Route element={<Protected/>}>
-      <Route path="panel" element={<Dashboard/>}/><Route path="perfil" element={<ProfilePage/>}/>
+      <Route path="panel" element={<DashboardHome/>}/><Route path="perfil" element={<ProfilePage/>}/>
     </Route>
     <Route element={<Protected roles={['USUARIO']}/> }>
       <Route path="mis-reservas" element={<MyReservations/>}/><Route path="mis-reservas/:codigo" element={<ReservationDetail/>}/>
       <Route path="mis-recetas" element={<MyPrescriptions/>}/>
     </Route>
     <Route element={<Protected roles={['OPERADOR', 'ADMINISTRADOR']}/> }>
-      <Route path="operacion/reservas" element={<PharmacyReservations/>}/><Route path="operacion/stock" element={<PharmacyStock/>}/><Route path="operacion/movimientos" element={<StockMovements/>}/>
-      <Route path="farmacias/:farmaciaId/reservas" element={<PharmacyReservations/>}/><Route path="farmacias/:farmaciaId/stock" element={<PharmacyStock/>}/><Route path="farmacias/:farmaciaId/movimientos" element={<StockMovements/>}/>
+      <Route path="operacion/reservas" element={<Operation current={PharmacyReservations} legacy={LegacyReservations}/>}/><Route path="operacion/stock" element={<Operation current={PharmacyStock} legacy={LegacyStock}/>}/><Route path="operacion/movimientos" element={<Operation current={StockMovements} legacy={LegacyMovements}/>}/>
+      <Route path="farmacias/:farmaciaId/reservas" element={<Operation current={PharmacyReservations} legacy={LegacyReservations}/>}/><Route path="farmacias/:farmaciaId/stock" element={<Operation current={PharmacyStock} legacy={LegacyStock}/>}/><Route path="farmacias/:farmaciaId/movimientos" element={<Operation current={StockMovements} legacy={LegacyMovements}/>}/>
     </Route>
     <Route element={<Protected roles={['ADMINISTRADOR']}/> }>
       <Route path="admin/farmacias" element={<AdminFarmacias/>}/><Route path="admin/medicamentos" element={<AdminMedicamentos/>}/><Route path="admin/presentaciones" element={<AdminPresentaciones/>}/><Route path="admin/operadores" element={<AdminOperadores/>}/>

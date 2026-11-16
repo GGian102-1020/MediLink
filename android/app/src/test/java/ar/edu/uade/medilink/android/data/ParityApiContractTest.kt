@@ -47,6 +47,16 @@ class ParityApiContractTest {
         assertTrue(request.body.readUtf8().contains("\"contrasenaActual\":\"antigua\""))
     }
 
+    @Test fun retiroRequierePinDeSeisDigitosEnElBody() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(200)
+            .setBody("""{"id":1,"codigoVisible":"RSV-TEST","estado":"COMPLETADA"}"""))
+        api.retirar(4, "RSV-TEST", RetiroPinRequest("123456"))
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/api/farmacias/4/reservas/RSV-TEST/retiro", request.path)
+        assertTrue(request.body.readUtf8().contains("\"pin\":\"123456\""))
+    }
+
     @Test fun cancelarFarmaciaRespetaBodyDelBackend() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(200)
             .setBody("""{"id":1,"codigoVisible":"RSV-TEST","estado":"CANCELADA"}"""))

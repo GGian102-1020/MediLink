@@ -5,25 +5,26 @@
 # Maven
 **/target/
 
-# Variables de entorno
+# Variables de entorno (nunca subir claves ni contraseñas reales)
 .env
 *.env
 
 # Logs
 *.log
 
-# Respaldos locales: nunca versionar datos extraidos de PostgreSQL
+# Respaldos locales: nunca versionar datos extraídos de PostgreSQL
 *.dump
 *.backup
 
 # Preferencias y archivos locales (no son parte del proyecto)
 .vscode/
+.claude/
 .DS_Store
 Thumbs.db
 __pycache__/
 *.pyc
 
-# Frontend (nota: algunos node_modules ya fueron incluidos en Git históricamente)
+# Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/

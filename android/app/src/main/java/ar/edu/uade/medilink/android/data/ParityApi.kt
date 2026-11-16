@@ -11,6 +11,8 @@ import retrofit2.http.Query
 import retrofit2.http.QueryMap
 import retrofit2.http.Url
 
+data class RetiroPinRequest(val pin: String)
+
 /** Endpoints correspondientes a pantallas React (User, Operator, Admin). */
 interface ParityApi {
     @GET("api/me") suspend fun me(): MeDto
@@ -31,6 +33,7 @@ interface ParityApi {
     ): ReservaDto
     @POST("api/farmacias/{id}/reservas/{codigo}/retiro") suspend fun retirar(
         @Path("id") id: Long, @Path("codigo") codigo: String,
+        @Body body: RetiroPinRequest,
     ): ReservaDto
     @POST("api/farmacias/{id}/reservas/{codigo}/cancelacion-operativa") suspend fun cancelarOperativa(
         @Path("id") id: Long, @Path("codigo") codigo: String,

@@ -2,10 +2,10 @@
 
 **Rama de mapas (noviembre de 2026):** el archivo `docker-compose.yml` **ya no carga automáticamente**
 `01_medlink_esquema.sql` ni `02_datos_prueba.sql`. En una base **nueva**, al iniciar
-el backend se crean las tablas mediante Flyway V1-V4. Después de comprobar
+el backend se crean las tablas mediante Flyway V1-V7. Después de comprobar
 que la API inició correctamente, se puede cargar **manualmente** el seed 02
 **solo en una base de demo descartable**, desde el procedimiento de
-[docs/DEMO_MAPAS_MVP.md](../docs/DEMO_MAPAS_MVP.md).
+[docs/ARRANQUE.md](../docs/ARRANQUE.md).
 
 El volumen anterior es persistente; no eliminarlo ni forzar baseline sin
 identificar primero si existen `flyway_schema_history` y datos que preservar.
@@ -21,12 +21,12 @@ Las indicaciones históricas de adopción Flyway V1 que acompañan al proyecto
 
 ```powershell
 Copy-Item .env.example .env
-# Generar una clave JWT antes de iniciar la API; ver docs/DEMO_MAPAS_MVP.md.
+# Generar una clave JWT antes de iniciar la API; ver docs/ARRANQUE.md.
 docker compose --profile api up -d --build
 ```
 
 PostgreSQL, Adminer y el HTTPS de Caddy se publican solamente en `127.0.0.1`.
-Consultar [docs/DEMO_MAPAS_MVP.md](../docs/DEMO_MAPAS_MVP.md) para generar
+Consultar [docs/ARRANQUE.md](../docs/ARRANQUE.md) para generar
 la clave JWT y cargar los datos de prueba manualmente. Las cuentas del ejemplo
 son públicas y solo sirven para un entorno local descartable.
 
@@ -203,3 +203,7 @@ Contraseña de **todas** las cuentas: `Password123!` (bcrypt `$2a$`).
 - `idempotency_record` y `sesion_revocada` arrancan vacías (las llena la API).
 
 Las fechas son relativas al momento en que se crea la base, así las reservas ACTIVAS arrancan vigentes.
+
+### Migraciones de recetas y PIN de retiro (V5-V7)
+
+La funcionalidad de recetas demo utiliza `V5__recetas_demo.sql` y `V6__receta_demo_verificacion.sql`. El PIN de retiro de reservas se agrega con `V7__pin_retiro_reserva.sql` (evita dos migraciones V5). **Antes de actualizar una base existente, revisar `flyway_schema_history`:** si ya se aplicó la versión V5 de PIN de la rama aislada del dashboard, detenerse y preparar una reconciliación específica. No editar ni repetir migraciones aplicadas. Ver [docs/INTEGRACION_DEVELOP_ANDROID_DASHBOARD.md](../docs/INTEGRACION_DEVELOP_ANDROID_DASHBOARD.md).

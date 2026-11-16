@@ -116,4 +116,5 @@ data class ReservaDto(
     val causaCancelacion: String?,
     val motivoCancelacion: String?,
     val prescripcionCodigo: String?,
+    val pinRetiro: String? = null,
 )
