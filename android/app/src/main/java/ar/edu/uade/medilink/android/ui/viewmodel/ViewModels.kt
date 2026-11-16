@@ -15,6 +15,8 @@ import ar.edu.uade.medilink.android.data.mensajeDeError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class VmsFactory(
@@ -44,22 +46,27 @@ class CatalogoVm(private val repository: MediLinkRepository) : ViewModel() {
     val state = mutable.asStateFlow()
     private var consulta = ""
     private var siguientePagina = 0
+    private var trabajo: Job? = null
 
     init { buscar("") }
 
-    fun buscar(nombre: String) {
-        if (mutable.value.cargando) return
-        consulta = nombre.trim()
+    /** Búsqueda mientras se escribe: espera una pausa breve y cancela la consulta anterior. */
+    fun buscar(nombre: String, demora: Long = 0) {
+        val texto = nombre.trim()
+        if (texto == consulta && mutable.value.lista.isNotEmpty() && demora > 0) return
+        consulta = texto
         siguientePagina = 0
-        cargar(reset = true)
+        trabajo?.cancel()
+        trabajo = cargar(reset = true, demora = demora)
     }
 
     fun mas() {
-        if (!mutable.value.ultimaPagina && !mutable.value.cargando) cargar(reset = false)
+        if (!mutable.value.ultimaPagina && !mutable.value.cargando) trabajo = cargar(reset = false)
     }
 
-    private fun cargar(reset: Boolean) {
+    private fun cargar(reset: Boolean, demora: Long = 0): Job =
         viewModelScope.launch {
+            if (demora > 0) delay(demora)
             mutable.value = mutable.value.copy(cargando = true, error = null)
             try {
                 val result = repository.medicamentos(consulta, siguientePagina)
@@ -74,7 +81,6 @@ class CatalogoVm(private val repository: MediLinkRepository) : ViewModel() {
                 mutable.value = mutable.value.copy(cargando = false, error = mensajeDeError(e))
             }
         }
-    }
 }
 
 data class PresentacionesState(

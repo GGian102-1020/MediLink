@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,10 +23,9 @@ val screenPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)
 
 @Composable
 fun Encabezado(titulo: String, subtitulo: String) {
+    // El logo ya está en la barra superior: no repetimos "MEDILINK" sobre cada título.
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 5.dp)) {
-        Text("MEDILINK", style = MaterialTheme.typography.labelMedium,
-            color = ar.edu.uade.medilink.android.ui.theme.MediColors.Teal, letterSpacing = 1.8.sp)
-        Text(titulo, fontSize = 30.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+        Text(titulo, fontSize = 30.sp, lineHeight = 34.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
             letterSpacing = (-0.4).sp, color = MaterialTheme.colorScheme.onSurface)
         Text(subtitulo, style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -58,14 +55,5 @@ fun IndicadorCargando() {
         CircularProgressIndicator()
         Text("  Cargando...", color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-fun RequiereSesion(onLogin: () -> Unit) {
-    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        HeroPanel("ACCESO SEGURO", "Ingresá a tu cuenta",
-            "Iniciá sesión para gestionar tus reservas y acceder a tu información.", Icons.Default.Lock)
-        Button(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }
     }
 }

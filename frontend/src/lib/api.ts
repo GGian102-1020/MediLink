@@ -62,5 +62,3 @@ export const authApi = {
   me: () => get<Me>('/api/me'),
   logout: () => post<void>('/api/auth/logout'),
 };
-export function pageQuery(page = 0, extra?: Query): Query { return { page, size: 10, ...extra }; }
-export function emptyPage<T>(): Page<T> { return { content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true }; }

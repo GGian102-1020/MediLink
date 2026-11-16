@@ -91,6 +91,12 @@ class MediLinkRepository internal constructor(
     suspend fun login(correo: String, clave: String) {
         val response = api.login(LoginRequest(correo.trim(), clave))
         session.set(response)
+        if (response.perfil.rol != "USUARIO") {
+            // La app es solo para pacientes; la farmacia usa el dashboard web. Revocamos el JWT recién emitido.
+            logout()
+            throw IllegalArgumentException(
+                if (response.perfil.rol == "OPERADOR") MENSAJE_CUENTA_FARMACIA else MENSAJE_SOLO_PACIENTES)
+        }
     }
 
     suspend fun registro(
@@ -129,6 +135,10 @@ class MediLinkRepository internal constructor(
     suspend fun detalleReserva(codigo: String) = parity.detalleUsuario(codigo)
     suspend fun cancelar(codigo: String) = api.cancelar(codigo)
 }
+
+const val MENSAJE_SOLO_PACIENTES = "La app MediLink es para pacientes. Ingresá con una cuenta de paciente."
+const val MENSAJE_CUENTA_FARMACIA =
+    "Las cuentas de farmacia se usan desde el dashboard web de MediLink, no desde la app."
 
 /** Mensaje legible basado en los errores REST reales de MediLink. */
 fun mensajeDeError(error: Throwable): String = when (error) {

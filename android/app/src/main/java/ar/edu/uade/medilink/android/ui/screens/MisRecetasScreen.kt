@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -69,13 +70,13 @@ internal fun MisRecetasScreen(vm: MisRecetasVm) {
             Encabezado("Mis recetas", "Adjuntá o vinculá recetas ficticias de MediLink.")
         }
         item {
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { mostrarSelector = true }, enabled = !estado.ocupado,
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Adjuntar receta") }
-                    Text("PDF de una página, JPG, PNG o WebP. Hasta 6 MiB.",
+                    Text("Foto o PDF de una página (JPG, PNG o WebP), hasta 6 MB.",
                         style = MaterialTheme.typography.bodySmall)
                     estado.adjunto?.let { adjunto ->
                         Text(if (estado.foto) "Fotografía capturada" else adjunto.nombre,
@@ -97,10 +98,10 @@ internal fun MisRecetasScreen(vm: MisRecetasVm) {
             }
         }
         item {
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SeccionTitulo("Vincular por código")
-                    Text("El ingreso manual comprueba el código y las reglas de vinculación. El escaneo también verifica los datos del documento.",
+                    Text("Si tu receta tiene un código (por ejemplo MLD-…), ingresalo para vincularla a tu cuenta.",
                         style = MaterialTheme.typography.bodySmall)
                     CampoTexto(
                         value = codigo, onValueChange = { codigo = it }, enabled = !estado.ocupado,
@@ -137,7 +138,7 @@ internal fun MisRecetasScreen(vm: MisRecetasVm) {
             }
         }
         items(estado.lista, key = { it.id }) { receta ->
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DatosPrescripcion(receta, estado.medicamentos)
                     TextButton(onClick = { vm.abrirDetalle(receta.id) }) { Text("Ver detalle") }

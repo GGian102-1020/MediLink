@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -271,7 +273,7 @@ fun MapasScreen(repository: MediLinkRepository, presentacionId: Long) {
         )
         Text("Farmacias con coordenadas: ${farmacias.count { it.punto() != null }}")
         farmacias.forEach { f ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("${f.nombre} · ${f.cantidadDisponible} unidades")
                     Text(f.direccion)

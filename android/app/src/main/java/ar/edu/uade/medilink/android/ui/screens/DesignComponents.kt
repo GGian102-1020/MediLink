@@ -214,18 +214,43 @@ fun AccesoTarjeta(
     }
 }
 
+/** Tonos semánticos de las píldoras de estado (fondo, texto). */
+enum class TonoPildora(val fondo: Color, val texto: Color) {
+    EXITO(Color(0xFFDDF6EC), Color(0xFF0B6B47)),
+    INFO(Color(0xFFE4F0FD), Color(0xFF004EA1)),
+    ALERTA(Color(0xFFFFF1D6), Color(0xFF8A5300)),
+    PELIGRO(Color(0xFFFDE8E8), Color(0xFF9B1C1C)),
+    NEUTRO(Color(0xFFEDF2F8), Color(0xFF4A5768)),
+}
+
+private val ETIQUETAS_ESTADO = mapOf(
+    "USUARIO" to "Paciente", "OPERADOR" to "Operador", "ADMINISTRADOR" to "Administrador",
+    "BAJO_RECETA" to "Bajo receta", "VENTA_LIBRE" to "Venta libre",
+)
+
+fun tonoDeEstado(estado: String): TonoPildora = when (estado.uppercase()) {
+    "ACTIVA", "ACTIVO", "HABILITADA", "VIGENTE", "VENTA LIBRE", "VENTA_LIBRE" -> TonoPildora.EXITO
+    "COMPLETADA", "UTILIZADA", "USUARIO", "OPERADOR", "ADMINISTRADOR" -> TonoPildora.INFO
+    "VENCIDA", "BAJO RECETA", "BAJO_RECETA", "SUSPENDIDA", "STOCK BAJO" -> TonoPildora.ALERTA
+    "CANCELADA", "DESHABILITADA", "INACTIVA", "ANULADA", "SIN STOCK" -> TonoPildora.PELIGRO
+    else -> TonoPildora.NEUTRO
+}
+
+fun etiquetaEstado(estado: String): String = ETIQUETAS_ESTADO[estado.uppercase()]
+    ?: estado.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+
 @Composable
-fun EstadoPildora(estado: String) {
-    val positivo = estado in listOf("ACTIVA", "ACTIVO", "COMPLETADA", "HABILITADA")
-    val color = if (positivo) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    Surface(color = color, shape = RoundedCornerShape(50), modifier = Modifier) {
-        Text(estado.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+fun EstadoPildora(estado: String, tono: TonoPildora = tonoDeEstado(estado)) {
+    Surface(color = tono.fondo, shape = RoundedCornerShape(50), modifier = Modifier) {
+        Text(etiquetaEstado(estado),
             modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (positivo) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant)
+            style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+            color = tono.texto)
     }
 }
+
+/** "Caja x 20" a partir de los datos de la presentación. */
+fun envaseLegible(unidad: String, cantidad: Int) = "$unidad x $cantidad"
 
 @Composable
 fun DatoFila(etiqueta: String, valor: String) {
@@ -257,11 +282,29 @@ fun VacioEstado(titulo: String, descripcion: String) {
         color = MaterialTheme.colorScheme.surface) {
         Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.CheckCircle, contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
+            Icon(Icons.Default.Info, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
             Text(titulo, style = MaterialTheme.typography.titleMedium)
             Text(descripcion, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+fun plural(n: Number, uno: String, varios: String) = "$n ${if (n.toLong() == 1L) uno else varios}"
+
+/** Selector de opción única con chips y texto legible (no el valor crudo). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun ComboSimple(label: String, opciones: List<String>, seleccionado: String, cambiar: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            opciones.forEach { opcion ->
+                androidx.compose.material3.FilterChip(selected = seleccionado == opcion, onClick = { cambiar(opcion) },
+                    label = { Text(if (opcion.isBlank()) "Todas" else etiquetaEstado(opcion)) })
+            }
         }
     }
 }

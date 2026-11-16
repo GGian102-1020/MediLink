@@ -140,7 +140,7 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
                     }
                 }
             }
-            SeccionTitulo("Datos personales", "Información consultada al servidor")
+            SeccionTitulo("Datos personales")
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
@@ -149,7 +149,7 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
                     DatoFila("Correo electrónico", p.correo)
                     p.farmaciaId?.let {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        DatoFila("Farmacia asignada", "Sucursal #$it")
+                        DatoFila("Farmacia asignada", "Farmacia #$it")
                     }
                 }
             }

@@ -50,6 +50,16 @@ private val Light = lightColorScheme(
     onSurfaceVariant = MediColors.Muted,
     outline = Color(0xFFB9C6D6),
     outlineVariant = Color(0xFFDDE5EF),
+    // Sin estos tonos Material 3 usa sus contenedores violáceos por defecto (Card, diálogos, menús).
+    surfaceTint = Color.Transparent,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFF8FAFD),
+    surfaceContainer = Color(0xFFF1F5FA),
+    surfaceContainerHigh = Color(0xFFEBF0F7),
+    surfaceContainerHighest = Color(0xFFE4EBF4),
+    error = Color(0xFFC62828),
+    errorContainer = Color(0xFFFDE8E8),
+    onErrorContainer = Color(0xFF8C1D18),
 )
 
 private val Dark = darkColorScheme(
@@ -68,6 +78,12 @@ private val Dark = darkColorScheme(
     onSurfaceVariant = Color(0xFFB4C2D4),
     outline = Color(0xFF6F8299),
     outlineVariant = Color(0xFF33445C),
+    surfaceTint = Color.Transparent,
+    surfaceContainerLowest = Color(0xFF0B1320),
+    surfaceContainerLow = Color(0xFF131D2D),
+    surfaceContainer = Color(0xFF172234),
+    surfaceContainerHigh = Color(0xFF1D2A3E),
+    surfaceContainerHighest = Color(0xFF243248),
 )
 
 private val MediShapes = Shapes(

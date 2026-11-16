@@ -1,6 +1,7 @@
 package ar.edu.uade.medilink.android.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -59,14 +61,15 @@ fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
     }
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = screenPadding,
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { Encabezado("Mis reservas", "Seguimiento de tus reservas en tiempo real.") }
+        item { Encabezado("Mis reservas", "Tocá una reserva para ver su código y PIN de retiro.") }
         item {
-            Row(horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                SeccionTitulo("Historial", "${state.lista.size} reservas cargadas")
-                OutlinedButton(onClick = vm::actualizar, enabled = !state.cargando) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Text("  Actualizar")
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(if (state.cargando && state.lista.isEmpty()) "Cargando…"
+                    else plural(state.lista.size, "reserva", "reservas"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                IconButton(onClick = vm::actualizar, enabled = !state.cargando) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Actualizar")
                 }
             }
         }
@@ -82,7 +85,7 @@ fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
         }
         item { AvisoError(state.error) }
         items(state.lista, key = { it.id }) { reserva ->
-            Card(modifier = Modifier.fillMaxWidth(),
+            Card(modifier = Modifier.fillMaxWidth().clickable { onDetalle(reserva.codigoVisible) },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
@@ -105,12 +108,9 @@ fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         Text(reserva.farmaciaNombreSnapshot, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text("Cantidad: ${reserva.cantidad} · Vence: ${fechaLegible(reserva.fechaHoraVencimiento)}",
+                    Text("${plural(reserva.cantidad, "unidad", "unidades")} · ${if (reserva.estado == "ACTIVA") "Vence" else "Creada"} ${fechaLegible(if (reserva.estado == "ACTIVA") reserva.fechaHoraVencimiento else reserva.fechaHoraCreacion)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = { onDetalle(reserva.codigoVisible) }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Ver detalle de la reserva")
-                    }
                     if (reserva.estado == "ACTIVA") {
                         OutlinedButton(onClick = { aCancelar = reserva },
                             enabled = state.cancelandoCodigo == null,
@@ -124,7 +124,7 @@ fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
         }
         if (state.lista.isEmpty() && !state.cargando && state.error == null) {
             item { VacioEstado("No hay reservas para mostrar",
-                "Cuando realices una reserva, vas a encontrarla aquí.") }
+                if (state.filtro.isBlank()) "Cuando hagas una reserva, la vas a encontrar acá." else "Probá con otro filtro.") }
         }
         if (state.cargando) item { IndicadorCargando() }
         if (!state.ultimaPagina && !state.cargando) {

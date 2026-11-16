@@ -81,7 +81,8 @@ public class ReservaStore {
             JOIN medicamento m ON m.id_medicamento=p.id_medicamento
             WHERE f.id_farmacia=? AND p.id_presentacion=?
             """,(rs,n)->new Product(rs.getString(1),rs.getString(2),rs.getString(3),
-                rs.getString(4)+" "+rs.getString(5)+" "+rs.getInt(6)+" "+rs.getString(7),rs.getString(8)),
+                // Mismo formato que las prescripciones y los datos seed: "500 mg - Comprimidos - Caja x 20".
+                rs.getString(4)+" - "+rs.getString(5)+" - "+rs.getString(7)+" x "+rs.getInt(6),rs.getString(8)),
             farmacia,presentacion).stream().findFirst().orElseThrow(ApiException::notFound);
     }
     ReservaDTO get(String code, Instant t, String view) {

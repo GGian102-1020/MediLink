@@ -30,14 +30,6 @@ class ParityApiContractTest {
         assertEquals("/api/reservas/mias?estado=ACTIVA&page=2&size=20", server.takeRequest().path)
     }
 
-    @Test fun filtrosDeAdminYUrlRelativa() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(200).setBody(paginaVacia))
-        api.adminList("api/admin/medicamentos", mapOf("page" to "0", "size" to "20", "nombre" to "ibu"))
-        val request = server.takeRequest()
-        assertTrue(request.path!!.startsWith("/api/admin/medicamentos?"))
-        assertTrue(request.path!!.contains("nombre=ibu"))
-    }
-
     @Test fun cambiarClaveNoFiltraLaRespuesta() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(204))
         api.cambiarClave(CambiarClaveRequest("antigua", "nueva"))
@@ -45,28 +37,6 @@ class ParityApiContractTest {
         assertEquals("POST", request.method)
         assertEquals("/api/auth/change-password", request.path)
         assertTrue(request.body.readUtf8().contains("\"contrasenaActual\":\"antigua\""))
-    }
-
-    @Test fun retiroRequierePinDeSeisDigitosEnElBody() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(200)
-            .setBody("""{"id":1,"codigoVisible":"RSV-TEST","estado":"COMPLETADA"}"""))
-        api.retirar(4, "RSV-TEST", RetiroPinRequest("123456"))
-        val request = server.takeRequest()
-        assertEquals("POST", request.method)
-        assertEquals("/api/farmacias/4/reservas/RSV-TEST/retiro", request.path)
-        assertTrue(request.body.readUtf8().contains("\"pin\":\"123456\""))
-    }
-
-    @Test fun cancelarFarmaciaRespetaBodyDelBackend() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(200)
-            .setBody("""{"id":1,"codigoVisible":"RSV-TEST","estado":"CANCELADA"}"""))
-        api.cancelarOperativa(4, "RSV-TEST",
-            CancelacionOperativaRequest("STOCK_INCONSISTENTE", cantidadStockReal = 3))
-        val request = server.takeRequest()
-        assertEquals("/api/farmacias/4/reservas/RSV-TEST/cancelacion-operativa", request.path)
-        val body = request.body.readUtf8()
-        assertTrue(body.contains("\"causa\":\"STOCK_INCONSISTENTE\""))
-        assertTrue(body.contains("\"cantidadStockReal\":3"))
     }
 
     companion object {

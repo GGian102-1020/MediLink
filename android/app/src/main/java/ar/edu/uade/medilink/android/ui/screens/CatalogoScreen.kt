@@ -15,10 +15,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.LocalPharmacy
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -51,35 +52,27 @@ fun CatalogoScreen(vm: CatalogoVm, onAbrir: (Long) -> Unit) {
 
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = screenPadding,
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item {
-            HeroPanel("CATÁLOGO MEDILINK", "Encontrá lo que necesitás",
-                "Explorá medicamentos y descubrí qué farmacias tienen disponibilidad.",
-                Icons.Default.LocalPharmacy)
-        }
-        item { SeccionTitulo("Buscar medicamentos", "Por nombre comercial o principio activo") }
+        item { Encabezado("Buscar medicamentos", "Escribí el nombre y elegí la presentación que necesitás.") }
         item {
             CampoTexto(
-                value = consulta, onValueChange = { consulta = it },
-                label = { Text("Nombre del medicamento") },
+                value = consulta, onValueChange = { consulta = it; vm.buscar(it, demora = 350) },
                 placeholder = { Text("Ej.: ibuprofeno") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = if (consulta.isNotEmpty()) { {
+                    IconButton(onClick = { consulta = ""; vm.buscar("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "Borrar búsqueda")
+                    }
+                } } else null,
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { buscar() }),
             )
         }
-        item {
-            Button(onClick = { buscar() }, enabled = !state.cargando,
-                modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Search, contentDescription = null)
-                Text("  Buscar en el catálogo")
-            }
-        }
         item { AvisoError(state.error) }
         if (state.cargando && state.lista.isEmpty()) item { IndicadorCargando() }
         if (state.lista.isNotEmpty()) {
-            item { SeccionTitulo("Resultados", "${state.lista.size} medicamentos cargados") }
+            item { SeccionTitulo("Resultados", plural(state.lista.size, "medicamento", "medicamentos")) }
         }
         items(state.lista, key = { it.id }) { medicamento ->
             Card(modifier = Modifier.fillMaxWidth().clickable { onAbrir(medicamento.id) },
@@ -118,7 +111,7 @@ fun PresentacionesScreen(vm: PresentacionesVm, onAbrir: (Long) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = screenPadding,
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { Encabezado("Presentaciones disponibles", "Elegí la presentación para consultar farmacias y stock.") }
+        item { Encabezado(state.lista.firstOrNull()?.medicamentoNombre ?: "Presentaciones", "Elegí la presentación para ver qué farmacias la tienen.") }
         item { AvisoError(state.error) }
         items(state.lista, key = { it.id }) { item ->
             Card(modifier = Modifier.fillMaxWidth().clickable { onAbrir(item.id) },
@@ -134,10 +127,10 @@ fun PresentacionesScreen(vm: PresentacionesVm, onAbrir: (Long) -> Unit) {
                         Text(item.medicamentoNombre, style = MaterialTheme.typography.titleMedium)
                         Text("${item.concentracionTexto} · ${item.formaFarmaceutica}",
                             style = MaterialTheme.typography.bodyMedium)
-                        Text("Envase: ${item.cantidadEnvase} ${item.unidadExpendio}",
+                        Text(envaseLegible(item.unidadExpendio, item.cantidadEnvase),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        EstadoPildora(if (item.condicionDispensa == "BAJO_RECETA") "Bajo receta" else "Venta libre")
+                        EstadoPildora(item.condicionDispensa)
                     }
                     Icon(Icons.Default.ArrowForward, contentDescription = "Consultar disponibilidad",
                         tint = MaterialTheme.colorScheme.primary)

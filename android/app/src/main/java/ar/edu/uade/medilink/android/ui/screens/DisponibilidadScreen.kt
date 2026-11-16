@@ -15,9 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Medication
@@ -28,16 +29,21 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ar.edu.uade.medilink.android.data.DisponibilidadDto
@@ -48,7 +54,7 @@ fun DisponibilidadScreen(
     vm: DisponibilidadVm,
     logueado: Boolean,
     onLogin: () -> Unit,
-    onReservaCreada: () -> Unit,
+    onReservaCreada: (String) -> Unit,
     onMapa: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -61,10 +67,21 @@ fun DisponibilidadScreen(
     val numero = cantidad.toIntOrNull()
     val esCantidadValida = numero != null && numero > 0 &&
         seleccion != null && numero <= seleccion.cantidadDisponible
+    val scroll = rememberScrollState()
+    var posicionConfirmar by remember { mutableFloatStateOf(0f) }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
+    // Al elegir farmacia bajamos hasta el bloque de confirmación (antes quedaba fuera de pantalla).
+    LaunchedEffect(farmaciaElegida, posicionConfirmar) {
+        if (seleccion != null && posicionConfirmar > 0f) scroll.animateScrollTo(posicionConfirmar.toInt())
+    }
+    // Reserva creada: se abre su detalle, donde el paciente ve el código y el PIN de retiro.
+    LaunchedEffect(state.confirmacion) {
+        state.confirmacion?.let { onReservaCreada(it.codigoVisible) }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(scroll).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Encabezado("Disponibilidad", "Elegí una farmacia con stock para continuar.")
+        Encabezado("Disponibilidad", "Elegí una farmacia con stock para reservar.")
         if (presentacion != null) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                 modifier = Modifier.fillMaxWidth()) {
@@ -77,11 +94,10 @@ fun DisponibilidadScreen(
                     }
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(presentacion.medicamentoNombre, style = MaterialTheme.typography.titleLarge)
-                        Text("${presentacion.concentracionTexto} · ${presentacion.formaFarmaceutica}",
+                        Text("${presentacion.concentracionTexto} · ${presentacion.formaFarmaceutica} · " +
+                            envaseLegible(presentacion.unidadExpendio, presentacion.cantidadEnvase),
                             style = MaterialTheme.typography.bodyMedium)
-                        Text("Envase: ${presentacion.cantidadEnvase} ${presentacion.unidadExpendio}",
-                            style = MaterialTheme.typography.bodySmall)
-                        EstadoPildora(if (bajoReceta) "Bajo receta" else "Venta libre")
+                        EstadoPildora(presentacion.condicionDispensa)
                     }
                 }
             }
@@ -97,57 +113,53 @@ fun DisponibilidadScreen(
                 Text(" Ver mapa")
             }
         }
-        AvisoError(state.error)
+        if (seleccion == null) AvisoError(state.error)
         if (state.cargando) IndicadorCargando()
-        SeccionTitulo("Farmacias con stock", "${state.farmacias.size} opciones disponibles")
+        SeccionTitulo("Farmacias con stock", plural(state.farmacias.size, "opción disponible", "opciones disponibles"))
         if (state.farmacias.isEmpty() && !state.cargando && state.error == null) {
-            VacioEstado("Sin stock disponible", "No hay farmacias con stock para esta presentación.")
+            VacioEstado("Sin stock disponible", "Ninguna farmacia tiene stock de esta presentación por ahora.")
         }
         state.farmacias.forEach { farmacia ->
             FarmaciaCard(farmacia = farmacia, seleccionada = farmacia.farmaciaId == farmaciaElegida,
                 onSeleccionar = { farmaciaElegida = farmacia.farmaciaId })
         }
         if (seleccion != null) {
-            SeccionTitulo("Confirmar reserva", "${seleccion.nombre} · ${seleccion.cantidadDisponible} disponibles")
-            Card(modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (!logueado) {
-                        NotaInformativa("Iniciá sesión con una cuenta de paciente para confirmar la reserva.")
-                        Button(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }
-                    } else {
-                        CampoTexto(value = cantidad,
-                            onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) cantidad = it },
-                            label = { Text("Cantidad (máximo ${seleccion.cantidadDisponible})") },
-                            singleLine = true, modifier = Modifier.fillMaxWidth())
-                        if (bajoReceta) {
-                            CampoTexto(value = prescripcion, onValueChange = { prescripcion = it },
-                                label = { Text("Código de prescripción demo") },
+            Column(Modifier.onGloballyPositioned { posicionConfirmar = it.positionInParent().y },
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SeccionTitulo("Confirmar reserva", "${seleccion.nombre} · ${plural(seleccion.cantidadDisponible, "unidad disponible", "unidades disponibles")}")
+                Card(modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (!logueado) {
+                            NotaInformativa("Iniciá sesión con una cuenta de paciente para confirmar la reserva.")
+                            Button(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }
+                        } else {
+                            CampoTexto(value = cantidad,
+                                onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) cantidad = it },
+                                label = { Text("Cantidad (máximo ${seleccion.cantidadDisponible})") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                isError = cantidad.isNotEmpty() && !esCantidadValida,
                                 singleLine = true, modifier = Modifier.fillMaxWidth())
+                            if (bajoReceta) {
+                                CampoTexto(value = prescripcion, onValueChange = { prescripcion = it },
+                                    label = { Text("Código de la receta") },
+                                    supportingText = { Text("Este medicamento se vende bajo receta.") },
+                                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                            }
+                            AvisoError(state.error)
+                            Button(onClick = {
+                                vm.reservar(farmaciaId = seleccion.farmaciaId,
+                                    cantidad = requireNotNull(numero),
+                                    codigoPrescripcion = if (bajoReceta) prescripcion else null)
+                            }, enabled = !state.reservando && esCantidadValida &&
+                                (!bajoReceta || prescripcion.isNotBlank()) && state.confirmacion == null,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Text(if (state.reservando) "Reservando..." else "Confirmar reserva")
+                            }
+                            Text("Vas a tener 4 horas para retirarlo. Al confirmar te mostramos el código y el PIN.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Button(onClick = {
-                            vm.reservar(farmaciaId = seleccion.farmaciaId,
-                                cantidad = requireNotNull(numero),
-                                codigoPrescripcion = if (bajoReceta) prescripcion else null)
-                        }, enabled = !state.reservando && esCantidadValida &&
-                            (!bajoReceta || prescripcion.isNotBlank()) && state.confirmacion == null,
-                            modifier = Modifier.fillMaxWidth()) {
-                            Text(if (state.reservando) "Reservando..." else "Confirmar reserva")
-                        }
-                    }
-                }
-            }
-        }
-        if (state.confirmacion != null) {
-            Surface(color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary)
-                    Text("¡Reserva creada!", style = MaterialTheme.typography.titleLarge)
-                    Text("Código: ${state.confirmacion?.codigoVisible}")
-                    Button(onClick = onReservaCreada, modifier = Modifier.fillMaxWidth()) {
-                        Text("Ver mis reservas")
                     }
                 }
             }
@@ -173,23 +185,29 @@ private fun FarmaciaCard(farmacia: DisponibilidadDto, seleccionada: Boolean, onS
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                EstadoPildora("${farmacia.cantidadDisponible} unidades")
+                EstadoPildora(plural(farmacia.cantidadDisponible, "unidad", "unidades"),
+                    if (farmacia.cantidadDisponible <= 3) TonoPildora.ALERTA else TonoPildora.EXITO)
                 farmacia.distanciaKm?.let { Text("%.1f km".format(it),
                     style = MaterialTheme.typography.bodySmall) }
             }
-            Button(onClick = onSeleccionar, modifier = Modifier.fillMaxWidth()) {
-                Text(if (seleccionada) "Farmacia seleccionada" else "Elegir farmacia")
-            }
-            if (farmacia.latitud != null && farmacia.longitud != null) {
-                OutlinedButton(onClick = {
-                    val lat = farmacia.latitud
-                    val lng = farmacia.longitud
-                    val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(farmacia.nombre)})")
-                    try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
-                    catch (_: ActivityNotFoundException) {
-                        Toast.makeText(context, "No hay app de mapas instalada", Toast.LENGTH_LONG).show()
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onSeleccionar, modifier = Modifier.weight(1f)) {
+                    Text(if (seleccionada) "Elegida" else "Elegir")
+                }
+                if (farmacia.latitud != null && farmacia.longitud != null) {
+                    OutlinedButton(onClick = {
+                        val lat = farmacia.latitud
+                        val lng = farmacia.longitud
+                        val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(farmacia.nombre)})")
+                        try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                        catch (_: ActivityNotFoundException) {
+                            Toast.makeText(context, "No hay app de mapas instalada", Toast.LENGTH_LONG).show()
+                        }
+                    }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Text(" Cómo llegar")
                     }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Cómo llegar") }
+                }
             }
         }
     }
