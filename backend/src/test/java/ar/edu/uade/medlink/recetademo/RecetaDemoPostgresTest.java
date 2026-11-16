@@ -449,7 +449,10 @@ class RecetaDemoPostgresTest {
         assertEquals(0,numero("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_prescripcion=?",id));
         assertEquals(10,numero("SELECT cantidad_disponible FROM stock WHERE id_stock=?",stock));
         var nueva=reservas.crear(entrada,UUID.randomUUID(),paciente,null).dto();
-        reservas.retirar(farmacia,nueva.codigoVisible(),operador,null);
+        assertTrue(nueva.pinRetiro().matches("\\d{6}"));
+        var retiro=reservas.retirar(farmacia,nueva.codigoVisible(),nueva.pinRetiro(),operador,null);
+        assertEquals(ReservaService.PinCheck.OK,retiro.pin());
+        assertEquals("COMPLETADA",retiro.dto().estado());
         assertEquals(1,numero("SELECT cantidad_utilizada FROM item_prescripcion WHERE id_prescripcion=?",id));
         assertEquals(0,numero("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_prescripcion=?",id));
         String agotada=error(()->reservas.crear(entrada,UUID.randomUUID(),paciente,null)).codigo();
@@ -500,7 +503,8 @@ class RecetaDemoPostgresTest {
             var recetasAnteriores=jdbc.queryForObject(snapshot,String.class);
             org.flywaydb.core.Flyway.configure().dataSource(origen).load().migrate();
             assertEquals(antes,tablas.stream().map(t->filas(jdbc,t)).toList());
-            assertEquals(6,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+            assertEquals(7,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM reserva WHERE pin_retiro !~ '^[0-9]{6}$' OR intentos_pin_fallidos <> 0",Integer.class));
             assertEquals(recetasAnteriores,jdbc.queryForObject(snapshot,String.class));
             assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM receta_demo WHERE codigo_verificacion IS NULL",Integer.class));
         } finally {
@@ -509,7 +513,9 @@ class RecetaDemoPostgresTest {
     }
 
     private String filas(JdbcTemplate jdbc,String tabla) {
-        return jdbc.queryForObject("SELECT jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text FROM "+tabla+" t",String.class);
+        // V7 adds PIN fields; compare the original reservation columns across migrations.
+        String json=tabla.equals("reserva")?"(to_jsonb(t)-'pin_retiro'-'intentos_pin_fallidos')":"to_jsonb(t)";
+        return jdbc.queryForObject("SELECT jsonb_agg("+json+" ORDER BY "+json+"::text)::text FROM "+tabla+" t",String.class);
     }
 
     private void sinVinculacion(Receta r) {
