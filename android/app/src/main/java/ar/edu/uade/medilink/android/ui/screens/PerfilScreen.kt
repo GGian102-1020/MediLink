@@ -15,7 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -29,11 +29,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +43,8 @@ import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.data.mensajeDeError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 @Composable
 fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () -> Unit) {
@@ -179,7 +179,7 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
                     finally { cerrando = false }
                 }
             }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Logout, contentDescription = null,
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null,
                     tint = MaterialTheme.colorScheme.error)
                 Text("  Cerrar sesión", color = MaterialTheme.colorScheme.error)
             }

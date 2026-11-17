@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Search
@@ -24,13 +24,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Modifier
@@ -42,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ar.edu.uade.medilink.android.ui.viewmodel.CatalogoVm
 import ar.edu.uade.medilink.android.ui.viewmodel.PresentacionesVm
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 @Composable
 fun CatalogoScreen(vm: CatalogoVm, onAbrir: (Long) -> Unit) {
@@ -91,7 +90,7 @@ fun CatalogoScreen(vm: CatalogoVm, onAbrir: (Long) -> Unit) {
                         Text("Ver presentaciones y stock", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Icon(Icons.Default.ArrowForward, contentDescription = "Ver presentaciones",
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Ver presentaciones",
                         tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
             }
@@ -132,7 +131,7 @@ fun PresentacionesScreen(vm: PresentacionesVm, onAbrir: (Long) -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         EstadoPildora(item.condicionDispensa)
                     }
-                    Icon(Icons.Default.ArrowForward, contentDescription = "Consultar disponibilidad",
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Consultar disponibilidad",
                         tint = MaterialTheme.colorScheme.primary)
                 }
             }

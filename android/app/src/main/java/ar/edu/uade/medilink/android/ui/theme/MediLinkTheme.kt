@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
@@ -28,45 +29,53 @@ object MediColors {
     val Canvas = Color(0xFFF5F8FC)
     val Field = Color(0xFFF1F4F8)     // inputs tipo píldora del template
     val Noche = Color(0xFF0D1B33)     // fondo de encabezados y barras (estilo del login)
-    val CampoGris = Color(0xFFE5E8ED) // campos de texto grises del login
+    val CampoGris = Color(0xFFF0F3F7) // campos de texto (gris muy suave)
+    /** Acento principal del rediseño claro: teal de la marca con contraste AA sobre blanco. */
+    val Primario = Color(0xFF00857D)
+    val PrimarioSuave = Color(0xFFE3F5F3)
+    val Fondo = Color(0xFFF6F8FA)
+    val Borde = Color(0xFFE6EBF0)
 }
 
+/**
+ * Rediseño "clara y limpia" (regla 60/30/10): 60% fondo neutro claro, 30% texto tinta,
+ * 10% acento teal reservado para acciones y estados clave.
+ */
 private val Light = lightColorScheme(
-    // Botones y acentos principales en azul noche, como el botón del login.
-    primary = Color(0xFF13294B),
+    primary = MediColors.Primario,
     onPrimary = Color.White,
-    primaryContainer = MediColors.IceBlue,
-    onPrimaryContainer = MediColors.Navy,
-    secondary = MediColors.Teal,
+    primaryContainer = MediColors.PrimarioSuave,
+    onPrimaryContainer = Color(0xFF00504B),
+    secondary = MediColors.Navy,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFDDF6F3),
-    onSecondaryContainer = Color(0xFF00504B),
+    secondaryContainer = Color(0xFFEEF3F8),
+    onSecondaryContainer = Color(0xFF3D4B5C),
     tertiary = MediColors.Navy,
-    background = MediColors.Canvas,
+    background = MediColors.Fondo,
     onBackground = MediColors.Ink,
     surface = Color.White,
     onSurface = MediColors.Ink,
-    surfaceVariant = Color(0xFFEDF2F8),
+    surfaceVariant = Color(0xFFF0F3F7),
     onSurfaceVariant = MediColors.Muted,
-    outline = Color(0xFFB9C6D6),
-    outlineVariant = Color(0xFFDDE5EF),
+    outline = Color(0xFFC5CFDA),
+    outlineVariant = MediColors.Borde,
     // Sin estos tonos Material 3 usa sus contenedores violáceos por defecto (Card, diálogos, menús).
     surfaceTint = Color.Transparent,
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFF8FAFD),
-    surfaceContainer = Color(0xFFF1F5FA),
-    surfaceContainerHigh = Color(0xFFEBF0F7),
-    surfaceContainerHighest = Color(0xFFE4EBF4),
+    surfaceContainerLow = Color(0xFFFAFBFC),
+    surfaceContainer = Color(0xFFF4F6F9),
+    surfaceContainerHigh = Color(0xFFEEF1F5),
+    surfaceContainerHighest = Color(0xFFE8ECF1),
     error = Color(0xFFC62828),
-    errorContainer = Color(0xFFFDE8E8),
+    errorContainer = Color(0xFFFDECEC),
     onErrorContainer = Color(0xFF8C1D18),
 )
 
 private val Dark = darkColorScheme(
-    primary = Color(0xFF8CC4FF),
-    onPrimary = Color(0xFF00315F),
-    primaryContainer = Color(0xFF0B4A8C),
-    onPrimaryContainer = Color(0xFFD6E8FF),
+    primary = Color(0xFF4FD8C8),
+    onPrimary = Color(0xFF003732),
+    primaryContainer = Color(0xFF0E3B3A),
+    onPrimaryContainer = Color(0xFFB8F1EA),
     secondary = Color(0xFF5EE0CF),
     onSecondary = Color(0xFF003732),
     tertiary = Color(0xFFA9C8F5),
@@ -89,19 +98,24 @@ private val Dark = darkColorScheme(
 private val MediShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(30.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(28.dp),
 )
 
 private val BaseTypography = Typography()
+/** Jerarquía corta: títulos 24/20/16, cuerpo 14, apoyo 12; pesos Regular y SemiBold/Bold. */
 private val MediTypography = Typography(
         headlineLarge = BaseTypography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-        headlineMedium = BaseTypography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-        headlineSmall = BaseTypography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-        titleLarge = BaseTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-        titleMedium = BaseTypography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = BaseTypography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+        headlineMedium = BaseTypography.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 28.sp),
+        headlineSmall = BaseTypography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 30.sp),
+        titleLarge = BaseTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 20.sp),
+        titleMedium = BaseTypography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 16.sp),
+        titleSmall = BaseTypography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        bodyLarge = BaseTypography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
+        bodyMedium = BaseTypography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
+        bodySmall = BaseTypography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
+        labelLarge = BaseTypography.labelLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
     )
 
 @Composable

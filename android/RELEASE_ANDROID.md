@@ -102,8 +102,7 @@ limitando las solicitudes.
 Cuando exista un backend público real, se puede configurar
 `-ApiBaseUrl https://HOST-REAL/` y publicar una **nueva versión** firmada con
 el mismo `.p12`. La URL debe ser HTTPS; no es obligatorio comprar un dominio.
-Para una demo solo local se puede usar la guía
-`docs/DEMO_ANDROID_SIN_DOMINIO.md`, pero **no es necesaria para este objetivo**.
+Para una demo solo local alcanza con la variante debug y `adb reverse` (ver `README.md`).
 
 No distribuir el APK como aplicación de salud de producción sin verificar
 seguridad, disponibilidad del backend y tratamiento de datos.

@@ -33,6 +33,10 @@ class MediLinkRepository internal constructor(
     constructor(session: SessionStore = SessionStore()) : this(session, BuildConfig.BASE_URL)
     /** Origen geográfico solo en memoria; no se persiste en disco ni se comparte sin acción del usuario. */
     val origen = MutableStateFlow<PuntoGeo?>(null)
+    /** Cómo mostrar el origen: "Tu ubicación" o la dirección buscada. */
+    val origenEtiqueta = MutableStateFlow<String?>(null)
+    /** El permiso de ubicación se pide automáticamente una sola vez por sesión de la app. */
+    var permisoUbicacionPedido = false
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -123,6 +127,7 @@ class MediLinkRepository internal constructor(
         } finally {
             session.clear()
             origen.value = null
+            origenEtiqueta.value = null
         }
     }
 

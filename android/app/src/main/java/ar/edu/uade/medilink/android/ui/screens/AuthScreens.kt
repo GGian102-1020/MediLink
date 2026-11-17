@@ -1,24 +1,18 @@
 package ar.edu.uade.medilink.android.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import kotlin.math.cos
 import kotlin.math.sin
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -51,7 +45,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -80,12 +73,10 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -105,16 +96,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ar.edu.uade.medilink.android.R
 import ar.edu.uade.medilink.android.ui.theme.MediColors
 import ar.edu.uade.medilink.android.ui.viewmodel.AuthVm
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private val PillShape = RoundedCornerShape(20.dp)
-private val CampoGris = Color(0xFFE5E8ED)
+private val CampoGris = MediColors.CampoGris
 private const val CLAVE_MIN = 8
 private const val CLAVE_MAX = 72
 private val CORREO_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
 /** Login obligatorio: encabezado oscuro con círculos y tarjeta blanca (diseño de pantallas.zip). */
 @Composable
-fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit) {
+fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit, onInvitado: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var correo by rememberSaveable { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
@@ -124,12 +117,19 @@ fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit) {
     val entrar = { foco.clearFocus(); vm.login(correo, contrasena) }
 
     PantallaAuth(
-        altoEncabezado = 270.dp,
-        formaTarjeta = RoundedCornerShape(topEnd = 96.dp),
+        altoEncabezado = 230.dp,
+        formaTarjeta = RoundedCornerShape(0.dp),
         encabezado = { LogoEnCaja(Modifier.align(Alignment.Center)) },
         pie = {
             BotonPrincipal(if (state.cargando) "Ingresando" else "Ingresar", cargando = state.cargando,
                 habilitado = puedeEntrar, modifier = Modifier.fillMaxWidth(), onClick = entrar)
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(onClick = { foco.clearFocus(); onInvitado() }, enabled = !state.cargando,
+                shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(50.dp)) {
+                Icon(Icons.Default.PersonOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text("Entrar como invitado", fontWeight = FontWeight.SemiBold)
+            }
             EnlaceCentrado("¿No tenés cuenta?", "Registrate", habilitado = !state.cargando, onClick = onRegistro)
         },
     ) {
@@ -204,14 +204,14 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit, onSuccess: () -> Unit) {
     val avanzar: () -> Unit = { foco.clearFocus(); paso++ }
 
     PantallaAuth(
-        altoEncabezado = 104.dp,
-        formaTarjeta = RoundedCornerShape(topStart = 96.dp),
+        altoEncabezado = 72.dp,
+        formaTarjeta = RoundedCornerShape(0.dp),
         encabezado = {
             IconButton(onClick = { if (paso > 1) paso-- else onVolver() }, enabled = !state.cargando,
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 8.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onSurface)
             }
-            Text("Paso $paso de $PASOS_REGISTRO", color = Color.White.copy(alpha = 0.85f),
+            Text("Paso $paso de $PASOS_REGISTRO", color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.align(Alignment.TopEnd).padding(end = 24.dp, top = 20.dp))
         },
@@ -358,7 +358,7 @@ private fun Titulo(titulo: String, subtitulo: String) {
 /** Título grande y centrado de la tarjeta, como "Login" en el diseño de referencia. */
 @Composable
 private fun ColumnScope.TituloGrande(titulo: String, subtitulo: String?) {
-    Text(titulo, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp,
+    Text(titulo, fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp,
         color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center,
         modifier = Modifier.align(Alignment.CenterHorizontally))
     if (subtitulo != null) {
@@ -372,7 +372,7 @@ private fun ColumnScope.EnlaceCentrado(texto: String, enlace: String, habilitado
     Row(Modifier.align(Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
         Text(texto, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         TextButton(onClick = onClick, enabled = habilitado, contentPadding = PaddingValues(horizontal = 6.dp)) {
-            Text(enlace, fontWeight = FontWeight.Bold, color = MediColors.Teal)
+            Text(enlace, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -396,8 +396,7 @@ private fun SelectorObraSocial(seleccion: String, onSeleccion: (String) -> Unit)
 /* ---------- Piezas compartidas de las pantallas de acceso ---------- */
 
 /** Fondo de las pantallas de acceso: azul noche con círculos de la marca. */
-private val FondoAuth = MediColors.Noche
-private val BotonOscuro = MediColors.Noche
+// Rediseño claro: las pantallas de acceso usan el mismo fondo blanco que la tarjeta.
 
 /**
  * Encabezado oscuro con círculos superpuestos y, debajo, una tarjeta con una esquina muy
@@ -412,8 +411,7 @@ private fun PantallaAuth(
     contenido: @Composable ColumnScope.() -> Unit,
 ) {
     // Los íconos claros de la barra de estado se manejan en MediLinkApp según la ruta.
-    Box(Modifier.fillMaxSize().background(FondoAuth)) {
-        CirculosMarca(Modifier.fillMaxWidth().fillMaxHeight(0.6f))
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().statusBarsPadding().height(altoEncabezado), content = encabezado)
             Column(
@@ -440,35 +438,18 @@ private fun PantallaAuth(
 private fun LogoEnCaja(modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            Modifier.size(112.dp).clip(RoundedCornerShape(30.dp)).background(Color.White),
+            Modifier.size(96.dp).clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Image(painterResource(R.drawable.logo_cruz), contentDescription = null, modifier = Modifier.size(82.dp))
+            Image(painterResource(R.drawable.logo_cruz), contentDescription = null, modifier = Modifier.size(64.dp))
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
             buildAnnotatedString {
-                withStyle(SpanStyle(color = Color.White)) { append("Med") }
-                withStyle(SpanStyle(color = MediColors.Aqua)) { append("link") }
+                withStyle(SpanStyle(color = MediColors.Navy)) { append("Med") }
+                withStyle(SpanStyle(color = MediColors.Primario)) { append("link") }
             },
-            fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp,
-        )
-    }
-}
-
-/** Cruz del logo + "Medlink" en los colores de la marca (legible también en modo oscuro). */
-@Composable
-fun MarcaMediLink(modifier: Modifier = Modifier, tamanoCruz: Int = 84) {
-    val oscuro = MaterialTheme.colorScheme.surface.red < 0.3f
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(painterResource(R.drawable.logo_cruz), contentDescription = null, modifier = Modifier.size(tamanoCruz.dp))
-        Spacer(Modifier.height(10.dp))
-        Text(
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = if (oscuro) Color(0xFF8CC4FF) else MediColors.Navy)) { append("Med") }
-                withStyle(SpanStyle(color = if (oscuro) Color(0xFF5EE0CF) else MediColors.Teal)) { append("link") }
-            },
-            fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp,
+            fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp,
         )
     }
 }
@@ -493,7 +474,7 @@ private fun CampoPildora(
     var verClave by rememberSaveable { mutableStateOf(false) }
     val campo = if (MaterialTheme.colorScheme.surface.red < 0.3f) MaterialTheme.colorScheme.surfaceVariant else CampoGris
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Text(etiqueta.uppercase(), fontSize = 12.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Medium,
+        Text(etiqueta, fontSize = 13.sp, fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
         Box {
         TextField(
@@ -542,8 +523,8 @@ private fun BotonPrincipal(
     val oscuro = MaterialTheme.colorScheme.surface.red < 0.3f
     Button(onClick = onClick, enabled = habilitado, shape = RoundedCornerShape(14.dp), modifier = modifier.height(54.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (oscuro) MaterialTheme.colorScheme.primary else BotonOscuro,
-            contentColor = Color.White)) {
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary)) {
         if (cargando) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp,
                 color = MaterialTheme.colorScheme.onPrimary)

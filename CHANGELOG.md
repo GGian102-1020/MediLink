@@ -4,6 +4,16 @@ Registro de los cambios efectivamente realizados en el alcance de las tarjetas *
 
 Convenciones: **Implementado** = cambio incorporado en el código; **Verificado** = comprobado por las pruebas indicadas; **Pendiente** = sin evidencia suficiente para darlo por cerrado. El resultado de las pruebas de abajo corresponde al registro de Maven compartido el **19/10/2026**, no a una ejecución independiente contra una base PostgreSQL.
 
+## [Sin publicar] — 2026-11-16: app Android (modo invitado, farmacias cercanas, mapa y rediseño)
+
+- **Modo invitado** en Android: botón "Entrar como invitado" en el login. Permite buscar y ver disponibilidad; reservar, ver reservas o recetas abre un aviso con estilo de la app para iniciar sesión o registrarse. No cambia la autorización del backend.
+- **Disponibilidad por cercanía:** la app envía la ubicación aproximada (si el usuario la concede) y usa el orden por distancia que ya ofrecía `GET /api/presentaciones/{id}/disponibilidad`. Lista acotada de a 5 farmacias con "Ver más" y buscador en vivo por calle, barrio o nombre.
+- **Mapa embebido** con osmdroid (OpenStreetMap) en lugar del WebView con Leaflet, que quedaba en blanco. Incluye pines, detalle de farmacia, ruta a pie/en auto y "Reservar acá". Nueva dependencia: `org.osmdroid:osmdroid-android:6.1.20`.
+- **Rediseño visual claro:** tema con fondo neutro y acento teal, barras superior e inferior claras, inicio con buscador y reserva por retirar destacada, login/registro y diálogos alineados al mismo estilo.
+- **Limpieza:** se retiraron `android/REDISENO_UI_EXPERIMENTAL.md` y `android/FULL_PARITY_EXPERIMENTAL.md` (describían ramas y un diseño ya reemplazados), los overrides locales `android/compose.coexist.yml` y `android/compose.projectdb.yml` (dependían de otra copia del proyecto en un equipo particular), `Logo Medlink.png` (sin referencias, ya retirado el 19/10/2026), código sin uso en la app y los íconos deprecados.
+- Verificado: `:app:assembleDebug` sin errores ni advertencias del compilador y `:app:testDebugUnitTest` con 21 pruebas aprobadas. Flujos probados manualmente en emulador contra el backend local con los seeds 02 y 05.
+- No se modificaron el backend, las migraciones, el frontend React ni los seeds.
+
 ## [Sin publicar] — 2026-10-19: limpieza final de archivos y distribución completa
 
 - Se retiraron los tres informes de revisión fechados el 14/10/2026, porque describían versiones obsoletas y confundían el estado actual. Las referencias del README se reemplazaron por documentos vigentes.

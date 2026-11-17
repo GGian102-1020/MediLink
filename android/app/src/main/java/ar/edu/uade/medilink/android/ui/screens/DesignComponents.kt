@@ -22,21 +22,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -45,7 +41,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -83,7 +78,7 @@ fun CirculosMarca(modifier: Modifier = Modifier, escala: Float = 1f) {
     }
 }
 
-/** Panel destacado de cada sección: azul noche con los círculos de la marca. */
+/** Panel destacado: tarjeta blanca con borde suave, ícono en teal y título claro (sin fondos oscuros). */
 @Composable
 fun HeroPanel(
     etiqueta: String,
@@ -93,22 +88,38 @@ fun HeroPanel(
     modifier: Modifier = Modifier,
     contenido: (@Composable () -> Unit)? = null,
 ) {
-    Box(modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(topEnd = 56.dp, topStart = 24.dp,
-        bottomStart = 24.dp, bottomEnd = 24.dp)).background(MediColors.Noche)) {
-        CirculosMarca(Modifier.matchParentSize().alpha(0.55f), escala = 0.8f)
-        Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(
-                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(Color.White),
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center,
-                ) { Icon(icono, contentDescription = null, tint = MediColors.Teal) }
-                Text(etiqueta.uppercase(), color = MediColors.Aqua,
-                    style = MaterialTheme.typography.labelMedium, letterSpacing = 1.6.sp)
+                ) { Icon(icono, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)) }
+                Text(etiqueta.uppercase(), color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold)
             }
-            Text(titulo, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.3).sp, lineHeight = 32.sp)
-            Text(descripcion, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
+            Text(titulo, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
+            Text(descripcion, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             contenido?.invoke()
+        }
+    }
+}
+
+/** Buscador de entrada: se ve como un campo, pero al tocarlo abre la pantalla de búsqueda. */
+@Composable
+fun BuscadorEntrada(texto: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp), color = Color.White,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text(texto, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f))
         }
     }
 }
@@ -160,7 +171,7 @@ fun CampoTexto(
 @Composable
 fun SeccionTitulo(titulo: String, descripcion: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(titulo, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+        Text(titulo, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         if (!descripcion.isNullOrBlank()) {
             Text(descripcion, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall)
@@ -170,13 +181,20 @@ fun SeccionTitulo(titulo: String, descripcion: String? = null) {
 
 @Composable
 fun MetricaTarjeta(valor: String, etiqueta: String, icono: ImageVector, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(icono, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-            Text(valor, style = MaterialTheme.typography.headlineMedium, maxLines = 1)
-            Text(etiqueta, style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+    Surface(modifier = modifier, shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center) {
+                Icon(icono, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+            // El valor manda; la etiqueta acompaña.
+            Column {
+                Text(valor, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                Text(etiqueta, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
         }
     }
 }
@@ -193,23 +211,22 @@ fun AccesoTarjeta(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                Icon(icono, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                Icon(icono, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(titulo, style = MaterialTheme.typography.titleMedium)
                 Text(descripcion, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
                     overflow = TextOverflow.Ellipsis)
             }
-            Icon(Icons.Default.ArrowForward, contentDescription = null,
-                tint = MediColors.Teal, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.ChevronRight, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -265,7 +282,7 @@ fun DatoFila(etiqueta: String, valor: String) {
 @Composable
 fun NotaInformativa(texto: String) {
     Surface(color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Default.Info, contentDescription = null,
@@ -278,33 +295,22 @@ fun NotaInformativa(texto: String) {
 
 @Composable
 fun VacioEstado(titulo: String, descripcion: String) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.Info, contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
-            Text(titulo, style = MaterialTheme.typography.titleMedium)
+            Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Info, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+            }
+            Text(titulo, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
             Text(descripcion, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
 }
 
 fun plural(n: Number, uno: String, varios: String) = "$n ${if (n.toLong() == 1L) uno else varios}"
 
-/** Selector de opción única con chips y texto legible (no el valor crudo). */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-fun ComboSimple(label: String, opciones: List<String>, seleccionado: String, cambiar: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            opciones.forEach { opcion ->
-                androidx.compose.material3.FilterChip(selected = seleccionado == opcion, onClick = { cambiar(opcion) },
-                    label = { Text(if (opcion.isBlank()) "Todas" else etiquetaEstado(opcion)) })
-            }
-        }
-    }
-}

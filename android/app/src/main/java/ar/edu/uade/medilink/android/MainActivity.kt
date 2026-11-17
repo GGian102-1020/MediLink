@@ -13,14 +13,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,11 +36,11 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -63,8 +64,9 @@ import ar.edu.uade.medilink.android.data.ArchivosReceta
 import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.ui.screens.AuthScreen
 import ar.edu.uade.medilink.android.ui.screens.CatalogoScreen
-import ar.edu.uade.medilink.android.ui.screens.CirculosMarca
 import ar.edu.uade.medilink.android.ui.screens.DetalleReservaPaciente
+import ar.edu.uade.medilink.android.ui.screens.DialogoRequiereSesion
+import ar.edu.uade.medilink.android.ui.screens.PanelInvitado
 import ar.edu.uade.medilink.android.ui.screens.DisponibilidadScreen
 import ar.edu.uade.medilink.android.ui.screens.MapasScreen
 import ar.edu.uade.medilink.android.ui.screens.MisRecetasScreen
@@ -84,6 +86,8 @@ import ar.edu.uade.medilink.android.ui.viewmodel.MisRecetasVm
 import ar.edu.uade.medilink.android.ui.viewmodel.PresentacionesVm
 import ar.edu.uade.medilink.android.ui.viewmodel.ReservasVm
 import ar.edu.uade.medilink.android.ui.viewmodel.VmsFactory
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,7 +97,11 @@ class MainActivity : ComponentActivity() {
 }
 
 /** La sesión vive en memoria: sobrevive rotaciones pero no al cierre del proceso. */
-class MediLinkAppVm : ViewModel() { val repository = MediLinkRepository() }
+class MediLinkAppVm : ViewModel() {
+    val repository = MediLinkRepository()
+    /** Modo invitado: navega sin cuenta; toda acción que requiera sesión muestra un aviso. */
+    var invitado by mutableStateOf(false)
+}
 
 private val RUTAS_ACCESO = setOf("splash", "login", "registro")
 
@@ -122,28 +130,33 @@ private fun MediLinkApp() {
     val repository = appVm.repository
     val sesion by repository.session.login.collectAsStateWithLifecycle()
     val rol = sesion?.perfil?.rol
+    // Invitado solo mientras no haya sesión: al iniciar sesión deja de aplicar.
+    val modoInvitado = appVm.invitado && rol == null
+    var avisoSesion by remember { mutableStateOf<String?>(null) }
+    val pedirSesion: (String) -> Unit = { avisoSesion = it }
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val ruta = backStack?.destination?.route.orEmpty()
     // La app es solo para pacientes. El personal de farmacia usa el dashboard web.
     val barra = listOf(DestinoBarra("panel", "Inicio", Icons.Default.Home),
         DestinoBarra("catalogo", "Buscar", Icons.Default.Search),
-        DestinoBarra("reservas", "Reservas", Icons.Default.ReceiptLong),
+        DestinoBarra("reservas", "Reservas", Icons.AutoMirrored.Filled.ReceiptLong),
         DestinoBarra("perfil", "Cuenta", Icons.Default.Person))
 
-    // Acceso obligatorio: sin sesión solo se puede estar en splash, login o registro.
-    // También cubre el cierre de sesión y el JWT vencido (la sesión pasa a null).
+    // Acceso obligatorio: sin sesión (y fuera del modo invitado) solo se puede estar en
+    // splash, login o registro. También cubre el cierre de sesión y el JWT vencido.
     val enAcceso = ruta in RUTAS_ACCESO
     val vista = androidx.compose.ui.platform.LocalView.current
     val modoOscuro = isSystemInDarkTheme()
     SideEffect {
         val ventana = (vista.context as? android.app.Activity)?.window ?: return@SideEffect
         val control = WindowCompat.getInsetsController(ventana, vista)
-        control.isAppearanceLightStatusBars = !modoOscuro && (ruta == "splash" || ruta.isEmpty())
-        control.isAppearanceLightNavigationBars = !modoOscuro && enAcceso
+        // Rediseño claro: íconos oscuros en las barras del sistema en todas las pantallas.
+        control.isAppearanceLightStatusBars = !modoOscuro
+        control.isAppearanceLightNavigationBars = !modoOscuro
     }
-    LaunchedEffect(rol, ruta) {
-        if (rol == null && ruta.isNotEmpty() && !enAcceso) {
+    LaunchedEffect(rol, ruta, modoInvitado) {
+        if (rol == null && ruta.isNotEmpty() && !enAcceso && !modoInvitado) {
             nav.navigate("login") {
                 popUpTo(nav.graph.id) { inclusive = true }
                 launchSingleTop = true
@@ -151,11 +164,27 @@ private fun MediLinkApp() {
         }
     }
     val entrarAlHome: () -> Unit = {
+        appVm.invitado = false
         nav.navigate("panel") {
             popUpTo(nav.graph.id) { inclusive = true }
             launchSingleTop = true
         }
     }
+
+    val entrarComoInvitado: () -> Unit = {
+        appVm.invitado = true
+        nav.navigate("panel") {
+            popUpTo(nav.graph.id) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+    val irALogin: () -> Unit = { nav.navigate("login") { launchSingleTop = true } }
+    val irARegistro: () -> Unit = { nav.navigate("registro") { launchSingleTop = true } }
+    // Secciones que requieren cuenta: el invitado ve el aviso en vez de entrar.
+    val mensajesProtegidos = mapOf(
+        "reservas" to "Para ver y gestionar tus reservas necesitás iniciar sesión.",
+        "mis-recetas" to "Para vincular y consultar tus recetas necesitás iniciar sesión.",
+    )
 
     val rutaPrincipal = ruta in barra.map { it.ruta }
     val seleccionActual = when {
@@ -165,71 +194,72 @@ private fun MediLinkApp() {
     }
     MediLinkTheme {
         Scaffold(
-            // Azul noche detrás de todo: el contenido se recorta con una esquina curva sobre él.
-            containerColor = if (enAcceso) MaterialTheme.colorScheme.background else MediColors.Noche,
+            containerColor = MaterialTheme.colorScheme.background,
             // Las pantallas de acceso manejan sus propios insets (status bar, teclado).
             contentWindowInsets = if (enAcceso) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
             topBar = {
-                if (!enAcceso) Box(Modifier.background(MediColors.Noche)) {
-                    CirculosMarca(Modifier.matchParentSize().alpha(0.7f), escala = 0.75f)
-                    CenterAlignedTopAppBar(
-                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                            containerColor = Color.Transparent,
-                            navigationIconContentColor = Color.White,
-                        ),
-                        title = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(Color.White),
-                                    contentAlignment = Alignment.Center) {
-                                    Image(painterResource(R.drawable.logo_cruz), contentDescription = null,
-                                        modifier = Modifier.size(27.dp))
-                                }
-                                Spacer(Modifier.width(10.dp))
-                                Text(buildAnnotatedString {
-                                    withStyle(SpanStyle(color = Color.White)) { append("Med") }
-                                    withStyle(SpanStyle(color = MediColors.Aqua)) { append("link") }
-                                }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                // Barra superior compacta y clara: logo chico, sin fondos oscuros.
+                if (!enAcceso) TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(painterResource(R.drawable.logo_cruz), contentDescription = null,
+                                modifier = Modifier.size(28.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(buildAnnotatedString {
+                                withStyle(SpanStyle(color = if (modoOscuro) Color.White else MediColors.Navy)) { append("Med") }
+                                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("link") }
+                            }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    actions = {
+                        if (modoInvitado) TextButton(onClick = irALogin) {
+                            Text("Ingresar", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        }
+                    },
+                    navigationIcon = {
+                        if (!rutaPrincipal && nav.previousBackStackEntry != null) {
+                            IconButton(onClick = { nav.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                             }
-                        },
-                        navigationIcon = {
-                            if (!rutaPrincipal && nav.previousBackStackEntry != null) {
-                                IconButton(onClick = { nav.popBackStack() }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                                }
-                            }
-                        },
-                    )
-                }
+                        }
+                    },
+                )
             },
             bottomBar = {
                 if (rutaPrincipal && !enAcceso) {
-                    NavigationBar(containerColor = MediColors.Noche, tonalElevation = 0.dp) {
-                        barra.forEach { dest ->
-                            NavigationBarItem(
-                                selected = seleccionActual == dest.ruta,
-                                onClick = { nav.irAPestana(dest.ruta) },
-                                icon = { Icon(dest.icono, contentDescription = null) },
-                                label = { Text(dest.titulo) },
-                                alwaysShowLabel = true,
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MediColors.Noche,
-                                    selectedTextColor = MediColors.Aqua,
-                                    indicatorColor = MediColors.Aqua,
-                                    unselectedIconColor = Color.White.copy(alpha = 0.6f),
-                                    unselectedTextColor = Color.White.copy(alpha = 0.6f),
-                                ),
-                            )
+                    Column {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                            barra.forEach { dest ->
+                                NavigationBarItem(
+                                    selected = seleccionActual == dest.ruta,
+                                    onClick = {
+                                        val aviso = mensajesProtegidos[dest.ruta]
+                                        if (modoInvitado && aviso != null) pedirSesion(aviso)
+                                        else nav.irAPestana(dest.ruta)
+                                    },
+                                    icon = { Icon(dest.icono, contentDescription = null) },
+                                    label = { Text(dest.titulo, fontWeight = FontWeight.Medium) },
+                                    alwaysShowLabel = true,
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
+                                )
+                            }
                         }
                     }
                 }
             },
         ) { padding ->
-            NavHost(navController = nav, startDestination = "splash",
-                modifier = Modifier.padding(padding).then(
-                    if (enAcceso) Modifier
-                    else Modifier.clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                )) {
+            NavHost(navController = nav, startDestination = "splash", modifier = Modifier.padding(padding)) {
                 composable("splash") {
                     SplashScreen(onTerminado = {
                         if (rol != null) entrarAlHome()
@@ -247,15 +277,30 @@ private fun MediLinkApp() {
                 composable("disponibilidad/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
                     val id = e.arguments!!.getLong("id")
                     val vm: DisponibilidadVm = viewModel(factory = VmsFactory(repository, id))
-                    DisponibilidadScreen(vm, logueado = rol == "USUARIO", onLogin = { nav.navigate("login") },
+                    val desdeMapa by e.savedStateHandle.getStateFlow<Long?>("farmaciaElegida", null)
+                        .collectAsStateWithLifecycle()
+                    DisponibilidadScreen(vm, repository, logueado = rol == "USUARIO", onLogin = irALogin,
+                        pedirSesion = pedirSesion,
                         // Tras reservar se abre el detalle: ahí están el código y el PIN de retiro.
                         onReservaCreada = { codigo ->
                             nav.navigate("reserva/$codigo") { popUpTo("panel") }
                         },
-                        onMapa = { nav.navigate("mapa/$id") })
+                        onMapa = { nav.navigate("mapa/$id") },
+                        onVerEnMapa = { farmacia -> nav.navigate("mapa/$id?farmacia=$farmacia") },
+                        farmaciaDesdeMapa = desdeMapa,
+                        onFarmaciaDesdeMapaUsada = { e.savedStateHandle["farmaciaElegida"] = null })
                 }
-                composable("mapa/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
-                    MapasScreen(repository, e.arguments!!.getLong("id"))
+                composable("mapa/{id}?farmacia={farmacia}", arguments = listOf(
+                    navArgument("id") { type = NavType.LongType },
+                    navArgument("farmacia") { type = NavType.LongType; defaultValue = -1L },
+                )) { e ->
+                    MapasScreen(repository, e.arguments!!.getLong("id"),
+                        farmaciaInicial = e.arguments!!.getLong("farmacia").takeIf { it > 0 },
+                        logueado = rol == "USUARIO", pedirSesion = pedirSesion,
+                        onReservar = { farmacia ->
+                            nav.previousBackStackEntry?.savedStateHandle?.set("farmaciaElegida", farmacia)
+                            nav.popBackStack()
+                        })
                 }
                 composable("panel") {
                     if (rol == "USUARIO") PanelPaciente(repository,
@@ -263,6 +308,10 @@ private fun MediLinkApp() {
                         onReservas = { nav.irAPestana("reservas") },
                         onRecetas = { nav.navigate("mis-recetas") { launchSingleTop = true } },
                         onDetalle = { nav.navigate("reserva/$it") })
+                    else if (modoInvitado) PanelInvitado(
+                        onCatalogo = { nav.irAPestana("catalogo") },
+                        onIniciarSesion = irALogin,
+                        pedirSesion = pedirSesion)
                 }
                 composable("mis-recetas") {
                     if (rol == "USUARIO") {
@@ -285,12 +334,13 @@ private fun MediLinkApp() {
                     else SoloPacientes()
                 }
                 composable("perfil") {
-                    PerfilScreen(repository, sesion, onLogin = { nav.navigate("login") })
+                    PerfilScreen(repository, sesion, onLogin = irALogin)
                 }
                 composable("login") {
                     val vm: AuthVm = viewModel(factory = VmsFactory(repository))
                     AuthScreen(vm, onSuccess = entrarAlHome,
-                        onRegistro = { nav.navigate("registro") { launchSingleTop = true } })
+                        onRegistro = { nav.navigate("registro") { launchSingleTop = true } },
+                        onInvitado = entrarComoInvitado)
                 }
                 composable("registro") {
                     val vm: AuthVm = viewModel(factory = VmsFactory(repository))
@@ -299,6 +349,12 @@ private fun MediLinkApp() {
                     }, onSuccess = entrarAlHome)
                 }
             }
+        }
+        avisoSesion?.let { mensaje ->
+            DialogoRequiereSesion(mensaje,
+                onIniciarSesion = { avisoSesion = null; irALogin() },
+                onRegistrarse = { avisoSesion = null; irARegistro() },
+                onCerrar = { avisoSesion = null })
         }
     }
 }

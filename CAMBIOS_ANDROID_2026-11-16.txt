@@ -1,0 +1,81 @@
+CAMBIOS - APP ANDROID MEDILINK (16/11/2026)
+==========================================
+
+ENTORNO Y DATOS
+- Se levantó el stack con Docker: Postgres, backend (puerto 18081), gateway y Adminer.
+- Se creó .env con una clave JWT_SECRET_BASE64 local (no se sube al repo).
+- Se cargó el seed 02_datos_prueba.sql: cuentas, medicamentos, farmacias, stock, recetas y reservas.
+- Se cargó el seed 05_farmacias_gcba_completo.sql: 1244 farmacias reales de CABA con stock de prueba. Solo agrega datos, no borra nada.
+
+MODO INVITADO
+- Botón "Entrar como invitado" en el login.
+- El invitado puede buscar medicamentos, ver presentaciones, ver farmacias con stock y usar el mapa.
+- Reservar, ver reservas o ver recetas muestra un aviso para iniciar sesión o crear cuenta.
+- Inicio propio para el invitado y botón "Ingresar" en la barra superior.
+- El modo invitado se desactiva al iniciar sesión o registrarse. Al cerrar sesión se vuelve al login.
+- El backend sigue exigiendo JWT para reservar (no se tocó la seguridad del servidor).
+
+FARMACIAS CERCANAS Y BUSCADOR (DISPONIBILIDAD)
+- Se pide permiso de ubicación aproximada y las farmacias se ordenan por distancia (usa el orden que ya tenía la API).
+- Cada farmacia muestra a cuánto queda ("a 71 m", "a 1.2 km").
+- Barra de ubicación con opciones para activar, volver a ubicar o dejar de ordenar por cercanía.
+- Lista acotada: se muestran 5 farmacias por vez con "Ver más".
+- Buscador en vivo por calle, barrio o nombre, sin distinguir tildes ni mayúsculas.
+- Si no hay coincidencias: "Ver las más cercanas a..." busca esa dirección y ordena desde ahí.
+
+MAPA EMBEBIDO
+- Se reemplazó el WebView con Leaflet (quedaba en blanco) por un mapa nativo con osmdroid y OpenStreetMap, sin API key.
+- Pines de las 80 farmacias más cercanas y tu ubicación marcada en el mapa.
+- Al tocar un pin aparece una tarjeta con nombre, dirección, stock y distancia.
+- "Cómo llegar": dibuja la ruta a pie o en auto con tiempo y distancia.
+- "Navegar": abre Google Maps.
+- "Reservar acá": vuelve a Disponibilidad con la farmacia ya elegida (al invitado le muestra el aviso de sesión).
+- En la lista, el botón "Cómo llegar" se reemplazó por "Ver en mapa", que abre el mapa centrado en esa farmacia.
+- Nueva dependencia: org.osmdroid:osmdroid-android:6.1.20
+
+REDISEÑO VISUAL ("CLARA Y LIMPIA")
+- Tema nuevo: fondo blanco/gris claro con un solo acento teal (regla 60/30/10).
+- Se quitaron el azul noche de barras y paneles y los círculos de fondo.
+- Barra superior compacta y clara con el logo; barra inferior blanca con indicador teal.
+- Inicio nuevo con saludo, avatar, buscador grande, reserva por retirar destacada, métricas compactas y reservas recientes.
+- Login y registro con fondo blanco, campos claros y botón teal.
+- Aviso de "iniciá sesión" con diseño propio de la app (no el diálogo genérico de Android).
+- Tipografía simplificada (24/20/16/14/12) y componentes compartidos rediseñados: tarjetas, accesos, métricas y estados vacíos.
+- Se mantiene oscura la tarjeta del código y PIN de retiro para destacarla.
+
+LIMPIEZA
+- Documentos obsoletos eliminados: android/REDISENO_UI_EXPERIMENTAL.md y android/FULL_PARITY_EXPERIMENTAL.md.
+- Configuración local eliminada: android/compose.coexist.yml y android/compose.projectdb.yml.
+- Eliminado "Logo Medlink.png" (sin referencias; ya figuraba como retirado en el CHANGELOG).
+- Código sin uso eliminado: imports sobrantes, MarcaMediLink y ComboSimple.
+- Íconos deprecados reemplazados por sus versiones AutoMirrored.
+- Eliminados los archivos generados (build/, .gradle/, .kotlin/, .idea/).
+- Se corrigieron links rotos a DEMO_ANDROID_SIN_DOMINIO.md en README.md y RELEASE_ANDROID.md.
+
+DOCUMENTACIÓN
+- android/README.md actualizado con el modo invitado, las farmacias cercanas, el mapa, el nuevo estilo y la solución de problemas.
+- CHANGELOG.md: nueva entrada del 16/11/2026.
+
+VERIFICACIÓN
+- :app:assembleDebug compila sin errores ni advertencias.
+- :app:testDebugUnitTest: 21 pruebas aprobadas, 0 fallos.
+- Flujos probados en el emulador contra el backend local: invitado, login, búsqueda, disponibilidad, mapa, ruta, "Reservar acá", reservas, cuenta y cierre de sesión.
+- No se modificaron el backend, las migraciones, el frontend React ni los seeds.
+
+ARCHIVOS MODIFICADOS (ANDROID)
+Ruta base: android/app/src/main/java/ar/edu/uade/medilink/android/
+- MainActivity.kt
+- data/MediLinkRepository.kt
+- ui/viewmodel/ViewModels.kt
+- ui/theme/MediLinkTheme.kt
+- ui/screens/AuthScreens.kt
+- ui/screens/Common.kt
+- ui/screens/DesignComponents.kt
+- ui/screens/DisponibilidadScreen.kt
+- ui/screens/InvitadoScreens.kt (nuevo)
+- ui/screens/MapasScreen.kt
+- ui/screens/PatientParityScreens.kt
+- ui/screens/CatalogoScreen.kt, DetalleReservaScreen.kt, MisRecetasScreen.kt,
+  PerfilScreen.kt, ReservasScreen.kt, SplashScreen.kt (solo imports e íconos)
+Además:
+- android/app/build.gradle.kts

@@ -10,6 +10,7 @@ import ar.edu.uade.medilink.android.data.IntentoReserva
 import ar.edu.uade.medilink.android.data.MedicamentoDto
 import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.data.PresentacionDto
+import ar.edu.uade.medilink.android.data.PuntoGeo
 import ar.edu.uade.medilink.android.data.ReservaDto
 import ar.edu.uade.medilink.android.data.mensajeDeError
 import kotlinx.coroutines.CancellationException
@@ -137,16 +138,29 @@ class DisponibilidadVm(private val repository: MediLinkRepository, private val p
     private val mutable = MutableStateFlow(DisponibilidadState())
     val state = mutable.asStateFlow()
     private val intento = IntentoReserva()
+    private var carga: Job? = null
+    private var origenCargado: PuntoGeo? = null
+    private var cargadoAlgunaVez = false
 
-    init { actualizar() }
+    init {
+        // Con origen (ubicación o dirección) el backend ordena por distancia: primero las más cercanas.
+        viewModelScope.launch {
+            repository.origen.collect { origen ->
+                if (!cargadoAlgunaVez || origen != origenCargado) actualizar()
+            }
+        }
+    }
 
     fun actualizar() {
-        if (mutable.value.cargando) return
-        viewModelScope.launch {
+        carga?.cancel()
+        carga = viewModelScope.launch {
+            val origen = repository.origen.value
             mutable.value = mutable.value.copy(cargando = true, error = null)
             try {
-                val presentacion = repository.presentacion(presentacionId)
-                val farmacias = repository.disponibilidad(presentacionId)
+                val presentacion = mutable.value.presentacion ?: repository.presentacion(presentacionId)
+                val farmacias = repository.disponibilidad(presentacionId, origen?.lat, origen?.lng)
+                origenCargado = origen
+                cargadoAlgunaVez = true
                 mutable.value = mutable.value.copy(
                     presentacion = presentacion, farmacias = farmacias, cargando = false,
                 )

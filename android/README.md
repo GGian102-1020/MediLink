@@ -8,15 +8,24 @@ La API REST existente es la fuente de verdad para stock, sesiones y reservas.
 
 - Catálogo público de medicamentos, filtro por nombre y paginación.
 - Presentaciones por medicamento y farmacias con stock.
-- Apertura de una app de mapas externa cuando la farmacia tiene coordenadas.
+- **Modo invitado:** desde el login se puede entrar sin cuenta para buscar medicamentos y ver
+  farmacias. Toda acción que requiere sesión (reservar, ver reservas o recetas) muestra un aviso
+  propio de la app que ofrece iniciar sesión o registrarse; el backend sigue exigiendo JWT.
+- **Farmacias cercanas:** con permiso de ubicación aproximada (`ACCESS_COARSE_LOCATION`) la API
+  ordena las farmacias por distancia. Se muestran de a 5 ("Ver más") y un buscador filtra en vivo
+  por calle, barrio o nombre (sin distinguir tildes). Sin coincidencias, se puede geocodificar el
+  texto y ordenar desde esa dirección.
+- **Mapa embebido** (osmdroid + teselas de OpenStreetMap, sin API key): pines de las farmacias más
+  cercanas, tarjeta de detalle, ruta a pie o en auto (OSRM público, solo demo), "Navegar" en una app
+  externa y "Reservar acá", que vuelve a Disponibilidad con la farmacia elegida.
 - Registro e inicio de sesión de pacientes (JWT en memoria, sin persistencia de claves).
 - Creación de reservas con `Idempotency-Key` estable por intento y prescripción de demo.
 - Listado paginado de reservas, actualización y cancelación voluntaria con confirmación.
 - Pantalla de perfil y cierre de sesión (se revoca el JWT del servidor si hay conexión).
 - Pruebas unitarias del mecanismo de idempotencia.
 
-No incluye mapas embebidos, ubicación GPS, operadores, administración, alertas push ni un
-servidor desplegado públicamente. La variante release se puede **descargar e instalar sin backend**,
+No incluye operadores, administración, alertas push ni un servidor desplegado públicamente.
+La ubicación se usa solo en memoria (redondeada a 4 decimales) y nunca en segundo plano. La variante release se puede **descargar e instalar sin backend**,
 pero login, catálogo y reservas necesitan uno para funcionar. `assembleRelease` exige siempre
 **firma privada**; `MEDILINK_API_BASE_URL` es opcional y, si existe, debe ser HTTPS válida.
 Ver [`RELEASE_ANDROID.md`](RELEASE_ANDROID.md) para publicar el APK firmado y enlazarlo al QR.
@@ -95,11 +104,16 @@ en bases con información real/compartida ni usar `docker compose down -v`.
   `adb devices`, `adb reverse --list` y los logs de `docker compose ... logs backend`.
 - **`401` o sesión vencida:** iniciar sesión otra vez; el JWT dura 30 minutos.
 - **Catálogo vacío:** primero confirmar datos del seed en una base de pruebas.
-- **No hay mapas:** instalar una aplicación compatible con el enlace `geo:`.
+- **Mapa en blanco o sin teselas:** el mapa y las rutas necesitan Internet en el dispositivo.
+- **Distancias de miles de km en el emulador:** el AVD arranca ubicado en California; fijar una
+  posición en CABA con `& $adb emu geo fix -58.41 -34.5875`.
 
 ## Decisiones de arquitectura
 
-- UI: Compose Material 3, Navigation Compose.
+- UI: Compose Material 3, Navigation Compose. Estilo claro (regla 60/30/10): fondo neutro,
+  texto tinta y un único acento teal; tema centralizado en `ui/theme/MediLinkTheme.kt` y
+  componentes compartidos en `ui/screens/DesignComponents.kt`.
+- Mapa: osmdroid dentro de Compose (`AndroidView`), con ciclo de vida atado a la pantalla.
 - Estado/lógica de presentación: ViewModels + StateFlow.
 - Acceso remoto: Repository + Retrofit + OkHttp + Gson.
 - Manejo de sesión: solo en memoria; no se persiste JWT ni contraseñas.
@@ -133,6 +147,5 @@ por QR desde `develop-web` está en [RELEASE_ANDROID.md](RELEASE_ANDROID.md). No
 Para **descargar e instalar** el APK desde el QR no se requiere ngrok ni Docker:
 segui directamente [RELEASE_ANDROID.md](RELEASE_ANDROID.md). Si mas adelante
 queres probar login, catalogo y reservas con backend local desde otro celular,
-esa es una tarea aparte: podes seguir la guia opcional
-[Demo Android sin dominio](../docs/DEMO_ANDROID_SIN_DOMINIO.md).
+esa es una tarea aparte que requiere exponer la API por HTTPS.
 No usar datos personales reales en la demostracion.

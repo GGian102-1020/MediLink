@@ -4,45 +4,83 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.LocalPharmacy
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import ar.edu.uade.medilink.android.data.DisponibilidadDto
 import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.data.PuntoGeo
 import ar.edu.uade.medilink.android.data.mensajeDeError
+import ar.edu.uade.medilink.android.ui.theme.MediColors
 import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -53,8 +91,19 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
 import org.json.JSONObject
+import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private fun DisponibilidadDto.punto(): PuntoGeo? = try {
     if (latitud == null || longitud == null) null else PuntoGeo(latitud, longitud)
@@ -62,7 +111,7 @@ private fun DisponibilidadDto.punto(): PuntoGeo? = try {
 
 /** LocationManager evita exigir Play Services. No pide localización en segundo plano. */
 @Suppress("DEPRECATION")
-private suspend fun obtenerUbicacion(context: Context): PuntoGeo = suspendCancellableCoroutine { cont ->
+internal suspend fun obtenerUbicacion(context: Context): PuntoGeo = suspendCancellableCoroutine { cont ->
     if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
         cont.resumeWith(Result.failure(IllegalArgumentException("Falta el permiso de ubicación.")))
         return@suspendCancellableCoroutine
@@ -96,7 +145,7 @@ private suspend fun obtenerUbicacion(context: Context): PuntoGeo = suspendCancel
 }
 
 @Suppress("DEPRECATION")
-private suspend fun geocodificar(context: Context, texto: String): PuntoGeo = withContext(Dispatchers.IO) {
+internal suspend fun geocodificar(context: Context, texto: String): PuntoGeo = withContext(Dispatchers.IO) {
     require(texto.trim().length >= 3) { "Ingresá una dirección completa." }
     // Geocoder del sistema; sin consultas directas al Nominatim público.
     val resultado = Geocoder(context, Locale.forLanguageTag("es-AR"))
@@ -162,157 +211,409 @@ private suspend fun calcularRuta(origen: PuntoGeo, destino: PuntoGeo, aPie: Bool
         }
     }
 
-private fun mapaHtml(farmacias: List<DisponibilidadDto>, origen: PuntoGeo?,
-    ruta: RutaDemo?): String {
-    val marcadores = JSONArray()
-    farmacias.forEach { farmacia ->
-        val p = farmacia.punto() ?: return@forEach
-        marcadores.put(JSONObject().put("lat", p.lat).put("lng", p.lng)
-            .put("nombre", farmacia.nombre).put("stock", farmacia.cantidadDisponible))
-    }
-    val markersEncoded = android.util.Base64.encodeToString(
-        marcadores.toString().toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-    val rutaJson = JSONArray()
-    ruta?.puntos?.forEach { rutaJson.put(JSONArray().put(it.lat).put(it.lng)) }
-    val centro = origen ?: farmacias.firstNotNullOfOrNull { it.punto() } ?: PuntoGeo(-34.6118, -58.4173)
-    val origenJs = if (origen == null) "null" else "[${origen.lat},${origen.lng}]"
-    return """<!doctype html><html lang="es"><head><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>html,body,#map{margin:0;width:100%;height:100%}</style></head><body><div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
-const map=L.map('map').setView([${centro.lat},${centro.lng}],13);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
-maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-const bounds=[];
-JSON.parse(new TextDecoder('utf-8').decode(Uint8Array.from(atob('$markersEncoded'),c=>c.charCodeAt(0)))).forEach(f=>{const p=[f.lat,f.lng]; bounds.push(p);
-L.marker(p).addTo(map).bindPopup(document.createTextNode(f.nombre+' · '+f.stock+' unidades'));});
-const origen=$origenJs;if(origen){bounds.push(origen);L.circleMarker(origen,{color:'blue'}).addTo(map).bindPopup('Tu origen');}
-const ruta=${rutaJson};if(ruta.length){L.polyline(ruta,{color:'blue',weight:5}).addTo(map);bounds.push(...ruta);}
-if(bounds.length>1) map.fitBounds(bounds,{padding:[24,24],maxZoom:15});
-</script></body></html>"""
+
+/** Centro de CABA, usado si no hay origen ni farmacias con coordenadas. */
+private val CENTRO_CABA = GeoPoint(-34.6037, -58.3816)
+/** Con 500+ farmacias el mapa se vuelve ilegible: se dibujan las más cercanas. */
+private const val MAX_MARCADORES = 80
+
+private fun PuntoGeo.geo() = GeoPoint(lat, lng)
+
+private fun distanciaLegible(km: Double) =
+    if (km < 1) "a ${(km * 1000).toInt()} m" else "a ${"%.1f".format(Locale.forLanguageTag("es-AR"), km)} km"
+
+/** Pin redondo de la marca dibujado a mano: círculo de color con borde blanco y cruz. */
+private fun iconoFarmacia(context: Context, relleno: Int, tamanoDp: Int): BitmapDrawable {
+    val d = context.resources.displayMetrics.density
+    val lado = (tamanoDp * d).toInt()
+    val bmp = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
+    val c = Canvas(bmp)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    val r = lado / 2f
+    p.color = android.graphics.Color.argb(60, 0, 0, 0)
+    c.drawCircle(r, r + d, r - d, p)
+    p.color = android.graphics.Color.WHITE
+    c.drawCircle(r, r, r - 2 * d, p)
+    p.color = relleno
+    c.drawCircle(r, r, r - 4.5f * d, p)
+    p.color = android.graphics.Color.WHITE
+    val brazo = r * 0.42f
+    val grosor = r * 0.16f
+    c.drawRoundRect(r - grosor, r - brazo, r + grosor, r + brazo, grosor / 2, grosor / 2, p)
+    c.drawRoundRect(r - brazo, r - grosor, r + brazo, r + grosor, grosor / 2, grosor / 2, p)
+    return BitmapDrawable(context.resources, bmp)
 }
 
+/** Punto azul con halo para el origen (ubicación del usuario o dirección buscada). */
+private fun iconoOrigen(context: Context): BitmapDrawable {
+    val d = context.resources.displayMetrics.density
+    val lado = (34 * d).toInt()
+    val bmp = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
+    val c = Canvas(bmp)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    val r = lado / 2f
+    p.color = android.graphics.Color.argb(70, 6, 117, 221)
+    c.drawCircle(r, r, r, p)
+    p.color = android.graphics.Color.WHITE
+    c.drawCircle(r, r, r * 0.48f, p)
+    p.color = MediColors.Blue.toArgb()
+    c.drawCircle(r, r, r * 0.34f, p)
+    return BitmapDrawable(context.resources, bmp)
+}
+
+/**
+ * Mapa nativo (osmdroid + OpenStreetMap) con las farmacias que tienen stock.
+ * Tocar un pin muestra la farmacia; desde ahí se ve la ruta o se reserva.
+ */
 @Composable
-fun MapasScreen(repository: MediLinkRepository, presentacionId: Long) {
+fun MapasScreen(
+    repository: MediLinkRepository,
+    presentacionId: Long,
+    farmaciaInicial: Long?,
+    logueado: Boolean,
+    pedirSesion: (String) -> Unit,
+    onReservar: (Long) -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var farmacias by remember { mutableStateOf<List<DisponibilidadDto>>(emptyList()) }
     val origen by repository.origen.collectAsState()
-    var direccion by remember { mutableStateOf("") }
-    var elegido by remember { mutableStateOf<DisponibilidadDto?>(null) }
-    var aPie by remember { mutableStateOf(false) }
+    val origenEtiqueta by repository.origenEtiqueta.collectAsState()
+    var farmacias by remember { mutableStateOf<List<DisponibilidadDto>>(emptyList()) }
+    var cargando by remember { mutableStateOf(true) }
+    var seleccionId by rememberSaveable { mutableStateOf(farmaciaInicial ?: -1L) }
+    var aPie by rememberSaveable { mutableStateOf(true) }
     var ruta by remember { mutableStateOf<RutaDemo?>(null) }
+    var calculando by remember { mutableStateOf(false) }
+    var ubicando by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var revision by remember { mutableStateOf(0) }
-    var ocupado by remember { mutableStateOf(false) }
-    LaunchedEffect(presentacionId, origen, revision) {
+    var camaraInicial by rememberSaveable { mutableStateOf(false) }
+    val seleccion = farmacias.find { it.farmaciaId == seleccionId }
+
+    LaunchedEffect(presentacionId, origen) {
+        cargando = true
         try {
             farmacias = repository.disponibilidad(presentacionId, origen?.lat, origen?.lng)
             error = null
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = mensajeDeError(e) }
+        finally { cargando = false }
     }
-    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
-        if (concedido) scope.launch {
-            ocupado = true
-            try { repository.origen.value = obtenerUbicacion(context); ruta = null }
+
+    fun usarMiUbicacion() {
+        scope.launch {
+            ubicando = true
+            try {
+                repository.origen.value = obtenerUbicacion(context)
+                repository.origenEtiqueta.value = "Tu ubicación"
+                ruta = null; error = null
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = mensajeDeError(e) }
+            finally { ubicando = false }
+        }
+    }
+    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) usarMiUbicacion() else error = "Sin permiso de ubicación no podemos mostrarte la ruta."
+    }
+    val pedirUbicacion = {
+        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+            usarMiUbicacion()
+        else permiso.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
+    val calcular: (DisponibilidadDto, Boolean) -> Unit = { f, pie ->
+        val desde = repository.origen.value
+        val hasta = f.punto()
+        if (desde != null && hasta != null) scope.launch {
+            calculando = true
+            try { ruta = calcularRuta(desde, hasta, pie); error = null }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = mensajeDeError(e) }
-            finally { ocupado = false }
-        } else error = "No diste permiso de ubicación. Podés buscar una dirección."
+            finally { calculando = false }
+        }
     }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Encabezado("Mapa de farmacias", "Disponibilidad, origen y ruta hasta la farmacia")
-        Text("Vista de mapa basada en Leaflet. Las teselas y las rutas requieren Internet.")
-        AvisoError(error)
-        Button(onClick = {
-            if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                scope.launch {
-                    ocupado = true
-                    try { repository.origen.value = obtenerUbicacion(context); ruta = null }
-                    catch (e: CancellationException) { throw e }
-                    catch (e: Exception) { error = mensajeDeError(e) }
-                    finally { ocupado = false }
-                }
-            } else permiso.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-        }, enabled = !ocupado) { Text("Usar mi ubicación (opcional)") }
-        CampoTexto(direccion, { direccion = it }, label = { Text("Dirección en CABA") },
-            modifier = Modifier.fillMaxWidth())
-        OutlinedButton(enabled = !ocupado && direccion.trim().length >= 3, onClick = {
-            scope.launch {
-                ocupado = true
-                try { repository.origen.value = geocodificar(context, direccion); ruta = null }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { error = mensajeDeError(e) }
-                finally { ocupado = false }
-            }
-        }) { Text("Buscar dirección") }
-        origen?.let {
-            Text("Origen aproximado: ${it.lat}, ${it.lng}")
-            OutlinedButton(onClick = { repository.origen.value = null; ruta = null }) {
-                Text("Olvidar mi origen")
+
+    // --- Mapa osmdroid ---
+    val mapa = remember {
+        Configuration.getInstance().apply {
+            load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+            userAgentValue = context.packageName // política de uso de teselas de OSM
+        }
+        MapView(context).apply {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+            minZoomLevel = 11.0
+            maxZoomLevel = 19.0
+            isTilesScaledToDpi = true
+            controller.setZoom(13.0)
+            controller.setCenter(CENTRO_CABA)
+        }
+    }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observador = LifecycleEventObserver { _, evento ->
+            when (evento) {
+                Lifecycle.Event.ON_RESUME -> mapa.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapa.onPause()
+                else -> Unit
             }
         }
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().height(290.dp),
-            factory = { ctx -> WebView(ctx).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = false
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
-                settings.javaScriptCanOpenWindowsAutomatically = false
-                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                webViewClient = WebViewClient()
-                settings.userAgentString = settings.userAgentString + " MediLink-Academic-Demo/0.2"
-            } },
-            update = { view ->
-                view.loadDataWithBaseURL("https://www.openstreetmap.org/",
-                    mapaHtml(farmacias, origen, ruta), "text/html", "UTF-8", null)
-            },
-        )
-        Text("Farmacias con coordenadas: ${farmacias.count { it.punto() != null }}")
-        farmacias.forEach { f ->
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("${f.nombre} · ${f.cantidadDisponible} unidades")
-                    Text(f.direccion)
-                    f.distanciaKm?.let { Text("A ${"%.1f".format(Locale.forLanguageTag("es-AR"), it)} km") }
-                    if (f.punto() != null) OutlinedButton(onClick = { elegido = f; ruta = null }) {
-                        Text("Elegir destino")
+        lifecycle.addObserver(observador)
+        mapa.onResume()
+        onDispose { lifecycle.removeObserver(observador); mapa.onPause(); mapa.onDetach() }
+    }
+    val iconoNormal = remember { iconoFarmacia(context, MediColors.Navy.toArgb(), 30) }
+    val iconoElegido = remember { iconoFarmacia(context, MediColors.Primario.toArgb(), 44) }
+    val iconoYo = remember { iconoOrigen(context) }
+
+    // Redibuja pines, origen y ruta cuando cambia algo.
+    LaunchedEffect(farmacias, seleccionId, origen, ruta) {
+        mapa.overlays.clear()
+        mapa.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean { seleccionId = -1L; ruta = null; return true }
+            override fun longPressHelper(p: GeoPoint?) = false
+        }))
+        ruta?.let { r ->
+            mapa.overlays.add(Polyline(mapa).apply {
+                setPoints(r.puntos.map { it.geo() })
+                outlinePaint.color = MediColors.Primario.toArgb()
+                outlinePaint.strokeWidth = 14f
+                outlinePaint.strokeCap = Paint.Cap.ROUND
+                outlinePaint.strokeJoin = Paint.Join.ROUND
+                infoWindow = null
+            })
+        }
+        val visibles = farmacias.filter { it.punto() != null }.take(MAX_MARCADORES).toMutableList()
+        seleccion?.takeIf { s -> visibles.none { it.farmaciaId == s.farmaciaId } }?.let { visibles += it }
+        // El elegido se agrega último para que quede encima.
+        visibles.sortedBy { it.farmaciaId == seleccionId }.forEach { f ->
+            val p = f.punto() ?: return@forEach
+            mapa.overlays.add(Marker(mapa).apply {
+                position = p.geo()
+                icon = if (f.farmaciaId == seleccionId) iconoElegido else iconoNormal
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                infoWindow = null
+                setOnMarkerClickListener { _, _ ->
+                    if (seleccionId != f.farmaciaId) { seleccionId = f.farmaciaId; ruta = null }
+                    true
+                }
+            })
+        }
+        origen?.let { o ->
+            mapa.overlays.add(Marker(mapa).apply {
+                position = o.geo(); icon = iconoYo; infoWindow = null
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                setOnMarkerClickListener { _, _ -> true }
+            })
+        }
+        mapa.invalidate()
+    }
+    // Cámara inicial: la farmacia pedida, o el origen, o la primera farmacia.
+    LaunchedEffect(farmacias) {
+        if (camaraInicial || farmacias.isEmpty()) return@LaunchedEffect
+        val foco = seleccion?.punto()?.geo() ?: origen?.geo() ?: farmacias.firstNotNullOfOrNull { it.punto() }?.geo()
+        if (foco != null) { mapa.controller.setZoom(if (seleccion != null) 16.5 else 15.0); mapa.controller.setCenter(foco) }
+        camaraInicial = true
+    }
+    // Al elegir otra farmacia, la cámara va hacia ella.
+    LaunchedEffect(seleccionId) {
+        if (camaraInicial) seleccion?.punto()?.let { mapa.controller.animateTo(it.geo(), 16.5, 450L) }
+    }
+    // Con ruta, se encuadra el recorrido completo.
+    LaunchedEffect(ruta) {
+        val r = ruta ?: return@LaunchedEffect
+        if (r.puntos.size > 1) mapa.post {
+            // La tarjeta tapa ~la mitad inferior del mapa y el encabezado la franja superior:
+            // se agranda la caja hacia abajo para que el recorrido quede en la zona visible.
+            val caja = BoundingBox.fromGeoPoints(r.puntos.map { it.geo() })
+            val alto = kotlin.math.max(caja.latitudeSpan, 0.002)
+            val ancho = kotlin.math.max(caja.longitudeSpanWithDateLine, 0.002)
+            mapa.zoomToBoundingBox(BoundingBox(caja.latNorth + alto * 0.35, caja.lonEast + ancho * 0.15,
+                caja.latSouth - alto * 1.25, caja.lonWest - ancho * 0.15), true, 40)
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        AndroidView(factory = { mapa }, modifier = Modifier.fillMaxSize())
+
+        // Encabezado flotante: cuántas farmacias y desde dónde.
+        Surface(shape = RoundedCornerShape(18.dp), shadowElevation = 6.dp,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.align(Alignment.TopStart).padding(14.dp).padding(end = 64.dp)) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(32.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center) {
+                    if (cargando) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary)
+                    else Icon(Icons.Default.LocalPharmacy, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp))
+                }
+                Column {
+                    Text(if (cargando) "Buscando farmacias…" else plural(farmacias.size, "farmacia con stock", "farmacias con stock"),
+                        style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(if (origen != null) "Cerca de: ${origenEtiqueta ?: "tu ubicación"}"
+                        else if (farmacias.size > MAX_MARCADORES) "Activá tu ubicación para ver las cercanas"
+                        else "Tocá un pin para ver la farmacia",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        // Botón "mi ubicación".
+        SmallFloatingActionButton(onClick = {
+            val o = origen
+            if (o != null && !ubicando) mapa.controller.animateTo(o.geo(), 15.5, 450L) else pedirUbicacion()
+        }, containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.align(Alignment.TopEnd).padding(14.dp).size(48.dp)) {
+            if (ubicando) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+            else Icon(Icons.Default.MyLocation, contentDescription = "Mi ubicación")
+        }
+
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            error?.let {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.errorContainer,
+                    shadowElevation = 4.dp) {
+                    Row(Modifier.padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(it, color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { error = null }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cerrar aviso",
+                                tint = MaterialTheme.colorScheme.onErrorContainer)
+                        }
                     }
                 }
             }
-        }
-        elegido?.let { f ->
-            Text("Destino: ${f.nombre}")
-            ComboSimple("Modo de viaje", listOf("AUTO", "PIE"), if (aPie) "PIE" else "AUTO") {
-                aPie = it == "PIE"; ruta = null
-            }
-            Button(enabled = !ocupado && origen != null, onClick = {
-                val desde = origen ?: return@Button
-                val destino = f.punto() ?: return@Button
-                scope.launch {
-                    ocupado = true
-                    try { ruta = calcularRuta(desde, destino, aPie) }
-                    catch (e: CancellationException) { throw e }
-                    catch (e: Exception) { error = mensajeDeError(e) }
-                    finally { ocupado = false }
+            AnimatedVisibility(visible = seleccion == null && !cargando && farmacias.isNotEmpty(),
+                enter = fadeIn(), exit = fadeOut()) {
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 6.dp) {
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.TouchApp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("Tocá una farmacia en el mapa para ver dónde queda y cómo llegar.",
+                            color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
-            }) { Text("Calcular ruta") }
-            OutlinedButton(onClick = {
-                val punto = f.punto() ?: return@OutlinedButton
-                val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${punto.lat},${punto.lng}&travelmode=${if (aPie) "walking" else "driving"}")
-                try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
-                catch (_: Exception) { error = "No se encontró una app para abrir la ruta." }
-            }) { Text("Abrir indicaciones externas") }
+            }
+            AnimatedVisibility(visible = seleccion != null,
+                enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
+                seleccion?.let { f ->
+                    TarjetaFarmaciaMapa(f, ruta = ruta, aPie = aPie, calculando = calculando, hayOrigen = origen != null,
+                        onCerrar = { seleccionId = -1L; ruta = null },
+                        onModo = { pie -> aPie = pie; if (ruta != null) calcular(f, pie) },
+                        onComoLlegar = { if (origen == null) pedirUbicacion() else calcular(f, aPie) },
+                        onAbrirExterno = {
+                            f.punto()?.let { p ->
+                                val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" +
+                                    "&travelmode=${if (aPie) "walking" else "driving"}")
+                                try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                                catch (_: Exception) { error = "No se encontró una app para abrir la ruta." }
+                            }
+                        },
+                        onReservar = {
+                            if (logueado) onReservar(f.farmaciaId)
+                            else pedirSesion("Para reservar en ${f.nombre} necesitás iniciar sesión con tu cuenta de paciente.")
+                        })
+                }
+            }
         }
-        ruta?.let { r ->
-            Text("Distancia: ${"%.1f".format(Locale.forLanguageTag("es-AR"), r.metros / 1000)} km")
-            Text("Duración estimada: ${kotlin.math.round(r.segundos / 60).toInt()} min")
-            r.pasos.forEachIndexed { i, paso -> Text("${i + 1}. $paso") }
-        }
-        Text("Demo local: antes de distribuir, configurar proveedores con cuotas propias y revisar privacidad de coordenadas.")
-        OutlinedButton(onClick = { revision++ }) { Text("Actualizar disponibilidad") }
     }
+}
+
+@Composable
+private fun TarjetaFarmaciaMapa(
+    f: DisponibilidadDto,
+    ruta: RutaDemo?,
+    aPie: Boolean,
+    calculando: Boolean,
+    hayOrigen: Boolean,
+    onCerrar: () -> Unit,
+    onModo: (Boolean) -> Unit,
+    onComoLlegar: () -> Unit,
+    onAbrirExterno: () -> Unit,
+    onReservar: () -> Unit,
+) {
+    val forma = RoundedCornerShape(topStart = 24.dp, topEnd = 40.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+    Surface(shape = forma, color = MaterialTheme.colorScheme.surface, shadowElevation = 10.dp,
+        modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.LocalPharmacy, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(f.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(f.direccion, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = onCerrar, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                EstadoPildora(plural(f.cantidadDisponible, "unidad", "unidades"),
+                    if (f.cantidadDisponible <= 3) TonoPildora.ALERTA else TonoPildora.EXITO)
+                f.distanciaKm?.let {
+                    Text(distanciaLegible(it), style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            if (ruta != null) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(if (aPie) Icons.AutoMirrored.Filled.DirectionsWalk else Icons.Default.DirectionsCar,
+                            contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f)) {
+                            Text("${kotlin.math.max(1, kotlin.math.round(ruta.segundos / 60).toInt())} min",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium)
+                            Text("${"%.1f".format(Locale.forLanguageTag("es-AR"), ruta.metros / 1000)} km " +
+                                if (aPie) "caminando" else "en auto",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = onAbrirExterno) {
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Navegar", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+            if (hayOrigen) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ModoChip("A pie", Icons.AutoMirrored.Filled.DirectionsWalk, aPie) { onModo(true) }
+                    ModoChip("En auto", Icons.Default.DirectionsCar, !aPie) { onModo(false) }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onComoLlegar, enabled = !calculando, shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)) {
+                    if (calculando) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                    else Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (ruta != null) "Recalcular" else "Cómo llegar", color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+                Button(onClick = onReservar, shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)) {
+                    Text("Reservar acá", fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModoChip(texto: String, icono: ImageVector, elegido: Boolean, onClick: () -> Unit) {
+    FilterChip(selected = elegido, onClick = onClick, label = { Text(texto) },
+        leadingIcon = { Icon(icono, contentDescription = null, modifier = Modifier.size(16.dp)) },
+        shape = CircleShape,
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MediColors.PrimarioSuave,
+            selectedLabelColor = MediColors.Ink, selectedLeadingIconColor = MediColors.Primario))
 }
