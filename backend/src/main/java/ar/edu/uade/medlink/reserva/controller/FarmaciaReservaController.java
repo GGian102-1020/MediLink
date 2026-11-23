@@ -53,6 +53,26 @@ public class FarmaciaReservaController {
         if (result.expired()) throw ApiException.conflict("RESERVATION_EXPIRED","La reserva venció.");
         return result.dto();
     }
+    /** Pharmacy reviewed the prescription of a PENDIENTE reservation and accepts it. */
+    @PostMapping("/{codigo}/confirmacion")
+    @PreAuthorize("hasRole('OPERADOR')")
+    public ReservaDTO confirmar(@PathVariable long id,@PathVariable String codigo,
+        @AuthenticationPrincipal CurrentAccount actor,HttpServletRequest request) {
+        var result=service.confirmar(id,codigo,actor,request);
+        if (result.expired()) throw ApiException.conflict("RESERVATION_EXPIRED","La reserva venció.");
+        return result.dto();
+    }
+    public record RechazoRecetaRequest(String motivo) { }
+    /** Pharmacy rejects the prescription of a PENDIENTE reservation; stock is returned. */
+    @PostMapping("/{codigo}/rechazo-receta")
+    @PreAuthorize("hasRole('OPERADOR')")
+    public ReservaDTO rechazar(@PathVariable long id,@PathVariable String codigo,
+        @RequestBody(required=false) RechazoRecetaRequest body,
+        @AuthenticationPrincipal CurrentAccount actor,HttpServletRequest request) {
+        var result=service.rechazarReceta(id,codigo,body==null?null:body.motivo(),actor,request);
+        if (result.expired()) throw ApiException.conflict("RESERVATION_EXPIRED","La reserva venció.");
+        return result.dto();
+    }
     @PostMapping("/{codigo}/cancelacion-operativa")
     public ReservaDTO cancelar(@PathVariable long id,@PathVariable String codigo,
         @Valid @RequestBody CancelacionOperativaRequest cmd,

@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.Call
 import okhttp3.EventListener
 import okhttp3.MultipartBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.OkHttpClient
 import retrofit2.HttpException
 import retrofit2.Retrofit
@@ -81,11 +83,15 @@ class MediLinkRepository internal constructor(
     suspend fun misPrescripciones(pagina: Int) = recetas.listar(pagina, 20)
     suspend fun detallePrescripcion(id: Long) = recetas.detalle(id)
     suspend fun vincularReceta(codigo: String) = recetas.vincular(VincularRecetaRequest(codigo.trim()))
+    internal suspend fun adjuntarReceta(adjunto: AdjuntoReceta, presentacionId: Long, cantidad: Int) =
+        recetas.adjuntar(adjunto.multipart(), presentacionId.toString().toRequestBody(TEXTO),
+            cantidad.toString().toRequestBody(TEXTO))
     internal suspend fun escanearReceta(archivo: MultipartBody.Part, enviado: () -> Unit) =
         escaneo.escanear(archivo, EnvioReceta(enviado))
 
-    suspend fun medicamentos(nombre: String, pagina: Int) =
-        api.medicamentos(nombre.ifBlank { null }, pagina, 20)
+    /** Primeros [cantidad] medicamentos que coinciden con [nombre] (orden alfabético). */
+    suspend fun medicamentos(nombre: String, cantidad: Int) =
+        api.medicamentos(nombre.ifBlank { null }, 0, cantidad)
 
     suspend fun presentaciones(id: Long, pagina: Int) = api.presentaciones(id, pagina, 20)
     suspend fun presentacion(id: Long) = api.presentacion(id)
@@ -105,15 +111,15 @@ class MediLinkRepository internal constructor(
 
     suspend fun registro(
         nombre: String, apellido: String, correo: String, clave: String,
-        datos: DatosPersonales? = null,
+        datos: DatosPersonales,
     ) {
         api.registro(RegisterRequest(
             nombre = nombre.trim(), apellido = apellido.trim(), correo = correo.trim(), contrasena = clave,
-            dni = datos?.dni?.filter(Char::isDigit),
-            fechaNacimiento = datos?.fechaNacimiento?.toString(),
-            telefono = datos?.telefono?.trim()?.ifBlank { null },
-            obraSocial = datos?.obraSocial?.trim()?.ifBlank { null },
-            numeroAfiliado = datos?.numeroAfiliado?.trim()?.ifBlank { null }
+            dni = datos.dni.filter(Char::isDigit),
+            fechaNacimiento = datos.fechaNacimiento.toString(),
+            telefono = datos.telefono?.trim()?.ifBlank { null },
+            obraSocial = datos.obraSocial?.trim()?.ifBlank { null },
+            numeroAfiliado = datos.numeroAfiliado?.trim()?.ifBlank { null }
                 ?.takeIf { !datos.obraSocial.isNullOrBlank() },
         ))
     }
@@ -139,16 +145,24 @@ class MediLinkRepository internal constructor(
     suspend fun cambiarClave(actual: String, nueva: String) = parity.cambiarClave(CambiarClaveRequest(actual, nueva))
     suspend fun detalleReserva(codigo: String) = parity.detalleUsuario(codigo)
     suspend fun cancelar(codigo: String) = api.cancelar(codigo)
+
+    // Chat con farmacias (solo aquellas donde el paciente tiene reservas).
+    suspend fun chats() = api.chats()
+    suspend fun chatsNoLeidos() = api.chatsNoLeidos().total
+    suspend fun mensajesChat(farmaciaId: Long, despuesDe: Long? = null) = api.mensajesChat(farmaciaId, despuesDe)
+    suspend fun estadoChat(farmaciaId: Long) = api.estadoChat(farmaciaId)
+    suspend fun enviarMensaje(farmaciaId: Long, texto: String) =
+        api.enviarMensaje(farmaciaId, EnviarMensajeRequest(texto.trim()))
 }
 
-const val MENSAJE_SOLO_PACIENTES = "La app MediLink es para pacientes. Ingresá con una cuenta de paciente."
+const val MENSAJE_SOLO_PACIENTES = "La app MediFarm es para pacientes. Ingresá con una cuenta de paciente."
 const val MENSAJE_CUENTA_FARMACIA =
-    "Las cuentas de farmacia se usan desde el dashboard web de MediLink, no desde la app."
+    "Las cuentas de farmacia se usan desde el dashboard web de MediFarm, no desde la app."
 
 /** Mensaje legible basado en los errores REST reales de MediLink. */
 fun mensajeDeError(error: Throwable): String = when (error) {
     is IllegalArgumentException -> error.message ?: "Datos incorrectos."
-    is IOException -> "No se pudo conectar con MediLink. Revisá el servidor y adb reverse."
+    is IOException -> "No se pudo conectar con MediFarm. Revisá el servidor y adb reverse."
     is HttpException -> {
         val apiMessage = try {
             val json = error.response()?.errorBody()?.string()
@@ -186,3 +200,5 @@ class IntentoReserva {
         clave = null
     }
 }
+
+private val TEXTO = "text/plain".toMediaType()

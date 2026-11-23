@@ -4,9 +4,10 @@ import { Loading } from './components/UI';
 import { AppLayout } from './components/Layout';
 import { LoginPage, ProfilePage } from './pages/Auth';
 import { OperatorDashboard, PharmacyReservations, PharmacyStock, StockMovements } from './pages/Operator';
+import { ChatPage } from './pages/Chat';
 
 /*
- * Web de MediLink = dashboard de farmacia. Solo cuentas OPERADOR.
+ * Web de MediFarm = dashboard de farmacia. Solo cuentas OPERADOR.
  * Los pacientes usan la app Android. Sin sesión solo se ve el login.
  */
 function Protected() {
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="operacion/reservas" element={<PharmacyReservations/>}/>
       <Route path="operacion/stock" element={<PharmacyStock/>}/>
       <Route path="operacion/movimientos" element={<StockMovements/>}/>
+      <Route path="chat" element={<ChatPage/>}/>
     </Route>
     <Route path="*" element={<Navigate to="/" replace/>}/>
   </Routes>;

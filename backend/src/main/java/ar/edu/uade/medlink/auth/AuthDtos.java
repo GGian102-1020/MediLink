@@ -10,7 +10,18 @@ public final class AuthDtos {
         @NotBlank String nombre,
         @NotBlank String apellido,
         @NotBlank String correo,
-        @NotNull String contrasena) { }
+        @NotNull String contrasena,
+        /** 7 u 8 dígitos; se aceptan puntos o espacios y se descartan. */
+        String dni,
+        /** ISO yyyy-MM-dd; el paciente debe ser mayor de 18 años. */
+        String fechaNacimiento,
+        String telefono,
+        String obraSocial,
+        String numeroAfiliado) { }
+
+    /** Datos personales ya normalizados y validados que se guardan en la tabla usuario. */
+    public record DatosPersonales(String dni, java.time.LocalDate fechaNacimiento, String telefono,
+                                  String obraSocial, String numeroAfiliado) { }
 
     public record LoginRequest(
         @NotBlank String correo,

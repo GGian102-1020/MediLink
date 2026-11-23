@@ -86,6 +86,13 @@ public class PrescripcionService {
         return crearPrescripcion(req,actor,request);
     }
 
+    /** Internal entry point for a prescription file the patient attaches when reserving. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public PrescripcionDTO crearDesdeRecetaAdjunta(PrescripcionCreateRequest req, CurrentAccount actor,
+                                                   HttpServletRequest request) {
+        return crearDesdeRecetaDemo(req,actor,request);
+    }
+
     private PrescripcionDTO crearPrescripcion(PrescripcionCreateRequest req, CurrentAccount actor,
                                                 HttpServletRequest request) {
         if (req.codigoExterno()==null || req.codigoExterno().isEmpty() || req.codigoExterno().length()>80

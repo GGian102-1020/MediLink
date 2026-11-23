@@ -106,7 +106,7 @@ fun PerfilScreen(repository: MediLinkRepository, sesion: LoginDto?, onLogin: () 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (sesion == null) {
-            HeroPanel("TU CUENTA", "Bienvenido a MediLink",
+            HeroPanel("TU CUENTA", "Bienvenido a MediFarm",
                 "Ingresá para consultar tus datos y gestionar las reservas de tu cuenta.",
                 Icons.Default.AccountCircle)
             Button(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }

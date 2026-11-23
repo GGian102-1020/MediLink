@@ -72,7 +72,7 @@ fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                listOf("" to "Todas", "ACTIVA" to "Activas", "COMPLETADA" to "Completadas",
+                listOf("" to "Todas", "PENDIENTE" to "Por confirmar", "ACTIVA" to "Activas", "COMPLETADA" to "Completadas",
                     "CANCELADA" to "Canceladas", "VENCIDA" to "Vencidas").forEach { (value, label) ->
                     FilterChip(selected = state.filtro == value, onClick = { vm.filtrar(value) },
                         enabled = !state.cargando, label = { Text(label) })
@@ -104,10 +104,11 @@ fun ReservasScreen(vm: ReservasVm, onDetalle: (String) -> Unit) {
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         Text(reserva.farmaciaNombreSnapshot, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text("${plural(reserva.cantidad, "unidad", "unidades")} · ${if (reserva.estado == "ACTIVA") "Vence" else "Creada"} ${fechaLegible(if (reserva.estado == "ACTIVA") reserva.fechaHoraVencimiento else reserva.fechaHoraCreacion)}",
+                    Text(if (reserva.estado == "PENDIENTE") "${plural(reserva.cantidad, "unidad", "unidades")} · Esperando que la farmacia confirme tu receta"
+                        else "${plural(reserva.cantidad, "unidad", "unidades")} · ${if (reserva.estado == "ACTIVA") "Vence" else "Creada"} ${fechaLegible(if (reserva.estado == "ACTIVA") reserva.fechaHoraVencimiento else reserva.fechaHoraCreacion)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (reserva.estado == "ACTIVA") {
+                    if (reserva.estado == "ACTIVA" || reserva.estado == "PENDIENTE") {
                         OutlinedButton(onClick = { aCancelar = reserva },
                             enabled = state.cancelandoCodigo == null,
                             modifier = Modifier.fillMaxWidth()) {

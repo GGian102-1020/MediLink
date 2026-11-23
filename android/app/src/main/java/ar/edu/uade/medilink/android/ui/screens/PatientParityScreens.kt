@@ -20,8 +20,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Medication
-import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,30 +66,6 @@ fun SaludoInicio(titulo: String, subtitulo: String, iniciales: String?) {
 
 /** Reserva por retirar destacada: es lo más importante que tiene que ver el paciente al entrar. */
 @Composable
-private fun ProximaReserva(r: ReservaDto, onClick: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primary) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.QrCode2, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Listo para retirar", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
-                Text(r.medicamentoNombreSnapshot, style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(r.farmaciaNombreSnapshot, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f), maxLines = 1,
-                    overflow = TextOverflow.Ellipsis)
-            }
-            Text("Ver código", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary)
-        }
-    }
-}
-
-@Composable
 fun FilaReserva(r: ReservaDto, onClick: () -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface,
@@ -115,14 +92,17 @@ fun FilaReserva(r: ReservaDto, onClick: () -> Unit) {
 
 @Composable
 fun PanelPaciente(repository: MediLinkRepository, onCatalogo: () -> Unit,
-    onReservas: () -> Unit, onRecetas: () -> Unit, onDetalle: (String) -> Unit) {
+    onReservas: () -> Unit, onRecetas: () -> Unit, onMensajes: () -> Unit, onDetalle: (String) -> Unit) {
     var perfil by remember { mutableStateOf<MeDto?>(null) }
     var reservas by remember { mutableStateOf<List<ReservaDto>>(emptyList()) }
-    var proxima by remember { mutableStateOf<ReservaDto?>(null) }
     var activas by remember { mutableStateOf<Long?>(null) }
+    var pendientes by remember { mutableStateOf<List<ReservaDto>>(emptyList()) }
     var total by remember { mutableStateOf<Long?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var mensajesSinLeer by remember { mutableStateOf(0L) }
     LaunchedEffect(repository.session.token) {
+        // Contador del chat: falla en silencio para no tapar el resto del inicio.
+        try { mensajesSinLeer = repository.chatsNoLeidos() } catch (e: CancellationException) { throw e } catch (_: Exception) { }
         try {
             perfil = repository.miPerfil()
             val pagina = repository.misReservas(0)
@@ -130,7 +110,7 @@ fun PanelPaciente(repository: MediLinkRepository, onCatalogo: () -> Unit,
             total = pagina.totalElements
             val paginaActivas = repository.misReservas(0, "ACTIVA")
             activas = paginaActivas.totalElements
-            proxima = paginaActivas.content.firstOrNull()
+            pendientes = repository.misReservas(0, "PENDIENTE").content
             error = null
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = mensajeDeError(e) }
@@ -145,9 +125,11 @@ fun PanelPaciente(repository: MediLinkRepository, onCatalogo: () -> Unit,
             AvisoError("Tu cuenta está suspendida hasta ${fechaLegible(it.fechaHoraFin)}: ${it.motivo}")
         }
         AvisoError(error)
-        proxima?.let { r ->
-            Spacer(Modifier.height(0.dp))
-            ProximaReserva(r) { onDetalle(r.codigoVisible) }
+        pendientes.firstOrNull()?.let { r ->
+            AccesoTarjeta(
+                if (pendientes.size > 1) "${pendientes.size} recetas en revisión" else "Receta en revisión",
+                "${r.farmaciaNombreSnapshot} está revisando tu receta de ${r.medicamentoNombreSnapshot}",
+                Icons.Default.HourglassTop, onClick = { onDetalle(r.codigoVisible) })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             MetricaTarjeta((activas ?: "—").toString(), "Por retirar",
@@ -156,6 +138,10 @@ fun PanelPaciente(repository: MediLinkRepository, onCatalogo: () -> Unit,
                 Icons.Default.History, Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).clickable(onClick = onReservas))
         }
         AccesoTarjeta("Mis recetas", "Vinculá y consultá tus recetas", Icons.Default.Medication, onRecetas)
+        AccesoTarjeta("Mensajes",
+            if (mensajesSinLeer > 0) plural(mensajesSinLeer, "mensaje nuevo de tu farmacia", "mensajes nuevos de tus farmacias")
+            else "Chateá con las farmacias donde reservaste",
+            Icons.AutoMirrored.Filled.Chat, onMensajes)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { SeccionTitulo("Reservas recientes") }
             if (reservas.isNotEmpty()) TextButton(onClick = onReservas) {

@@ -41,6 +41,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -55,7 +59,7 @@ import androidx.compose.runtime.getValue
 
 /**
  * Pantalla de bienvenida: la cruz del logo entra con rebote, un pulso con los colores
- * de la marca, el texto "Medlink" sube y aparece; luego avisa con [onTerminado].
+ * de la marca, el texto "MediFarm" sube y aparece; luego avisa con [onTerminado].
  * Siempre sobre blanco, igual que el logo original.
  */
 @Composable
@@ -91,7 +95,7 @@ fun SplashScreen(onTerminado: () -> Unit) {
 
     Box(
         modifier = Modifier.fillMaxSize().background(Color.White)
-            .semantics { contentDescription = "MediLink, cargando" },
+            .semantics { contentDescription = "MediFarm, cargando" },
         contentAlignment = Alignment.Center,
     ) {
         // Manchas suaves de color detrás del logo.
@@ -128,11 +132,14 @@ fun SplashScreen(onTerminado: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(4.dp))
-            Image(
-                painter = painterResource(R.drawable.logo_texto),
-                contentDescription = null,
-                modifier = Modifier.width(210.dp)
-                    .offset(y = subidaTexto.value.dp).alpha(alfaTexto.value),
+            // Nombre de la marca en texto.
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = MediColors.Navy)) { append("Medi") }
+                    withStyle(SpanStyle(color = MediColors.Primario)) { append("Farm") }
+                },
+                fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp,
+                modifier = Modifier.offset(y = subidaTexto.value.dp).alpha(alfaTexto.value),
             )
             Spacer(Modifier.height(14.dp))
             Text(

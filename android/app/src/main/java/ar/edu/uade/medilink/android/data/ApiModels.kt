@@ -117,4 +117,46 @@ data class ReservaDto(
     val motivoCancelacion: String?,
     val prescripcionCodigo: String?,
     val pinRetiro: String? = null,
+    /** Momento en que la farmacia confirmó la receta (solo reservas BAJO_RECETA ya confirmadas). */
+    val fechaHoraConfirmacion: String? = null,
 )
+
+/** Mensaje del chat con una farmacia. autor: FARMACIA o USUARIO. */
+data class MensajeChatDto(
+    val id: Long,
+    val autor: String,
+    val texto: String,
+    val fechaHora: String,
+    val leido: Boolean,
+)
+
+/** Conversación con una farmacia donde el paciente reservó. */
+data class ConversacionChatDto(
+    val farmaciaId: Long,
+    val nombre: String,
+    val direccion: String,
+    val ultimoMensaje: String?,
+    val ultimoAutor: String?,
+    val ultimaActividad: String?,
+    val noLeidos: Long,
+    /** Medicamento y código de la reserva de referencia (la abierta más reciente o la última). */
+    val medicamento: String? = null,
+    val codigoReserva: String? = null,
+    val estadoReserva: String? = null,
+    /** false: la reserva terminó y la conversación es solo de lectura. */
+    val abierta: Boolean = true,
+    /** Cuándo se borra solo el historial de una conversación cerrada. */
+    val fechaHoraBorrado: String? = null,
+)
+
+/** Si se puede escribir en la conversación y a qué reserva corresponde. */
+data class EstadoChatDto(
+    val abierta: Boolean,
+    val medicamento: String?,
+    val codigoReserva: String?,
+    val estadoReserva: String?,
+    val fechaHoraBorrado: String? = null,
+)
+
+data class EnviarMensajeRequest(val texto: String)
+data class NoLeidosDto(val total: Long)

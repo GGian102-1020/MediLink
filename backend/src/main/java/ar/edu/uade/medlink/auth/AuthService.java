@@ -1,6 +1,7 @@
 package ar.edu.uade.medlink.auth;
 
 import ar.edu.uade.medlink.auth.AuthDtos.*;
+import ar.edu.uade.medlink.common.ApiClock;
 import ar.edu.uade.medlink.common.AuditService;
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.security.CurrentAccount;
@@ -8,6 +9,8 @@ import ar.edu.uade.medlink.security.JwtTokens;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -55,15 +58,63 @@ public class AuthService {
         String nombre = name(request.nombre());
         String apellido = name(request.apellido());
         initialPassword(request.contrasena());
+        DatosPersonales datos = datosPersonales(request, LocalDate.now(clock.withZone(ApiClock.ZONE)));
         if (repository.byEmail(correo).isPresent())
             throw ApiException.conflict("EMAIL_ALREADY_EXISTS","Ya existe una cuenta con ese correo.");
+        if (repository.existsUserWithDni(datos.dni()))
+            throw dniDuplicado();
         try {
             long id = repository.newAccount(correo,passwords.encode(request.contrasena()),"USUARIO",clock.instant());
-            repository.newUser(id,nombre,apellido);
+            repository.newUser(id,nombre,apellido,datos);
             return repository.userProfile(id);
         } catch (DuplicateKeyException ex) {
+            // Carrera entre dos registros simultáneos: decide el índice único que se violó.
+            if (ex.getMessage() != null && ex.getMessage().contains("ux_usuario_dni")) throw dniDuplicado();
             throw ApiException.conflict("EMAIL_ALREADY_EXISTS","Ya existe una cuenta con ese correo.");
         }
+    }
+    private static ApiException dniDuplicado() {
+        return ApiException.conflict("DNI_ALREADY_EXISTS","Ya existe una cuenta registrada con ese DNI.");
+    }
+
+    public static final int EDAD_MINIMA = 18;
+
+    static DatosPersonales datosPersonales(RegisterRequest request, LocalDate hoy) {
+        String dni = request.dni() == null ? "" : request.dni().replaceAll("[\\s.]", "");
+        if (!dni.matches("[0-9]{7,8}"))
+            throw ApiException.validation("DNI inválido: ingresá 7 u 8 números.");
+        if (request.fechaNacimiento() == null || request.fechaNacimiento().isBlank())
+            throw ApiException.validation("La fecha de nacimiento es obligatoria.");
+        LocalDate nacimiento;
+        try {
+            nacimiento = LocalDate.parse(request.fechaNacimiento().strip());
+        } catch (DateTimeParseException ex) {
+            throw ApiException.validation("Fecha de nacimiento inválida (formato yyyy-MM-dd).");
+        }
+        if (nacimiento.isAfter(hoy))
+            throw ApiException.validation("La fecha de nacimiento no puede ser futura.");
+        if (nacimiento.plusYears(EDAD_MINIMA).isAfter(hoy))
+            throw ApiException.validation("Tenés que ser mayor de " + EDAD_MINIMA + " años para registrarte.");
+        if (nacimiento.isBefore(hoy.minusYears(120)))
+            throw ApiException.validation("Fecha de nacimiento inválida.");
+
+        String telefono = optional(request.telefono());
+        if (telefono != null) {
+            int digitos = telefono.replaceAll("\\D", "").length();
+            if (telefono.length() > 20 || !telefono.matches("[0-9+\\- ]+") || digitos < 6 || digitos > 15)
+                throw ApiException.validation("Teléfono inválido.");
+        }
+        String obraSocial = optional(request.obraSocial());
+        if (obraSocial != null && obraSocial.length() > 80)
+            throw ApiException.validation("Obra social inválida (máximo 80 caracteres).");
+        // Sin obra social no tiene sentido un número de afiliado.
+        String afiliado = obraSocial == null ? null : optional(request.numeroAfiliado());
+        if (afiliado != null && afiliado.length() > 30)
+            throw ApiException.validation("Número de afiliado inválido (máximo 30 caracteres).");
+        return new DatosPersonales(dni, nacimiento, telefono, obraSocial, afiliado);
+    }
+    private static String optional(String raw) {
+        return raw == null || raw.isBlank() ? null : raw.strip();
     }
     // BCrypt uses at most 72 UTF-8 bytes. Apply the same byte limit to every
     // supplied password, including login and the current password on change.

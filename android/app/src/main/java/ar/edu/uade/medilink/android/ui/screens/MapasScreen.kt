@@ -182,7 +182,7 @@ private suspend fun calcularRuta(origen: PuntoGeo, destino: PuntoGeo, aPie: Bool
         val url = "$base/${origen.lng},${origen.lat};${destino.lng},${destino.lat}" +
             "?overview=full&geometries=geojson&steps=true"
         val request = Request.Builder().url(url)
-            .header("User-Agent", "MediLink-Android-Academic-Demo/0.2")
+            .header("User-Agent", "MediFarm-Android-Academic-Demo/0.2")
             .build()
         val client = OkHttpClient()
         client.newCall(request).execute().use { response ->

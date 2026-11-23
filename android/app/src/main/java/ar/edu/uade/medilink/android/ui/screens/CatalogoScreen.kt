@@ -71,7 +71,11 @@ fun CatalogoScreen(vm: CatalogoVm, onAbrir: (Long) -> Unit) {
         item { AvisoError(state.error) }
         if (state.cargando && state.lista.isEmpty()) item { IndicadorCargando() }
         if (state.lista.isNotEmpty()) {
-            item { SeccionTitulo("Resultados", plural(state.lista.size, "medicamento", "medicamentos")) }
+            val total = maxOf(state.total, state.lista.size.toLong())
+            val detalle = if (total > state.lista.size)
+                "Mostrando ${state.lista.size} de $total. Escribí el nombre para encontrar el tuyo."
+            else plural(total, "medicamento", "medicamentos")
+            item { SeccionTitulo("Resultados", detalle) }
         }
         items(state.lista, key = { it.id }) { medicamento ->
             Card(modifier = Modifier.fillMaxWidth().clickable { onAbrir(medicamento.id) },
@@ -99,21 +103,18 @@ fun CatalogoScreen(vm: CatalogoVm, onAbrir: (Long) -> Unit) {
             item { VacioEstado("Sin resultados", "Probá buscar con otro nombre o revisar la escritura.") }
         }
         if (state.cargando && state.lista.isNotEmpty()) item { IndicadorCargando() }
-        if (!state.ultimaPagina && !state.cargando) {
-            item { Button(onClick = vm::mas, modifier = Modifier.fillMaxWidth()) { Text("Mostrar más medicamentos") } }
-        }
     }
 }
 
 @Composable
-fun PresentacionesScreen(vm: PresentacionesVm, onAbrir: (Long) -> Unit) {
+fun PresentacionesScreen(vm: PresentacionesVm, onAbrir: (ar.edu.uade.medilink.android.data.PresentacionDto) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = screenPadding,
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Encabezado(state.lista.firstOrNull()?.medicamentoNombre ?: "Presentaciones", "Elegí la presentación para ver qué farmacias la tienen.") }
         item { AvisoError(state.error) }
         items(state.lista, key = { it.id }) { item ->
-            Card(modifier = Modifier.fillMaxWidth().clickable { onAbrir(item.id) },
+            Card(modifier = Modifier.fillMaxWidth().clickable { onAbrir(item) },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, CalendarCheck, CalendarX2, CheckCircle2, ChevronRight, Clock3, History, Minus, PackageOpen, PackagePlus, Plus, RefreshCcw, Search, SlidersHorizontal, Store, XCircle } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, CalendarCheck, CalendarX2, CheckCircle2, ChevronRight, Clock3, ExternalLink, FileText, History, Minus, PackageOpen, PackagePlus, Plus, RefreshCcw, Search, SlidersHorizontal, Store, TriangleAlert, XCircle } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useLive } from '../lib/live';
-import { ApiError, get, post, put } from '../lib/api';
+import { ApiError, get, getBlob, post, put } from '../lib/api';
 import { ago, dateTime, greeting, movimientoLabel, plural, readable, remaining, shortDateTime, today } from '../lib/format';
 import { fetchPresentacion, presentacionDetalle, presentacionTitulo, usePresentaciones } from '../lib/presentaciones';
 import { useResource } from '../lib/useResource';
@@ -13,15 +13,19 @@ import { Alert, Badge, Button, ConfirmDialog, Empty, ErrorState, Field, IconButt
 
 const LOW_STOCK = 5;
 const ESTADOS: { value: '' | EstadoReserva; label: string }[] = [
-  { value: '', label: 'Todas' }, { value: 'ACTIVA', label: 'Activas' }, { value: 'COMPLETADA', label: 'Completadas' }, { value: 'CANCELADA', label: 'Canceladas' }, { value: 'VENCIDA', label: 'Vencidas' },
+  { value: '', label: 'Todas' }, { value: 'PENDIENTE', label: 'Por confirmar' }, { value: 'ACTIVA', label: 'Activas' }, { value: 'COMPLETADA', label: 'Completadas' }, { value: 'CANCELADA', label: 'Canceladas' }, { value: 'VENCIDA', label: 'Vencidas' },
 ];
 const reservasUrl = (id: number) => `/api/farmacias/${id}/reservas`;
 const stockUrl = (id: number) => `/api/farmacias/${id}/stock`;
 
 function usePharmacyId() { const { me } = useAuth(); return me?.perfil.farmaciaId || null; }
 function NeedPharmacy() { return <Panel><Empty icon={<Store size={20}/>} title="Sin farmacia asignada" detail="Tu cuenta de operador no tiene una farmacia asociada. Pedile a un administrador que te asigne una."/></Panel>; }
-function TimeLeft({ seconds }: { seconds: number }) {
-  return <span className={`time-left ${seconds < 3600 ? 'urgent' : ''}`}>{seconds > 0 ? `Vence en ${remaining(seconds)}` : 'Venciendo'}</span>;
+function TimeLeft({ seconds, prefix = 'Vence en' }: { seconds: number; prefix?: string }) {
+  return <span className={`time-left ${seconds < 3600 ? 'urgent' : ''}`}>{seconds > 0 ? `${prefix} ${remaining(seconds)}` : 'Venciendo'}</span>;
+}
+/** PENDIENTE: the countdown is the time the pharmacy has left to review the prescription. */
+function ReservaTime({ r }: { r: Reserva }) {
+  return r.estado === 'PENDIENTE' ? <TimeLeft seconds={r.segundosRestantes} prefix="Revisar en"/> : <TimeLeft seconds={r.segundosRestantes}/>;
 }
 function StockLevel({ qty }: { qty: number }) {
   if (qty === 0) return <Badge value="SIN_STOCK" tone="danger" label="Sin stock"/>;
@@ -34,11 +38,12 @@ export function OperatorDashboard() {
   const { me } = useAuth(); const navigate = useNavigate(); const farmId = me?.perfil.farmaciaId; const { version, isNew } = useLive();
   const counts = useResource(async () => {
     if (!farmId) return null;
-    const estados: EstadoReserva[] = ['ACTIVA', 'COMPLETADA', 'CANCELADA', 'VENCIDA'];
+    const estados: EstadoReserva[] = ['PENDIENTE', 'ACTIVA', 'COMPLETADA', 'CANCELADA', 'VENCIDA'];
     const pages = await Promise.all(estados.map(estado => get<Page<Reserva>>(reservasUrl(farmId), { page: 0, size: 1, estado })));
     return Object.fromEntries(estados.map((e, i) => [e, pages[i].totalElements])) as Record<EstadoReserva, number>;
   }, [farmId, version]);
   const activas = useResource(() => farmId ? get<Page<Reserva>>(reservasUrl(farmId), { page: 0, size: 100, estado: 'ACTIVA' }) : Promise.resolve(null), [farmId, version]);
+  const pendientes = useResource(() => farmId ? get<Page<Reserva>>(reservasUrl(farmId), { page: 0, size: 6, estado: 'PENDIENTE', sort: 'fechaHoraVencimiento,asc' }) : Promise.resolve(null), [farmId, version]);
   const stock = useResource(() => farmId ? get<Page<Stock>>(stockUrl(farmId), { page: 0, size: 100 }) : Promise.resolve(null), [farmId, version]);
   const movs = useResource(() => farmId ? get<Page<MovimientoStock>>(`${stockUrl(farmId)}/movimientos`, { page: 0, size: 6 }) : Promise.resolve(null), [farmId, version]);
 
@@ -56,6 +61,14 @@ export function OperatorDashboard() {
       <Kpi label="Canceladas" value={c ? c.CANCELADA : '—'} hint="Por usuario u operación" icon={<XCircle size={16}/>} tone="danger" to="/operacion/reservas?estado=CANCELADA"/>
       <Kpi label="Vencidas" value={c ? c.VENCIDA : '—'} hint="Sin retirar a tiempo" icon={<CalendarX2 size={16}/>} tone="warning" to="/operacion/reservas?estado=VENCIDA"/>
     </div>
+    <Panel className="section-gap" title={c && c.PENDIENTE > 0 ? `Recetas por confirmar (${c.PENDIENTE})` : 'Recetas por confirmar'} subtitle="Reservas bajo receta esperando que revises la receta" action={<Link to="/operacion/reservas?estado=PENDIENTE" className="link">Ver todas <ArrowRight size={14}/></Link>}>
+      {pendientes.loading && !pendientes.data ? <SkeletonList rows={2}/> : pendientes.error ? <ErrorState error={pendientes.error} retry={pendientes.reload}/> : pendientes.data?.content.length ? <div className="list">{pendientes.data.content.map(r =>
+        <button key={r.id} className={`list-row ${isNew(r.id) ? 'row-new' : ''}`} onClick={() => navigate(`/operacion/reservas?codigo=${encodeURIComponent(r.codigoVisible)}`)}>
+          <span className="list-icon"><FileText size={16}/></span>
+          <span className="list-main"><strong title={r.medicamentoNombreSnapshot}>{r.medicamentoNombreSnapshot} <span className="muted" style={{ fontWeight: 400 }}>× {r.cantidad}</span></strong><small>{[r.usuarioNombre, r.usuarioApellido].filter(Boolean).join(' ') || 'Usuario'} · {r.recetaAdjunta ? 'Receta adjunta' : 'Receta electrónica'}</small></span>
+          <span className="list-side"><ReservaTime r={r}/><small>Revisar receta</small></span>
+        </button>)}</div> : <Empty compact icon={<FileText size={20}/>} title="No hay recetas por revisar" detail="Cuando un paciente reserve un medicamento bajo receta, va a aparecer acá."/>}
+    </Panel>
     <div className="grid-2">
       <Panel title="Próximas a vencer" subtitle="Reservas activas ordenadas por vencimiento" action={<Link to="/operacion/reservas?estado=ACTIVA" className="link">Ver todas <ArrowRight size={14}/></Link>}>
         {activas.loading && !activas.data ? <SkeletonList rows={3}/> : activas.error ? <ErrorState error={activas.error} retry={activas.reload}/> : porRetirar.length ? <div className="list">{porRetirar.map(r =>
@@ -118,7 +131,7 @@ export function PharmacyReservations() {
             <td style={{ maxWidth: 280 }}><span className="cell-main truncate" style={{ display: 'block' }} title={r.medicamentoNombreSnapshot}>{r.medicamentoNombreSnapshot}</span><span className="cell-sub truncate" title={r.presentacionDescripcionSnapshot}>{r.presentacionDescripcionSnapshot}</span></td>
             <td className="hide-sm">{[r.usuarioNombre, r.usuarioApellido].filter(Boolean).join(' ') || '—'}</td>
             <td><Badge value={r.estado}/></td>
-            <td className="hide-sm">{r.estado === 'ACTIVA' ? <TimeLeft seconds={r.segundosRestantes}/> : <span className="muted">{shortDateTime(r.fechaHoraVencimiento)}</span>}</td>
+            <td className="hide-sm">{r.estado === 'ACTIVA' || r.estado === 'PENDIENTE' ? <ReservaTime r={r}/> : <span className="muted">{shortDateTime(r.fechaHoraVencimiento)}</span>}</td>
             <td className="col-action"><ChevronRight size={16} className="chev"/></td>
           </tr>)}</tbody>
         </table></div>
@@ -129,13 +142,40 @@ export function PharmacyReservations() {
   </>;
 }
 
+/** Receta (PDF o imagen) que adjuntó el paciente: vista previa para verificarla antes de entregar. */
+function RecetaAdjunta({ url, pendiente }: { url: string; pendiente: boolean }) {
+  const [archivo, setArchivo] = useState<{ src: string; tipo: string } | null>(null);
+  const [cargando, setCargando] = useState(false); const [error, setError] = useState('');
+  useEffect(() => () => { if (archivo) URL.revokeObjectURL(archivo.src); }, [archivo]);
+  async function ver() {
+    setCargando(true); setError('');
+    try { const blob = await getBlob(url); setArchivo({ src: URL.createObjectURL(blob), tipo: blob.type }); }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo abrir la receta.'); }
+    finally { setCargando(false); }
+  }
+  return <div className="receta-box">
+    <div className="receta-head">
+      <span className="receta-icon"><FileText size={18}/></span>
+      <div><strong>Receta adjunta por el paciente</strong><small>{pendiente ? 'Revisala y después confirmá o rechazá la reserva.' : 'Documento presentado al reservar.'}</small></div>
+      {archivo
+        ? <a className="btn btn-secondary btn-sm" href={archivo.src} target="_blank" rel="noopener noreferrer"><ExternalLink size={14}/> Abrir</a>
+        : <Button size="sm" variant="secondary" onClick={() => void ver()} busy={cargando}>Ver receta</Button>}
+    </div>
+    {error && <Alert>{error}</Alert>}
+    {archivo && (archivo.tipo === 'application/pdf'
+      ? <iframe className="receta-preview" src={archivo.src} title="Receta adjunta"/>
+      : <img className="receta-preview" src={archivo.src} alt="Receta adjunta por el paciente"/>)}
+  </div>;
+}
+
 function ReservationDetail({ pharmacyId, code, onClose, onChanged, version }: { pharmacyId: number; code: string; onClose: () => void; onChanged: () => void; version: number }) {
   const detail = useResource(() => get<Reserva>(`${reservasUrl(pharmacyId)}/${encodeURIComponent(code)}`), [pharmacyId, code, version]);
-  const [mode, setMode] = useState<'view' | 'cancel' | 'pickup'>('view');
+  const [mode, setMode] = useState<'view' | 'cancel' | 'pickup' | 'reject'>('view');
   const [cause, setCause] = useState<string>('PRODUCTO_NO_DISPONIBLE'); const [reason, setReason] = useState(''); const [restitution, setRestitution] = useState('RESTITUIR'); const [realStock, setRealStock] = useState(0);
-  const [confirmation, setConfirmation] = useState<'cancelacion' | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [confirmation, setConfirmation] = useState<'cancelacion' | 'confirmar' | 'rechazar' | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const [pin, setPin] = useState('');
-  const r = detail.data; const active = r?.estado === 'ACTIVA';
+  const [rejectReason, setRejectReason] = useState('');
+  const r = detail.data; const active = r?.estado === 'ACTIVA'; const pending = r?.estado === 'PENDIENTE';
   const path = r ? `${reservasUrl(pharmacyId)}/${encodeURIComponent(r.codigoVisible)}` : '';
 
   async function pickup(e: FormEvent) {
@@ -161,9 +201,32 @@ function ReservationDetail({ pharmacyId, code, onClose, onChanged, version }: { 
     } catch (err) { setConfirmation(null); setError(err instanceof Error ? err.message : 'No se pudo cancelar la reserva.'); detail.reload(); }
     finally { setBusy(false); }
   }
+  async function confirmReservation() {
+    if (!r) return;
+    setBusy(true); setError('');
+    try {
+      await post<Reserva>(`${path}/confirmacion`, {});
+      toast.success('Reserva confirmada', { description: 'El paciente ya ve su PIN y tiene 4 horas para retirar.' });
+      setConfirmation(null); detail.reload(); onChanged();
+    } catch (err) { setConfirmation(null); setError(err instanceof Error ? err.message : 'No se pudo confirmar la reserva.'); detail.reload(); }
+    finally { setBusy(false); }
+  }
+  async function rejectPrescription() {
+    if (!r) return;
+    setBusy(true); setError('');
+    try {
+      await post<Reserva>(`${path}/rechazo-receta`, { motivo: rejectReason.trim() });
+      toast.success('Receta rechazada', { description: 'La reserva se canceló y las unidades volvieron al stock.' });
+      setConfirmation(null); setMode('view'); setRejectReason(''); detail.reload(); onChanged();
+    } catch (err) { setConfirmation(null); setError(err instanceof Error ? err.message : 'No se pudo rechazar la receta.'); detail.reload(); }
+    finally { setBusy(false); }
+  }
   function go(next: typeof mode) { setMode(next); setError(''); setPin(''); }
 
-  const footer = r && active ? mode === 'view'
+  const footer = r && pending ? mode === 'reject'
+    ? <><Button variant="secondary" onClick={() => go('view')} disabled={busy}>Volver</Button><Button variant="danger" type="submit" form="reject-form" disabled={!rejectReason.trim()}>Rechazar receta</Button></>
+    : <><Button variant="ghost" onClick={() => go('reject')}><XCircle size={16}/> Rechazar receta</Button><Button onClick={() => setConfirmation('confirmar')}><CheckCircle2 size={16}/> Confirmar reserva</Button></>
+    : r && active ? mode === 'view'
     ? <><Button variant="ghost" onClick={() => go('cancel')}>Cancelación operativa</Button><Button onClick={() => go('pickup')}><CheckCircle2 size={16}/> Confirmar retiro</Button></>
     : mode === 'pickup'
       ? <><Button variant="secondary" onClick={() => go('view')} disabled={busy}>Volver</Button><Button type="submit" form="pickup-form" busy={busy} disabled={!/^\d{6}$/.test(pin)}><CheckCircle2 size={16}/> Confirmar retiro</Button></>
@@ -178,13 +241,21 @@ function ReservationDetail({ pharmacyId, code, onClose, onChanged, version }: { 
           <div><small>Usuario</small><strong>{[r.usuarioNombre, r.usuarioApellido].filter(Boolean).join(' ') || '—'}</strong></div>
           <div><small>Cantidad</small><strong className="num">{plural(r.cantidad, 'unidad', 'unidades')}</strong></div>
           <div><small>Creada</small><strong>{dateTime(r.fechaHoraCreacion)}</strong></div>
-          <div><small>Vence</small><strong>{dateTime(r.fechaHoraVencimiento)}</strong>{active && <div><TimeLeft seconds={r.segundosRestantes}/></div>}</div>
+          <div><small>{pending ? 'Revisar antes de' : 'Vence'}</small><strong>{dateTime(r.fechaHoraVencimiento)}</strong>{(active || pending) && <div><ReservaTime r={r}/></div>}</div>
+          {r.fechaHoraConfirmacion && <div><small>Receta confirmada</small><strong>{dateTime(r.fechaHoraConfirmacion)}</strong></div>}
           {r.fechaHoraRetiro && <div><small>Retirada</small><strong>{dateTime(r.fechaHoraRetiro)}</strong></div>}
           {r.fechaHoraCancelacion && <div><small>Cancelada</small><strong>{dateTime(r.fechaHoraCancelacion)}</strong></div>}
           {r.causaCancelacion && <div><small>Causa</small><strong>{readable(r.causaCancelacion)}</strong></div>}
           {r.motivoCancelacion && <div className="span-2"><small>Motivo</small><strong>{r.motivoCancelacion}</strong></div>}
           {r.prescripcionCodigo && <div><small>Receta</small><strong className="code">{r.prescripcionCodigo}</strong></div>}
         </div>
+        {r.condicionDispensa === 'BAJO_RECETA' && (r.recetaAdjunta
+          ? <RecetaAdjunta url={`${path}/receta`} pendiente={pending}/>
+          : <div className="receta-box receta-sin"><TriangleAlert size={16}/><span>Bajo receta · el paciente usó un código de receta electrónica (sin archivo adjunto).</span></div>)}
+        {pending && mode === 'reject' && <form id="reject-form" className="stack" onSubmit={(e: FormEvent) => { e.preventDefault(); if (rejectReason.trim()) setConfirmation('rechazar'); }}>
+          <div className="divider"/>
+          <Field label="Motivo del rechazo" hint="El paciente va a ver este motivo en su reserva."><textarea value={rejectReason} maxLength={470} onChange={e => setRejectReason(e.target.value)} placeholder="Ej.: la receta está vencida o es ilegible" required autoFocus/></Field>
+        </form>}
         {active && mode === 'pickup' && <form id="pickup-form" className="stack" onSubmit={pickup}>
           <div className="divider"/>
           <Field label="PIN de retiro" hint="Pedile al paciente el PIN de 6 dígitos que ve en su reserva. Después de 5 intentos incorrectos, la reserva se bloquea para retiro.">
@@ -202,7 +273,15 @@ function ReservationDetail({ pharmacyId, code, onClose, onChanged, version }: { 
         </form>}
       </> : null}
     </Modal>
-    {confirmation && r && <ConfirmDialog
+    {confirmation === 'confirmar' && r && <ConfirmDialog
+      title="¿Confirmar la reserva?"
+      message="Confirmás que la receta es válida. El paciente va a ver su PIN y tiene 4 horas para retirar."
+      confirmText="Confirmar reserva" busy={busy} onClose={() => setConfirmation(null)} onConfirm={confirmReservation}/>}
+    {confirmation === 'rechazar' && r && <ConfirmDialog
+      title="¿Rechazar la receta?"
+      message="La reserva se cancela, las unidades vuelven al stock y el paciente ve el motivo. No se puede deshacer."
+      confirmText="Rechazar receta" danger busy={busy} onClose={() => setConfirmation(null)} onConfirm={rejectPrescription}/>}
+    {confirmation === 'cancelacion' && r && <ConfirmDialog
       title="¿Cancelar la reserva?"
       message="La reserva deja de estar activa y el stock se ajusta según la causa elegida. No se puede deshacer."
       confirmText="Cancelar reserva" danger busy={busy} onClose={() => setConfirmation(null)} onConfirm={cancelReservation}/>}

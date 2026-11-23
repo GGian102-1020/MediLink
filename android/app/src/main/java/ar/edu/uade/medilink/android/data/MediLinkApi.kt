@@ -56,4 +56,25 @@ interface MediLinkApi {
 
     @POST("api/reservas/{codigo}/cancelacion")
     suspend fun cancelar(@Path("codigo") codigo: String): ReservaDto
+
+    @GET("api/chats")
+    suspend fun chats(): List<ConversacionChatDto>
+
+    @GET("api/chats/no-leidos")
+    suspend fun chatsNoLeidos(): NoLeidosDto
+
+    @GET("api/chats/{farmaciaId}")
+    suspend fun estadoChat(@Path("farmaciaId") farmaciaId: Long): EstadoChatDto
+
+    @GET("api/chats/{farmaciaId}/mensajes")
+    suspend fun mensajesChat(
+        @Path("farmaciaId") farmaciaId: Long,
+        @Query("despuesDe") despuesDe: Long? = null,
+    ): List<MensajeChatDto>
+
+    @POST("api/chats/{farmaciaId}/mensajes")
+    suspend fun enviarMensaje(
+        @Path("farmaciaId") farmaciaId: Long,
+        @Body request: EnviarMensajeRequest,
+    ): MensajeChatDto
 }

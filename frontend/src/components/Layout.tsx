@@ -2,7 +2,7 @@ import { ChevronDown } from 'lucide-react';
 import { initials } from '../lib/format';
 import { LiveProvider, useLive } from '../lib/live';
 import { IconButton } from './UI';
-import { Boxes, CalendarCheck, History, House, LayoutDashboard, LogOut, Menu, Search, Settings, Store, X } from 'lucide-react';
+import { Boxes, CalendarCheck, History, House, LayoutDashboard, LogOut, Menu, MessageCircle, Search, Settings, Store, X } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -11,17 +11,18 @@ import { useAuth } from '../context/AuthContext';
 export function AppLayout() { return <OperatorAppLayout/>; }
 
 // Diseño del panel de operador: no reemplaza las vistas públicas, de pacientes ni administrativas.
-type OperatorNavItem = { path: string; label: string; icon: typeof House; count?: 'activas' };
+type OperatorNavItem = { path: string; label: string; icon: typeof House; count?: 'activas' | 'chat' };
 const operatorDashboardNav: OperatorNavItem[] = [
   { path: '/panel', label: 'Resumen', icon: LayoutDashboard },
   { path: '/operacion/reservas', label: 'Reservas', icon: CalendarCheck, count: 'activas' },
   { path: '/operacion/stock', label: 'Stock', icon: Boxes },
   { path: '/operacion/movimientos', label: 'Movimientos', icon: History },
+  { path: '/chat', label: 'Chat', icon: MessageCircle, count: 'chat' },
 ];
 const extraTitles: Record<string, string> = { '/perfil': 'Mi cuenta' };
 
 function OperatorBrand() {
-  return <Link to="/panel" className="dash-brand" aria-label="MediLink, ir al resumen"><img src="/logo-mark.png" alt="" width={28} height={27}/><span>Medi<b>Link</b></span></Link>;
+  return <Link to="/panel" className="dash-brand" aria-label="MediFarm, ir al resumen"><img src="/logo-mark.png" alt="" width={28} height={27}/><span>Medi<b>Farm</b></span></Link>;
 }
 
 function ProfileMenu() {
@@ -54,7 +55,7 @@ function OperatorAppLayout() {
   return <LiveProvider farmId={me?.perfil.farmaciaId}><Shell/></LiveProvider>;
 }
 function Shell() {
-  const { me } = useAuth(); const navigate = useNavigate(); const location = useLocation(); const { activeCount } = useLive();
+  const { me } = useAuth(); const navigate = useNavigate(); const location = useLocation(); const { activeCount, chatUnread } = useLive();
   const [open, setOpen] = useState(false); const [code, setCode] = useState(''); const searchRef = useRef<HTMLInputElement>(null);
   const farmId = me?.perfil.farmaciaId;
   const title = operatorDashboardNav.find(x => location.pathname.startsWith(x.path))?.label || extraTitles[location.pathname] || '';
@@ -78,9 +79,12 @@ function Shell() {
     <aside className={`dash-sidebar ${open ? 'open' : ''}`} aria-label="Navegación principal">
       <div className="dash-sidebar-head"><OperatorBrand/><IconButton label="Cerrar menú" className="only-mobile" onClick={() => setOpen(false)}><X size={18}/></IconButton></div>
       <div className="nav-label">Operación</div>
-      <nav className="dash-nav">{operatorDashboardNav.map(({ path, label, icon: Icon, count }) => <NavLink key={path} to={path} className={({ isActive }) => `dash-nav-link ${isActive ? 'active' : ''}`}>
-        <Icon size={17}/><span>{label}</span>{count && !!activeCount && <span className="nav-count" aria-label={`${activeCount} activas`}>{activeCount}</span>}
-      </NavLink>)}</nav>
+      <nav className="dash-nav">{operatorDashboardNav.map(({ path, label, icon: Icon, count }) => {
+        const n = count === 'activas' ? activeCount : count === 'chat' ? chatUnread : null;
+        return <NavLink key={path} to={path} className={({ isActive }) => `dash-nav-link ${isActive ? 'active' : ''}`}>
+          <Icon size={17}/><span>{label}</span>{!!n && <span className={`nav-count ${count === 'chat' ? 'nav-count-alert' : ''}`} aria-label={count === 'chat' ? `${n} sin leer` : `${n} activas`}>{n}</span>}
+        </NavLink>;
+      })}</nav>
       <div className="sidebar-foot"><span className="pharmacy-icon"><Store size={16}/></span><div className="truncate"><strong>Farmacia #{farmId ?? '—'}</strong><small>Operador</small></div></div>
     </aside>
     {open && <button className="dash-overlay" aria-label="Cerrar menú" onClick={() => setOpen(false)}/>}

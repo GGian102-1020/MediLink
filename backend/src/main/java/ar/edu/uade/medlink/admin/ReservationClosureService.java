@@ -118,6 +118,8 @@ public class ReservationClosureService {
     public void evaluateSuspensions(long userId, Instant t, HttpServletRequest request) {
         var events = db.query("SELECT id_reserva, fecha_hora_vencimiento FROM reserva WHERE id_usuario=? " +
             "AND fecha_hora_vencimiento<=? AND (estado_persistido='VENCIDA' OR estado_persistido='ACTIVA') " +
+            // A reservation the pharmacy never confirmed is not the patient's no-show.
+            "AND NOT (requiere_confirmacion AND fecha_hora_confirmacion IS NULL) " +
             "ORDER BY fecha_hora_vencimiento ASC, id_reserva ASC",
             (rs,n)->new SuspensionPlanner.Event(rs.getLong(1),
                 rs.getObject(2,OffsetDateTime.class).toInstant()),userId,Timestamp.from(t));

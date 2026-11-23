@@ -243,12 +243,13 @@ enum class TonoPildora(val fondo: Color, val texto: Color) {
 private val ETIQUETAS_ESTADO = mapOf(
     "USUARIO" to "Paciente", "OPERADOR" to "Operador", "ADMINISTRADOR" to "Administrador",
     "BAJO_RECETA" to "Bajo receta", "VENTA_LIBRE" to "Venta libre",
+    "PENDIENTE" to "Por confirmar",
 )
 
 fun tonoDeEstado(estado: String): TonoPildora = when (estado.uppercase()) {
     "ACTIVA", "ACTIVO", "HABILITADA", "VIGENTE", "VENTA LIBRE", "VENTA_LIBRE" -> TonoPildora.EXITO
     "COMPLETADA", "UTILIZADA", "USUARIO", "OPERADOR", "ADMINISTRADOR" -> TonoPildora.INFO
-    "VENCIDA", "BAJO RECETA", "BAJO_RECETA", "SUSPENDIDA", "STOCK BAJO" -> TonoPildora.ALERTA
+    "PENDIENTE", "VENCIDA", "BAJO RECETA", "BAJO_RECETA", "SUSPENDIDA", "STOCK BAJO" -> TonoPildora.ALERTA
     "CANCELADA", "DESHABILITADA", "INACTIVA", "ANULADA", "SIN STOCK" -> TonoPildora.PELIGRO
     else -> TonoPildora.NEUTRO
 }

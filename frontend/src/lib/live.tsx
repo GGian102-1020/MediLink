@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { get } from './api';
 import { plural } from './format';
@@ -20,12 +20,20 @@ type LiveState = {
   isNew: (id: number) => boolean;
   /** Fuerza una consulta inmediata (por ejemplo, después de una acción del operador). */
   refresh: () => void;
+  /** Mensajes de pacientes sin leer (badge de "Chat" en la barra lateral). */
+  chatUnread: number;
+  refreshChat: () => void;
 };
-const LiveContext = createContext<LiveState>({ version: 0, activeCount: null, isNew: () => false, refresh: () => {} });
+const LiveContext = createContext<LiveState>({ version: 0, activeCount: null, isNew: () => false, refresh: () => {}, chatUnread: 0, refreshChat: () => {} });
 
 export function LiveProvider({ farmId, children }: { farmId: number | null | undefined; children: ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [version, setVersion] = useState(0);
+  const [chatUnread, setChatUnread] = useState(0);
+  const lastChatUnread = useRef<number | null>(null);
+  const enChat = useRef(false);
+  enChat.current = location.pathname.startsWith('/chat');
   const [activeCount, setActiveCount] = useState<number | null>(null);
   const [fresh, setFresh] = useState<Record<number, number>>({});
   const lastMaxId = useRef<number | null>(null);
@@ -52,9 +60,9 @@ export function LiveProvider({ farmId, children }: { farmId: number | null | und
         const now = Date.now();
         setFresh(prev => ({ ...prev, ...Object.fromEntries(nuevas.map(r => [r.id, now])) }));
         if (nuevas.length > 2) {
-          toast.info(`${plural(nuevas.length, 'reserva nueva', 'reservas nuevas')}`, { action: { label: 'Ver', onClick: () => navigate('/operacion/reservas?estado=ACTIVA') } });
+          toast.info(`${plural(nuevas.length, 'reserva nueva', 'reservas nuevas')}`, { action: { label: 'Ver', onClick: () => navigate('/operacion/reservas') } });
         } else {
-          nuevas.forEach(r => toast.info('Nueva reserva', {
+          nuevas.forEach(r => toast.info(r.estado === 'PENDIENTE' ? 'Nueva receta para revisar' : 'Nueva reserva', {
             description: `${r.medicamentoNombreSnapshot} × ${r.cantidad} · ${[r.usuarioNombre, r.usuarioApellido].filter(Boolean).join(' ') || 'Usuario'}`,
             action: { label: 'Ver', onClick: () => navigate(`/operacion/reservas?codigo=${encodeURIComponent(r.codigoVisible)}`) },
           }));
@@ -85,8 +93,29 @@ export function LiveProvider({ farmId, children }: { farmId: number | null | und
     return () => window.clearTimeout(t);
   }, [fresh]);
 
+  // Mensajes de chat sin leer: avisa cuando aumentan y el operador no está mirando el chat.
+  const pollChat = useCallback(async () => {
+    if (!farmId || document.hidden) return;
+    try {
+      const { total } = await get<{ total: number }>(`/api/farmacias/${farmId}/chats/no-leidos`);
+      setChatUnread(total);
+      if (lastChatUnread.current !== null && total > lastChatUnread.current && !enChat.current) {
+        toast.info('Nuevo mensaje de un paciente', { action: { label: 'Abrir chat', onClick: () => navigate('/chat') } });
+      }
+      lastChatUnread.current = total;
+    } catch { /* se reintenta en la próxima consulta */ }
+  }, [farmId, navigate]);
+
+  useEffect(() => {
+    lastChatUnread.current = null;
+    void pollChat();
+    const timer = window.setInterval(() => { void pollChat(); }, POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [pollChat]);
+
   const isNew = useCallback((id: number) => id in fresh, [fresh]);
   const refresh = useCallback(() => { void poll(); }, [poll]);
-  return <LiveContext.Provider value={{ version, activeCount, isNew, refresh }}>{children}</LiveContext.Provider>;
+  const refreshChat = useCallback(() => { void pollChat(); }, [pollChat]);
+  return <LiveContext.Provider value={{ version, activeCount, isNew, refresh, chatUnread, refreshChat }}>{children}</LiveContext.Provider>;
 }
 export const useLive = () => useContext(LiveContext);

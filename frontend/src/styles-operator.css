@@ -1,6 +1,6 @@
-/* Estilos del dashboard restringidos a vistas de operador, sin alterar el portal MediLink. */
+/* Estilos del dashboard restringidos a vistas de operador, sin alterar el portal MediFarm. */
 /* =========================================================
-   MediLink · Panel de operadores
+   MediFarm · Panel de operadores
    Sistema visual minimalista: superficies blancas, bordes finos,
    un solo color de acento (azul de marca) y movimiento corto.
    ========================================================= */
@@ -702,3 +702,62 @@ body:has(.dash) *, body:has(.dash) *::before, body:has(.dash) *::after { animati
 body:has(.dash) .modal, body:has(.dash) .menu { animation: fade-in .15s ease !important; }
 
 }
+
+/* =========================================================
+   Chat farmacia ↔ paciente
+   ========================================================= */
+body:has(.dash) .dash-nav-link .nav-count.nav-count-alert { background: var(--danger); color: #fff; }
+body:has(.dash) .chat-panel { padding: 0; overflow: hidden; }
+body:has(.dash) .chat { display: grid; grid-template-columns: 320px minmax(0, 1fr); height: calc(100vh - 210px); min-height: 460px; }
+body:has(.dash) .chat-lista { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+body:has(.dash) .chat-buscar { display: flex; align-items: center; gap: 8px; margin: 12px; padding: 0 12px; height: 38px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); }
+body:has(.dash) .chat-buscar:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+body:has(.dash) .chat-buscar input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; font: inherit; color: var(--text); }
+body:has(.dash) .chat-items { overflow-y: auto; flex: 1; padding: 0 8px 8px; }
+body:has(.dash) .chat-item { display: flex; gap: 10px; align-items: center; width: 100%; padding: 10px; border: 0; border-radius: var(--radius-sm); background: transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; transition: background .15s; }
+body:has(.dash) .chat-item:hover { background: var(--hover); }
+body:has(.dash) .chat-item.active { background: var(--accent-soft); }
+body:has(.dash) .chat-item-body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+body:has(.dash) .chat-item-top, body:has(.dash) .chat-item-bottom { display: flex; align-items: center; gap: 8px; justify-content: space-between; min-width: 0; }
+body:has(.dash) .chat-item-top small { color: var(--muted); font-size: 11.5px; flex-shrink: 0; }
+body:has(.dash) .chat-item-bottom > span:first-child { color: var(--text-2); font-size: 13px; }
+body:has(.dash) .chat-item-bottom .unread { color: var(--text); font-weight: 600; }
+body:has(.dash) .chat-item-bottom em { color: var(--muted); font-style: normal; }
+body:has(.dash) .chat-badge { flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 11.5px; font-weight: 600; }
+body:has(.dash) .chat-hilo { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+body:has(.dash) .chat-vacio { flex: 1; display: grid; place-items: center; }
+body:has(.dash) .chat-hilo-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+body:has(.dash) .chat-hilo-head strong, body:has(.dash) .chat-hilo-head small { display: block; }
+body:has(.dash) .chat-hilo-head small { color: var(--muted); font-size: 12px; }
+body:has(.dash) .chat-mensajes { flex: 1; overflow-y: auto; padding: 16px 20px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
+body:has(.dash) .chat-fila { display: flex; flex-direction: column; }
+body:has(.dash) .chat-dia { align-self: center; margin: 10px 0 6px; padding: 3px 10px; border-radius: 999px; background: var(--neutral-soft); color: var(--text-2); font-size: 11.5px; }
+body:has(.dash) .chat-burbuja { align-self: flex-start; max-width: min(560px, 80%); padding: 8px 12px 6px; border-radius: 14px 14px 14px 4px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+body:has(.dash) .chat-burbuja.propio { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: var(--accent); border-color: var(--accent); color: #fff; }
+body:has(.dash) .chat-burbuja p { white-space: pre-wrap; overflow-wrap: anywhere; }
+body:has(.dash) .chat-burbuja small { display: block; text-align: right; margin-top: 2px; font-size: 11px; color: var(--muted); }
+body:has(.dash) .chat-burbuja.propio small { color: rgba(255, 255, 255, .78); }
+body:has(.dash) .chat-enviar { display: flex; align-items: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+body:has(.dash) .chat-enviar textarea { flex: 1; resize: none; min-height: 40px; max-height: 140px; field-sizing: content; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); font: inherit; color: var(--text); background: var(--surface); outline: 0; }
+body:has(.dash) .chat-enviar textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+body:has(.dash) .chat-enviar-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--accent); color: #fff; cursor: pointer; flex-shrink: 0; transition: background .15s; }
+body:has(.dash) .chat-enviar-btn:hover:not(:disabled) { background: var(--accent-hover); }
+body:has(.dash) .chat-enviar-btn:disabled { opacity: .45; cursor: default; }
+@media (max-width: 900px) {
+  body:has(.dash) .chat { grid-template-columns: 1fr; height: calc(100vh - 190px); }
+  body:has(.dash) .chat.chat-abierto .chat-lista { display: none; }
+  body:has(.dash) .chat:not(.chat-abierto) .chat-hilo { display: none; }
+}
+
+/* Receta adjunta en el detalle de la reserva */
+body:has(.dash) .receta-box { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--surface-2); display: grid; gap: 12px; }
+body:has(.dash) .receta-head { display: flex; align-items: center; gap: 12px; }
+body:has(.dash) .receta-head > div { flex: 1; min-width: 0; }
+body:has(.dash) .receta-head strong, body:has(.dash) .receta-head small { display: block; }
+body:has(.dash) .receta-head small { color: var(--muted); font-size: 12.5px; }
+body:has(.dash) .receta-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex-shrink: 0; }
+body:has(.dash) .receta-preview { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; object-fit: contain; }
+body:has(.dash) .receta-sin { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
+
+/* Conversación sin reservas abiertas: solo lectura. */
+body:has(.dash) .chat-enviar.chat-cerrado { align-items: center; color: var(--text-muted, var(--muted, #64748b)); font-size: 13px; }

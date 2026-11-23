@@ -177,7 +177,10 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit, onSuccess: () -> Unit) {
     val paso1Ok = nombre.isNotBlank() && apellido.isNotBlank() && correoValido
 
     val hoy = remember { LocalDate.now() }
+    // Fecha máxima seleccionable: quien nació hoy hace 18 años ya puede registrarse.
+    val nacimientoMaximo = remember(hoy) { hoy.minusYears(EDAD_MINIMA.toLong()) }
     val nacimiento = nacimientoIso.takeIf { it.isNotEmpty() }?.let(LocalDate::parse)
+    val mayorDeEdad = nacimiento != null && !nacimiento.isAfter(nacimientoMaximo)
     val dniOk = dni.length in 7..8
     val telefonoOk = telefono.isBlank() || telefono.filter(Char::isDigit).length in 6..15
     val nombreObraSocial = when (obraSocial) {
@@ -186,7 +189,7 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit, onSuccess: () -> Unit) {
         else -> obraSocial
     }
     val obraSocialOk = obraSocial != OTRA_OBRA_SOCIAL || nombreObraSocial != null
-    val paso2Ok = dniOk && nacimiento != null && telefonoOk && obraSocialOk
+    val paso2Ok = dniOk && mayorDeEdad && telefonoOk && obraSocialOk
 
     val claveBytes = clave.toByteArray(Charsets.UTF_8).size
     val claveOk = clave.length >= CLAVE_MIN && claveBytes <= CLAVE_MAX
@@ -261,6 +264,8 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit, onSuccess: () -> Unit) {
                         Spacer(Modifier.height(16.dp))
                         CampoPildora("Fecha de nacimiento", nacimiento?.format(FORMATO_FECHA) ?: "", {},
                             soloLectura = true, placeholder = "dd/mm/aaaa", icono = Icons.Default.DateRange,
+                            error = if (nacimiento != null && !mayorDeEdad)
+                                "Tenés que ser mayor de $EDAD_MINIMA años para registrarte." else null,
                             onClick = { foco.clearFocus(); verCalendario = true })
                         Spacer(Modifier.height(16.dp))
                         CampoPildora("Teléfono (opcional)", telefono,
@@ -310,14 +315,14 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit, onSuccess: () -> Unit) {
 
     if (verCalendario) {
         val utc = ZoneOffset.UTC
-        val limite = hoy.atStartOfDay(utc).toInstant().toEpochMilli()
+        val limite = nacimientoMaximo.atStartOfDay(utc).toInstant().toEpochMilli()
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = nacimiento?.atStartOfDay(utc)?.toInstant()?.toEpochMilli(),
             initialDisplayedMonthMillis = (nacimiento ?: hoy.minusYears(30)).atStartOfDay(utc).toInstant().toEpochMilli(),
-            yearRange = (hoy.year - 120)..hoy.year,
+            yearRange = (hoy.year - 120)..nacimientoMaximo.year,
             selectableDates = object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= limite
-                override fun isSelectableYear(year: Int) = year <= hoy.year
+                override fun isSelectableYear(year: Int) = year <= nacimientoMaximo.year
             },
         )
         DatePickerDialog(
@@ -340,6 +345,7 @@ fun RegistroScreen(vm: AuthVm, onVolver: () -> Unit, onSuccess: () -> Unit) {
 }
 
 private const val PASOS_REGISTRO = 3
+private const val EDAD_MINIMA = 18
 private const val SIN_OBRA_SOCIAL = "Sin obra social / particular"
 private const val OTRA_OBRA_SOCIAL = "Otra"
 private val OBRAS_SOCIALES = listOf(
@@ -433,7 +439,7 @@ private fun PantallaAuth(
     }
 }
 
-/** La cruz del logo dentro de una caja blanca redondeada, con "Medlink" debajo. */
+/** La cruz del logo dentro de una caja blanca redondeada, con "MediFarm" debajo. */
 @Composable
 private fun LogoEnCaja(modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -446,8 +452,8 @@ private fun LogoEnCaja(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(12.dp))
         Text(
             buildAnnotatedString {
-                withStyle(SpanStyle(color = MediColors.Navy)) { append("Med") }
-                withStyle(SpanStyle(color = MediColors.Primario)) { append("link") }
+                withStyle(SpanStyle(color = MediColors.Navy)) { append("Medi") }
+                withStyle(SpanStyle(color = MediColors.Primario)) { append("Farm") }
             },
             fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp,
         )

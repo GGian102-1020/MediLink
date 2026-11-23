@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Medication
@@ -75,7 +76,8 @@ private val Ambar = Color(0xFFF5A524)
 /** Detalle de una reserva del paciente, presentado como un comprobante de retiro. */
 @Suppress("UNUSED_PARAMETER")
 @Composable
-fun DetalleReservaPaciente(repository: MediLinkRepository, codigo: String, onVolver: () -> Unit) {
+fun DetalleReservaPaciente(repository: MediLinkRepository, codigo: String, onVolver: () -> Unit,
+    onChatear: (farmaciaId: Long, nombre: String) -> Unit) {
     val scope = rememberCoroutineScope()
     var reserva by remember(codigo) { mutableStateOf<ReservaDto?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -86,6 +88,15 @@ fun DetalleReservaPaciente(repository: MediLinkRepository, codigo: String, onVol
         try { reserva = repository.detalleReserva(codigo); error = null }
         catch (e: CancellationException) { throw e }
         catch (e: Exception) { error = mensajeDeError(e) }
+    }
+    // Mientras la farmacia revisa la receta, se consulta cada 15 s para mostrar la confirmación sin recargar.
+    LaunchedEffect(codigo, reserva?.estado) {
+        while (reserva?.estado == "PENDIENTE") {
+            delay(15_000)
+            try { reserva = repository.detalleReserva(codigo) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { }
+        }
     }
 
     if (confirmacion) AlertDialog(
@@ -131,7 +142,9 @@ fun DetalleReservaPaciente(repository: MediLinkRepository, codigo: String, onVol
                     Etiqueta(if (r.cantidad == 1) "1 unidad" else "${r.cantidad} unidades")
                     Etiqueta(if (r.condicionDispensa == "BAJO_RECETA") "Bajo receta" else "Venta libre")
                 }
-                r.prescripcionCodigo?.let { DatoDetalle("Receta asociada", it) }
+                r.prescripcionCodigo?.let {
+                    DatoDetalle("Receta", if (it.startsWith("ADJ-")) "Adjuntada al reservar · la farmacia la revisa" else it)
+                }
             }
             TarjetaDetalle("Farmacia") {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -148,9 +161,19 @@ fun DetalleReservaPaciente(repository: MediLinkRepository, codigo: String, onVol
                     }
                 }
                 BotonComoLlegar(r)
+                // El chat solo se ofrece mientras la reserva sigue abierta.
+                if (r.estado == "ACTIVA" || r.estado == "PENDIENTE") OutlinedButton(
+                    onClick = { onChatear(r.farmaciaId, r.farmaciaNombreSnapshot) },
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Chatear con la farmacia")
+                }
             }
             TarjetaDetalle("Seguimiento") { LineaDeTiempo(pasosDe(r)) }
-            if (r.estado == "ACTIVA") {
+            if (r.estado == "ACTIVA" || r.estado == "PENDIENTE") {
                 OutlinedButton(
                     onClick = { confirmacion = true }, enabled = !procesando,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -168,7 +191,7 @@ private fun ComprobanteReserva(r: ReservaDto, onActualizar: () -> Unit) {
     // Cuenta regresiva local a partir de los segundos que informa el servidor.
     var restantes by remember(r) { mutableLongStateOf(r.segundosRestantes) }
     LaunchedEffect(r) {
-        while (r.estado == "ACTIVA" && restantes > 0) { delay(30_000); restantes = (restantes - 30).coerceAtLeast(0) }
+        while ((r.estado == "ACTIVA" || r.estado == "PENDIENTE") && restantes > 0) { delay(30_000); restantes = (restantes - 30).coerceAtLeast(0) }
     }
     Box(
         Modifier.fillMaxWidth()
@@ -180,7 +203,7 @@ private fun ComprobanteReserva(r: ReservaDto, onActualizar: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("CÓDIGO DE RETIRO", color = MediColors.Aqua, style = MaterialTheme.typography.labelMedium,
                     letterSpacing = 1.8.sp, modifier = Modifier.weight(1f))
-                ChipEstado(r.estado)
+                ChipEstado(r.estado, confirmada = r.fechaHoraConfirmacion != null)
             }
             Text(r.codigoVisible, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold,
                 fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
@@ -210,27 +233,45 @@ private fun ComprobanteReserva(r: ReservaDto, onActualizar: () -> Unit) {
     }
 }
 
+private fun duracionLegible(segundos: Long): String {
+    val h = segundos / 3600
+    val m = (segundos % 3600) / 60
+    return if (h > 0) "$h h $m min" else "$m min"
+}
+
+/** La farmacia rechazó la receta: cancelación operativa con motivo "Receta rechazada: …". */
+private fun recetaRechazada(r: ReservaDto) = r.estado == "CANCELADA" &&
+    r.motivoCancelacion?.startsWith("Receta rechazada") == true
+
 private fun mensajeEstado(r: ReservaDto, restantes: Long): Pair<String, String> = when (r.estado) {
+    "PENDIENTE" -> "Esperando que la farmacia confirme tu receta" to
+        "Cuando la confirme vas a ver tu PIN acá y vas a tener 4 horas para retirar tu medicamento."
     "ACTIVA" -> {
-        val h = restantes / 3600
-        val m = (restantes % 3600) / 60
         val tiempo = when {
             restantes <= 0 -> "Está por vencer"
-            h > 0 -> "Te quedan ${h} h ${m} min para retirarlo"
-            else -> "Te quedan $m min para retirarlo"
+            r.fechaHoraConfirmacion != null -> "¡Tu reserva fue confirmada!"
+            else -> "Te quedan ${duracionLegible(restantes)} para retirarlo"
         }
-        tiempo to "Mostrá el código y el PIN en la farmacia antes del ${fechaLegible(r.fechaHoraVencimiento)}."
+        val detalle = if (r.fechaHoraConfirmacion != null && restantes > 0)
+            "Recordá que tenés ${duracionLegible(restantes)} para retirar tu medicamento. Mostrá el código y el PIN " +
+                "en la farmacia antes del ${fechaLegible(r.fechaHoraVencimiento)}."
+        else "Mostrá el código y el PIN en la farmacia antes del ${fechaLegible(r.fechaHoraVencimiento)}."
+        tiempo to detalle
     }
     "COMPLETADA" -> "Ya retiraste tu medicamento" to "Retirado el ${fechaLegible(r.fechaHoraRetiro)}."
-    "CANCELADA" -> "Esta reserva fue cancelada" to "Cancelada el ${fechaLegible(r.fechaHoraCancelacion)}."
+    "CANCELADA" -> if (recetaRechazada(r))
+        "La farmacia rechazó tu receta" to (r.motivoCancelacion?.removePrefix("Receta rechazada:")?.trim()
+            ?.ifBlank { null } ?: "Podés reservar de nuevo con otra receta.")
+    else "Esta reserva fue cancelada" to "Cancelada el ${fechaLegible(r.fechaHoraCancelacion)}."
     "VENCIDA" -> "Esta reserva venció" to "No se retiró antes del ${fechaLegible(r.fechaHoraVencimiento)}."
     else -> r.estado to ""
 }
 
 @Composable
-private fun ChipEstado(estado: String) {
+private fun ChipEstado(estado: String, confirmada: Boolean = false) {
     val (fondo, texto, nombre) = when (estado) {
-        "ACTIVA" -> Triple(MediColors.Aqua, MediColors.Noche, "Activa")
+        "PENDIENTE" -> Triple(Ambar, MediColors.Noche, "Por confirmar")
+        "ACTIVA" -> Triple(MediColors.Aqua, MediColors.Noche, if (confirmada) "Confirmada" else "Activa")
         "COMPLETADA" -> Triple(Verde, Color.White, "Retirada")
         "CANCELADA" -> Triple(Rojo, Color.White, "Cancelada")
         "VENCIDA" -> Triple(Ambar, MediColors.Noche, "Vencida")
@@ -306,7 +347,12 @@ private data class Paso(val titulo: String, val detalle: String, val color: Colo
 
 private fun pasosDe(r: ReservaDto): List<Paso> = buildList {
     add(Paso("Reserva creada", fechaLegible(r.fechaHoraCreacion), MediColors.Teal))
+    if (r.condicionDispensa == "BAJO_RECETA" && r.estado != "PENDIENTE" && !recetaRechazada(r)) {
+        r.fechaHoraConfirmacion?.let { add(Paso("Receta confirmada por la farmacia", fechaLegible(it), MediColors.Teal)) }
+    }
     when (r.estado) {
+        "PENDIENTE" -> add(Paso("Esperando confirmación de la receta",
+            "La farmacia está revisando tu receta", Ambar, pendiente = true))
         "ACTIVA" -> add(Paso("Pendiente de retiro", "Vence el ${fechaLegible(r.fechaHoraVencimiento)}",
             MediColors.Teal, pendiente = true))
         "COMPLETADA" -> add(Paso("Medicamento retirado", fechaLegible(r.fechaHoraRetiro), Verde))

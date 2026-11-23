@@ -39,7 +39,7 @@ export async function api<T>(path: string, options: RequestInit & { idempotencyK
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
   let response: Response;
   try { response = await fetch(path, { ...init, headers, cache: 'no-store' }); }
-  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediLink. Revisá que la API esté en funcionamiento.'); }
+  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediFarm. Revisá que la API esté en funcionamiento.'); }
   if (!response.ok) {
     let err: ApiErrorBody = {};
     try { err = await response.json() as ApiErrorBody; } catch { /* respuesta inesperada */ }
@@ -51,6 +51,22 @@ export async function api<T>(path: string, options: RequestInit & { idempotencyK
   }
   if (response.status === 204) return undefined as T;
   return await response.json() as T;
+}
+/** Descarga un archivo protegido (por ejemplo, la receta adjunta de una reserva). */
+export async function getBlob(path: string): Promise<Blob> {
+  if (!path.startsWith('/api/')) throw new Error('Ruta API inválida');
+  const headers = new Headers({ 'X-Correlation-Id': crypto.randomUUID() });
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  let response: Response;
+  try { response = await fetch(path, { headers, cache: 'no-store' }); }
+  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediFarm.'); }
+  if (!response.ok) {
+    let err: ApiErrorBody = {};
+    try { err = await response.json() as ApiErrorBody; } catch { /* respuesta binaria o vacía */ }
+    if (response.status === 401 && accessToken) { setAccessToken(null); window.dispatchEvent(new Event('medlink:session-expired')); }
+    throw new ApiError(response.status, err.codigo || `HTTP_${response.status}`, err.mensaje || `No se pudo descargar el archivo (${response.status}).`, err.correlationId);
+  }
+  return await response.blob();
 }
 export function get<T>(path: string, params?: Query): Promise<T> { return api<T>(withQuery(path, params)); }
 export function post<T>(path: string, payload?: unknown, idempotencyKey?: string): Promise<T> {

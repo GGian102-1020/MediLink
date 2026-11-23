@@ -21,12 +21,16 @@ public class ReservaStore {
     final JdbcTemplate db;
     public ReservaStore(JdbcTemplate db) { this.db=db; }
 
+    /** Una Reserva BAJO_RECETA sin confirmar por la farmacia se expone como PENDIENTE. */
+    static final String PENDING_SQL = "(r.requiere_confirmacion AND r.fecha_hora_confirmacion IS NULL)";
     static final String EFFECTIVE = "CASE WHEN r.estado_persistido='ACTIVA' AND r.fecha_hora_vencimiento<=? " +
-        "THEN 'VENCIDA' ELSE r.estado_persistido::text END";
+        "THEN 'VENCIDA' WHEN r.estado_persistido='ACTIVA' AND "+PENDING_SQL+" THEN 'PENDIENTE' " +
+        "ELSE r.estado_persistido::text END";
     private static final String FIELDS = """
         SELECT r.*, p.condicion_dispensa::text AS condicion, u.nombre AS usuario_nombre,
         u.apellido AS usuario_apellido, rx.codigo_externo AS codigo_rx,
-        i.id_prescripcion AS id_prescripcion
+        i.id_prescripcion AS id_prescripcion,
+        EXISTS (SELECT 1 FROM receta_adjunta ra WHERE ra.id_prescripcion = i.id_prescripcion) AS receta_adjunta
         FROM reserva r JOIN usuario u ON u.id_usuario=r.id_usuario
         JOIN presentacion_medicamento p ON p.id_presentacion=r.id_presentacion
         LEFT JOIN item_prescripcion i ON i.id_item_prescripcion=r.id_item_prescripcion
@@ -34,18 +38,19 @@ public class ReservaStore {
         """;
 
     record Item(long id, long usuario, long farmacia, long presentacion, Long rxItem, Long rx,
-                int cantidad, String estado, Instant vencimiento) { }
+                int cantidad, String estado, Instant vencimiento, boolean pendiente) { }
     record Context(long usuario, long cuenta, long farmacia, long medicamento, long presentacion,
                    long stock, Long rx, Long item) { }
     record Product(String pharmacy, String address, String med, String presentation, String condition) { }
 
     Item item(String codigo) {
         return db.query("SELECT r.id_reserva,r.id_usuario,r.id_farmacia,r.id_presentacion,r.id_item_prescripcion, " +
-            "i.id_prescripcion,r.cantidad,r.estado_persistido::text,r.fecha_hora_vencimiento " +
+            "i.id_prescripcion,r.cantidad,r.estado_persistido::text,r.fecha_hora_vencimiento, " +
+            "(r.requiere_confirmacion AND r.fecha_hora_confirmacion IS NULL) " +
             "FROM reserva r LEFT JOIN item_prescripcion i ON i.id_item_prescripcion=r.id_item_prescripcion " +
             "WHERE r.codigo_visible=upper(?)", (rs,n)->new Item(rs.getLong(1),rs.getLong(2),rs.getLong(3),
                 rs.getLong(4), (Long)rs.getObject(5),(Long)rs.getObject(6),rs.getInt(7),rs.getString(8),
-                rs.getObject(9,OffsetDateTime.class).toInstant()), codigo).stream().findFirst().orElseThrow(ApiException::notFound);
+                rs.getObject(9,OffsetDateTime.class).toInstant(),rs.getBoolean(10)), codigo).stream().findFirst().orElseThrow(ApiException::notFound);
     }
     Item item(long id) {
         return db.query("SELECT codigo_visible FROM reserva WHERE id_reserva=?", (rs,n)->rs.getString(1),id)
@@ -101,7 +106,9 @@ public class ReservaStore {
         Instant exp=r.getObject("fecha_hora_vencimiento",OffsetDateTime.class).toInstant();
         String status=r.getString("estado_persistido");
         if (status.equals("ACTIVA") && !exp.isAfter(t)) status="VENCIDA";
-        long seconds=status.equals("ACTIVA")?Math.max(0,java.time.Duration.between(t,exp).toSeconds()):0;
+        else if (status.equals("ACTIVA") && r.getBoolean("requiere_confirmacion")
+            && r.getObject("fecha_hora_confirmacion")==null) status="PENDIENTE";
+        long seconds=status.equals("ACTIVA")||status.equals("PENDIENTE")?Math.max(0,java.time.Duration.between(t,exp).toSeconds()):0;
         return new ReservaDTO(r.getLong("id_reserva"),r.getString("codigo_visible"),status,r.getInt("cantidad"),
             time(r,"fecha_hora_creacion"),time(r,"fecha_hora_vencimiento"),seconds,
             time(r,"fecha_hora_cancelacion"),time(r,"fecha_hora_retiro"),r.getLong("id_farmacia"),
@@ -111,7 +118,8 @@ public class ReservaStore {
             !view.equals("USUARIO")?r.getString("usuario_nombre"):null,!view.equals("USUARIO")?r.getString("usuario_apellido"):null,
             r.getString("origen_cancelacion"),r.getString("causa_cancelacion"),r.getString("motivo_cancelacion"),
             view.equals("OPERADOR")?null:r.getString("codigo_rx"),
-            view.equals("USUARIO") && status.equals("ACTIVA")?r.getString("pin_retiro"):null);
+            view.equals("USUARIO") && status.equals("ACTIVA")?r.getString("pin_retiro"):null,
+            r.getBoolean("receta_adjunta"),time(r,"fecha_hora_confirmacion"));
     }
     /** PIN state for pickup verification; read under the reservation row lock. */
     record Pin(String pin, int failedAttempts) { }
@@ -124,7 +132,7 @@ public class ReservaStore {
         var pagination=PageRequests.of(page,size,sort,Set.of("fechaHoraCreacion","fechaHoraVencimiento","estado","id"),
             Sort.by(Sort.Order.desc("fechaHoraCreacion"),Sort.Order.desc("id")));
         if (state!=null) {
-            if (!Set.of("ACTIVA","COMPLETADA","CANCELADA","VENCIDA").contains(state))
+            if (!Set.of("PENDIENTE","ACTIVA","COMPLETADA","CANCELADA","VENCIDA").contains(state))
                 throw ApiException.validation("Estado de Reserva inválido.");
             where+=" AND "+EFFECTIVE+"=?";
             args.add(Timestamp.from(t)); args.add(state);

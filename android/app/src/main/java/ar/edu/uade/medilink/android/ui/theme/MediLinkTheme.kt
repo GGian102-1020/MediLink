@@ -14,11 +14,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
- * Paleta tomada del logo MediLink: azul marino de "Med", la cruz azul→celeste
+ * Paleta tomada del logo MediFarm: azul marino de "Medi", la cruz azul→celeste
  * y el verde agua de "link". No cambia endpoints, sesión ni reglas de negocio.
  */
 object MediColors {
-    val Navy = Color(0xFF004EA1)      // "Med"
+    val Navy = Color(0xFF004EA1)      // "Medi"
     val Blue = Color(0xFF0675DD)      // brazo izquierdo de la cruz
     val Sky = Color(0xFF14ADFB)       // brazo superior
     val Teal = Color(0xFF00A39B)      // "link" (oscurecido apenas para contraste AA)

@@ -142,12 +142,14 @@ public class ReservaService {
                 INSERT INTO reserva (codigo_visible,id_usuario,id_farmacia,id_presentacion,id_item_prescripcion,
                     cantidad,estado_persistido,fecha_hora_creacion,fecha_hora_vencimiento,
                     farmacia_nombre_snapshot,farmacia_direccion_snapshot,medicamento_nombre_snapshot,
-                    presentacion_descripcion_snapshot,pin_retiro)
-                VALUES (?,?,?,?,?,?,'ACTIVA',?,?,?,?,?,?,?)
+                    presentacion_descripcion_snapshot,pin_retiro,requiere_confirmacion)
+                VALUES (?,?,?,?,?,?,'ACTIVA',?,?,?,?,?,?,?,?)
                 ON CONFLICT (codigo_visible) DO NOTHING RETURNING id_reserva
                 """,(r,n)->r.getLong(1),candidate,usuario,req.farmaciaId(),req.presentacionId(),item,
                 req.cantidad(),Timestamp.from(t),Timestamp.from(t.plus(Duration.ofHours(4))),
-                product.pharmacy(),product.address(),product.med(),product.presentation(),nextPin());
+                product.pharmacy(),product.address(),product.med(),product.presentation(),nextPin(),
+                // BAJO_RECETA waits for the pharmacy to review the prescription before pickup.
+                item!=null);
             if (!ids.isEmpty()) { visible=candidate; reservation=ids.getFirst(); }
         }
         if (reservation==null) throw new IllegalStateException("No fue posible generar un código aleatorio de Reserva.");
@@ -257,6 +259,8 @@ public class ReservaService {
             expire(current,ctx,t,request);
             return new RetiroOutcome(store.get(code,t,actor.rol()),true,PinCheck.OK,0);
         }
+        if (current.pendiente())
+            throw ApiException.conflict("RESERVATION_PENDING_CONFIRMATION","Primero confirmá la receta de esta reserva.");
         var pin=store.pin(current.id());
         if (pin.failedAttempts()>=MAX_PIN_ATTEMPTS)
             return new RetiroOutcome(null,false,PinCheck.BLOCKED,0);
@@ -350,6 +354,46 @@ public class ReservaService {
         }
         cancel(current,ctx,t,actor.rol(),cause,reason,restore,cmd.cantidadStockReal(),actor,request);
         return new Outcome(store.get(code,t,actor.rol()),false);
+    }
+    /** Pharmacy accepts the prescription: the 4-hour pickup window starts now and the patient sees the PIN. */
+    @Transactional
+    public Outcome confirmar(long pharmacy,String code,CurrentAccount actor,HttpServletRequest request) {
+        requireRole(actor,"OPERADOR");
+        scope(pharmacy,actor);
+        Instant t=now();
+        var target=store.item(code);
+        if (target.farmacia()!=pharmacy) throw ApiException.notFound();
+        var ctx=store.context(target);
+        lockContext(ctx,target.id(),actor.id());
+        activePharmacyForOperator(pharmacy,actor);
+        var current=store.item(code);
+        if (!current.estado().equals("ACTIVA")) throw invalidState();
+        if (!current.vencimiento().isAfter(t)) {
+            expire(current,ctx,t,request);
+            return new Outcome(store.get(code,t,actor.rol()),true);
+        }
+        if (!current.pendiente())
+            throw ApiException.conflict("INVALID_STATE_TRANSITION","La reserva no está pendiente de confirmación.");
+        int updated=db.update("UPDATE reserva SET fecha_hora_confirmacion=?,fecha_hora_vencimiento=? " +
+            "WHERE id_reserva=? AND estado_persistido='ACTIVA' AND requiere_confirmacion " +
+            "AND fecha_hora_confirmacion IS NULL",Timestamp.from(t),Timestamp.from(t.plus(Duration.ofHours(4))),current.id());
+        if (updated!=1) throw invalidState();
+        audit.record(actor.id(),actor.rol(),"CONFIRMAR_RESERVA","RESERVA",current.id(),current.usuario(),null,
+            Map.of("estado","PENDIENTE"),Map.of("estado","ACTIVA"),request);
+        return new Outcome(store.get(code,t,actor.rol()),false);
+    }
+    /** Pharmacy rejects the prescription: operational cancellation that returns the stock and releases the Rx. */
+    @Transactional
+    public Outcome rechazarReceta(long pharmacy,String code,String motivo,CurrentAccount actor,HttpServletRequest request) {
+        requireRole(actor,"OPERADOR");
+        String reason=motivo==null?"":motivo.strip();
+        if (reason.isEmpty()) throw ApiException.validation("Indicá el motivo del rechazo.");
+        String full="Receta rechazada: "+reason;
+        if (full.length()>500) throw ApiException.validation("Motivo demasiado largo.");
+        var target=store.item(code);
+        if (target.farmacia()!=pharmacy) throw ApiException.notFound();
+        if (!target.pendiente()) throw ApiException.conflict("INVALID_STATE_TRANSITION","La reserva no está pendiente de confirmación.");
+        return cancelarOperativa(pharmacy,code,new CancelacionOperativaRequest("OTRA_CAUSA",full,"RESTITUIR",null),actor,request);
     }
     private List<ReservaStore.Item> expiredPair(long pharmacy,long presentation,Instant t) {
         return db.query("SELECT codigo_visible FROM reserva WHERE id_farmacia=? AND id_presentacion=? " +

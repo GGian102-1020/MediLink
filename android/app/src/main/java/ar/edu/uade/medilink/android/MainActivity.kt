@@ -64,6 +64,11 @@ import ar.edu.uade.medilink.android.data.ArchivosReceta
 import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.ui.screens.AuthScreen
 import ar.edu.uade.medilink.android.ui.screens.CatalogoScreen
+import ar.edu.uade.medilink.android.ui.screens.ChatScreen
+import ar.edu.uade.medilink.android.ui.screens.ReservaConRecetaScreen
+import ar.edu.uade.medilink.android.ui.viewmodel.RecetaLista
+import ar.edu.uade.medilink.android.ui.viewmodel.ReservaConRecetaVm
+import ar.edu.uade.medilink.android.ui.screens.ConversacionesScreen
 import ar.edu.uade.medilink.android.ui.screens.DetalleReservaPaciente
 import ar.edu.uade.medilink.android.ui.screens.DialogoRequiereSesion
 import ar.edu.uade.medilink.android.ui.screens.PanelInvitado
@@ -184,12 +189,15 @@ private fun MediLinkApp() {
     val mensajesProtegidos = mapOf(
         "reservas" to "Para ver y gestionar tus reservas necesitás iniciar sesión.",
         "mis-recetas" to "Para vincular y consultar tus recetas necesitás iniciar sesión.",
+        "chats" to "Para chatear con una farmacia necesitás iniciar sesión.",
     )
 
     val rutaPrincipal = ruta in barra.map { it.ruta }
     val seleccionActual = when {
         ruta.startsWith("reserva/") -> "reservas"
-        ruta.startsWith("presentaciones/") || ruta.startsWith("disponibilidad/") || ruta.startsWith("mapa/") -> "catalogo"
+        ruta == "chats" || ruta.startsWith("chat/") -> "panel"
+        ruta.startsWith("presentaciones/") || ruta.startsWith("disponibilidad/") || ruta.startsWith("mapa/") ||
+            ruta.startsWith("receta/") -> "catalogo"
         else -> ruta
     }
     MediLinkTheme {
@@ -199,7 +207,8 @@ private fun MediLinkApp() {
             contentWindowInsets = if (enAcceso) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
             topBar = {
                 // Barra superior compacta y clara: logo chico, sin fondos oscuros.
-                if (!enAcceso) TopAppBar(
+                // En el inicio del paciente no hay barra: el saludo queda arriba de todo.
+                if (!enAcceso && !(ruta == "panel" && !modoInvitado)) TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background,
                         navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
@@ -210,8 +219,8 @@ private fun MediLinkApp() {
                                 modifier = Modifier.size(28.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(buildAnnotatedString {
-                                withStyle(SpanStyle(color = if (modoOscuro) Color.White else MediColors.Navy)) { append("Med") }
-                                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("link") }
+                                withStyle(SpanStyle(color = if (modoOscuro) Color.White else MediColors.Navy)) { append("Medi") }
+                                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("Farm") }
                             }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
                     },
@@ -272,10 +281,31 @@ private fun MediLinkApp() {
                 }
                 composable("presentaciones/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
                     val vm: PresentacionesVm = viewModel(factory = VmsFactory(repository, e.arguments!!.getLong("id")))
-                    PresentacionesScreen(vm, onAbrir = { nav.navigate("disponibilidad/$it") })
+                    // BAJO_RECETA con sesión: primero se adjunta la receta y después se eligen farmacias.
+                    PresentacionesScreen(vm, onAbrir = { p ->
+                        if (p.condicionDispensa == "BAJO_RECETA" && rol == "USUARIO") nav.navigate("receta/${p.id}")
+                        else nav.navigate("disponibilidad/${p.id}")
+                    })
                 }
-                composable("disponibilidad/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
+                composable("receta/{presentacionId}", arguments = listOf(navArgument("presentacionId") { type = NavType.LongType })) { e ->
+                    if (rol == "USUARIO") {
+                        val presentacionId = e.arguments!!.getLong("presentacionId")
+                        val contexto = androidx.compose.ui.platform.LocalContext.current.applicationContext
+                        val vm = viewModel<ReservaConRecetaVm>(key = "receta-$presentacionId") {
+                            ReservaConRecetaVm(repository, ArchivosReceta(contexto), presentacionId)
+                        }
+                        ReservaConRecetaScreen(vm, onContinuar = { r ->
+                            nav.navigate("disponibilidad/$presentacionId?receta=${android.net.Uri.encode(r.codigo)}&cantidad=${r.cantidad}")
+                        })
+                    } else SoloPacientes()
+                }
+                composable("disponibilidad/{id}?receta={receta}&cantidad={cantidad}", arguments = listOf(
+                    navArgument("id") { type = NavType.LongType },
+                    navArgument("receta") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("cantidad") { type = NavType.IntType; defaultValue = 1 },
+                )) { e ->
                     val id = e.arguments!!.getLong("id")
+                    val receta = e.arguments?.getString("receta")?.let { RecetaLista(it, e.arguments!!.getInt("cantidad")) }
                     val vm: DisponibilidadVm = viewModel(factory = VmsFactory(repository, id))
                     val desdeMapa by e.savedStateHandle.getStateFlow<Long?>("farmaciaElegida", null)
                         .collectAsStateWithLifecycle()
@@ -288,7 +318,9 @@ private fun MediLinkApp() {
                         onMapa = { nav.navigate("mapa/$id") },
                         onVerEnMapa = { farmacia -> nav.navigate("mapa/$id?farmacia=$farmacia") },
                         farmaciaDesdeMapa = desdeMapa,
-                        onFarmaciaDesdeMapaUsada = { e.savedStateHandle["farmaciaElegida"] = null })
+                        onFarmaciaDesdeMapaUsada = { e.savedStateHandle["farmaciaElegida"] = null },
+                        receta = receta,
+                        onAdjuntarReceta = { nav.navigate("receta/$id") })
                 }
                 composable("mapa/{id}?farmacia={farmacia}", arguments = listOf(
                     navArgument("id") { type = NavType.LongType },
@@ -307,6 +339,7 @@ private fun MediLinkApp() {
                         onCatalogo = { nav.irAPestana("catalogo") },
                         onReservas = { nav.irAPestana("reservas") },
                         onRecetas = { nav.navigate("mis-recetas") { launchSingleTop = true } },
+                        onMensajes = { nav.navigate("chats") { launchSingleTop = true } },
                         onDetalle = { nav.navigate("reserva/$it") })
                     else if (modoInvitado) PanelInvitado(
                         onCatalogo = { nav.irAPestana("catalogo") },
@@ -330,7 +363,21 @@ private fun MediLinkApp() {
                 }
                 composable("reserva/{codigo}") { e ->
                     if (rol == "USUARIO") DetalleReservaPaciente(repository,
-                        e.arguments?.getString("codigo").orEmpty(), onVolver = { nav.popBackStack() })
+                        e.arguments?.getString("codigo").orEmpty(), onVolver = { nav.popBackStack() },
+                        onChatear = { id, nombre -> nav.navigate(rutaChat(id, nombre)) })
+                    else SoloPacientes()
+                }
+                composable("chats") {
+                    if (rol == "USUARIO") ConversacionesScreen(repository,
+                        onAbrir = { nav.navigate(rutaChat(it.farmaciaId, it.nombre)) })
+                    else SoloPacientes()
+                }
+                composable("chat/{farmaciaId}?nombre={nombre}", arguments = listOf(
+                    navArgument("farmaciaId") { type = NavType.LongType },
+                    navArgument("nombre") { type = NavType.StringType; defaultValue = "Farmacia" },
+                )) { e ->
+                    if (rol == "USUARIO") ChatScreen(repository, e.arguments!!.getLong("farmaciaId"),
+                        e.arguments?.getString("nombre").orEmpty().ifBlank { "Farmacia" })
                     else SoloPacientes()
                 }
                 composable("perfil") {
@@ -358,6 +405,8 @@ private fun MediLinkApp() {
         }
     }
 }
+
+private fun rutaChat(farmaciaId: Long, nombre: String) = "chat/$farmaciaId?nombre=${android.net.Uri.encode(nombre)}"
 
 @Composable
 private fun SoloPacientes() = Box(Modifier.padding(18.dp)) {

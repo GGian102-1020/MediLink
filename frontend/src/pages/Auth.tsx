@@ -13,7 +13,7 @@ export function LoginPage() {
     try {
       const perfil = await signIn(email, password);
       // La web es solo para el personal de farmacia: los pacientes usan la app.
-      if (perfil.rol !== 'OPERADOR') { await signOut(); setError(perfil.rol === 'USUARIO' ? 'Esta web es para farmacias. Los pacientes ingresan desde la app MediLink.' : 'Esta web es solo para cuentas de farmacia.'); return; }
+      if (perfil.rol !== 'OPERADOR') { await signOut(); setError(perfil.rol === 'USUARIO' ? 'Esta web es para farmacias. Los pacientes ingresan desde la app MediFarm.' : 'Esta web es solo para cuentas de farmacia.'); return; }
       const from = (location.state as { from?: string } | null)?.from;
       navigate(from?.startsWith('/') && !from.startsWith('//') ? from : '/panel', { replace: true });
     }

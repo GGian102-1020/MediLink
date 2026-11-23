@@ -62,11 +62,20 @@ def main():
     admin_pass = 'Password123!'
     expect('GET','/api/health',200)
     expect('GET','/api/me',401,code='INVALID_TOKEN')
+    dni = str(10_000_000 + int(suffix, 16) % 89_999_999)
+    datos = {'dni':dni, 'fechaNacimiento':'1990-05-10'}
+    expect('POST','/api/auth/register',400,{
+        'nombre':'Ana','apellido':'Prueba','correo':email,'contrasena':passwd,
+        'dni':dni,'fechaNacimiento':'2015-01-01'},code='VALIDATION_ERROR')
     user = expect('POST','/api/auth/register',201,{
-        'nombre':'Ana', 'apellido':'Prueba','correo':' '+email+' ', 'contrasena':passwd})
+        'nombre':'Ana', 'apellido':'Prueba','correo':' '+email+' ', 'contrasena':passwd, **datos})
     assert user['rol'] == 'USUARIO' and user['estadoCuenta'] == 'ACTIVA'
     expect('POST','/api/auth/register',409,{
-        'nombre':'Ana','apellido':'Prueba','correo':email.upper(),'contrasena':passwd},code='EMAIL_ALREADY_EXISTS')
+        'nombre':'Ana','apellido':'Prueba','correo':email.upper(),'contrasena':passwd,
+        'dni':'1234567','fechaNacimiento':'1990-05-10'},code='EMAIL_ALREADY_EXISTS')
+    expect('POST','/api/auth/register',409,{
+        'nombre':'Ana','apellido':'Prueba','correo':'otro+'+email,'contrasena':passwd, **datos},
+        code='DNI_ALREADY_EXISTS')
     expect('POST','/api/auth/login',401,{'correo':email,'contrasena':'mal'},code='INVALID_CREDENTIALS')
     login = expect('POST','/api/auth/login',200,{'correo':email.upper(),'contrasena':passwd})
     assert login['tokenType'] == 'Bearer' and login['expiresInSeconds'] == 1800

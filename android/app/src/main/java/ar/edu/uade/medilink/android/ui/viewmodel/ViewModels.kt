@@ -39,14 +39,18 @@ data class CatalogoState(
     val lista: List<MedicamentoDto> = emptyList(),
     val cargando: Boolean = false,
     val error: String? = null,
-    val ultimaPagina: Boolean = true,
+    /** Total de medicamentos que coinciden con la búsqueda (no solo los mostrados). */
+    val total: Long = 0,
 )
 
+/**
+ * Catálogo sin paginación: muestra solo los primeros [MAX_RESULTADOS] que coinciden con la
+ * búsqueda; para llegar a otro medicamento el usuario sigue escribiendo y la lista se filtra.
+ */
 class CatalogoVm(private val repository: MediLinkRepository) : ViewModel() {
     private val mutable = MutableStateFlow(CatalogoState())
     val state = mutable.asStateFlow()
     private var consulta = ""
-    private var siguientePagina = 0
     private var trabajo: Job? = null
 
     init { buscar("") }
@@ -56,32 +60,27 @@ class CatalogoVm(private val repository: MediLinkRepository) : ViewModel() {
         val texto = nombre.trim()
         if (texto == consulta && mutable.value.lista.isNotEmpty() && demora > 0) return
         consulta = texto
-        siguientePagina = 0
         trabajo?.cancel()
-        trabajo = cargar(reset = true, demora = demora)
+        trabajo = cargar(demora)
     }
 
-    fun mas() {
-        if (!mutable.value.ultimaPagina && !mutable.value.cargando) trabajo = cargar(reset = false)
-    }
-
-    private fun cargar(reset: Boolean, demora: Long = 0): Job =
+    private fun cargar(demora: Long): Job =
         viewModelScope.launch {
             if (demora > 0) delay(demora)
             mutable.value = mutable.value.copy(cargando = true, error = null)
             try {
-                val result = repository.medicamentos(consulta, siguientePagina)
-                mutable.value = CatalogoState(
-                    lista = if (reset) result.content else mutable.value.lista + result.content,
-                    ultimaPagina = result.last,
-                )
-                siguientePagina++
+                val result = repository.medicamentos(consulta, MAX_RESULTADOS)
+                mutable.value = CatalogoState(lista = result.content, total = result.totalElements)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 mutable.value = mutable.value.copy(cargando = false, error = mensajeDeError(e))
             }
         }
+
+    companion object {
+        const val MAX_RESULTADOS = 5
+    }
 }
 
 data class PresentacionesState(
@@ -223,25 +222,10 @@ class AuthVm(private val repository: MediLinkRepository) : ViewModel() {
         }
     }
 
-    fun registrar(nombre: String, apellido: String, correo: String, clave: String) {
-        if (mutable.value.cargando) return
-        viewModelScope.launch {
-            mutable.value = AuthState(cargando = true)
-            try {
-                repository.registro(nombre, apellido, correo, clave)
-                mutable.value = AuthState(registroExitoso = true)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                mutable.value = AuthState(error = mensajeDeError(e))
-            }
-        }
-    }
-
     /** Crea la cuenta de paciente e inicia sesión con las mismas credenciales. */
     fun registrarYEntrar(
         nombre: String, apellido: String, correo: String, clave: String,
-        datos: DatosPersonales? = null,
+        datos: DatosPersonales,
     ) {
         if (mutable.value.cargando) return
         viewModelScope.launch {
@@ -286,7 +270,7 @@ class ReservasVm(private val repository: MediLinkRepository) : ViewModel() {
     init { actualizar() }
 
     fun filtrar(estado: String) {
-        if (estado !in setOf("", "ACTIVA", "COMPLETADA", "CANCELADA", "VENCIDA")) return
+        if (estado !in setOf("", "PENDIENTE", "ACTIVA", "COMPLETADA", "CANCELADA", "VENCIDA")) return
         filtro = estado
         siguientePagina = 0
         cargar(limpiar = true)

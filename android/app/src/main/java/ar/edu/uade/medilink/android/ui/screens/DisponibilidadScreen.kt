@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalPharmacy
@@ -72,7 +73,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /** Cuántas farmacias se muestran de entrada y cuántas más agrega "Ver más". */
-private const val TANDA_FARMACIAS = 5
+/** Solo las 3 más cercanas: el usuario filtra con el buscador o ve el resto en el mapa. */
+private const val MAX_FARMACIAS = 3
 
 /** Minúsculas y sin tildes, para que "cordoba" encuentre "Av. Córdoba". */
 private fun normalizar(texto: String): String =
@@ -99,6 +101,10 @@ fun DisponibilidadScreen(
     onVerEnMapa: (Long) -> Unit,
     farmaciaDesdeMapa: Long? = null,
     onFarmaciaDesdeMapaUsada: () -> Unit = {},
+    /** BAJO_RECETA: receta adjuntada en el paso anterior (código + cantidad autorizada). */
+    receta: ar.edu.uade.medilink.android.ui.viewmodel.RecetaLista? = null,
+    /** BAJO_RECETA sin receta todavía: vuelve al paso "Adjuntá tu receta". */
+    onAdjuntarReceta: () -> Unit = {},
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -108,9 +114,7 @@ fun DisponibilidadScreen(
     val origenEtiqueta by repository.origenEtiqueta.collectAsState()
     var farmaciaElegida by rememberSaveable { mutableStateOf(-1L) }
     var cantidad by rememberSaveable { mutableStateOf("1") }
-    var prescripcion by rememberSaveable { mutableStateOf("") }
     var busqueda by rememberSaveable { mutableStateOf("") }
-    var visibles by rememberSaveable { mutableIntStateOf(TANDA_FARMACIAS) }
     var ubicando by remember { mutableStateOf(false) }
     var avisoUbicacion by remember { mutableStateOf<String?>(null) }
     val presentacion = state.presentacion
@@ -123,9 +127,8 @@ fun DisponibilidadScreen(
     var posicionConfirmar by remember { mutableFloatStateOf(0f) }
 
     val filtradas = remember(state.farmacias, busqueda) { state.farmacias.filter { it.coincideCon(busqueda) } }
-    val mostradas = filtradas.take(visibles)
+    val mostradas = filtradas.take(MAX_FARMACIAS)
     // Al cambiar la búsqueda o el origen se vuelve a mostrar solo la primera tanda.
-    LaunchedEffect(busqueda, origen) { visibles = TANDA_FARMACIAS }
 
     fun usarMiUbicacion() {
         scope.launch {
@@ -189,34 +192,9 @@ fun DisponibilidadScreen(
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(scroll).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Encabezado("Disponibilidad", if (logueado) "Elegí una farmacia con stock para reservar."
-            else "Estas farmacias tienen stock. Iniciá sesión para reservar.")
-        if (presentacion != null) {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.size(46.dp).background(MaterialTheme.colorScheme.surface,
-                        RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Medication, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary)
-                    }
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(presentacion.medicamentoNombre, style = MaterialTheme.typography.titleLarge)
-                        Text("${presentacion.concentracionTexto} · ${presentacion.formaFarmaceutica} · " +
-                            envaseLegible(presentacion.unidadExpendio, presentacion.cantidadEnvase),
-                            style = MaterialTheme.typography.bodyMedium)
-                        EstadoPildora(presentacion.condicionDispensa)
-                    }
-                }
-            }
-        }
-
-        BarraUbicacion(etiqueta = origenEtiqueta.takeIf { origen != null }, ubicando = ubicando,
-            onUsarUbicacion = pedirUbicacion,
-            onOlvidar = { repository.origen.value = null; repository.origenEtiqueta.value = null })
-        avisoUbicacion?.let { NotaInformativa(it) }
-
+        val que = presentacion?.let { "${it.medicamentoNombre} ${it.concentracionTexto}" } ?: "este medicamento"
+        Encabezado("Elegí una farmacia", if (logueado) "Dónde retirar $que."
+            else "Farmacias con stock de $que. Iniciá sesión para reservar.")
         CampoTexto(value = busqueda, onValueChange = { busqueda = it.take(80) },
             placeholder = { Text("Buscá por calle, barrio o farmacia") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -230,26 +208,29 @@ fun DisponibilidadScreen(
             singleLine = true, modifier = Modifier.fillMaxWidth())
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = vm::actualizar, enabled = !state.cargando && !state.reservando,
-                modifier = Modifier.weight(1f)) {
-                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
-                Text(" Actualizar")
+            OutlinedButton(onClick = pedirUbicacion, enabled = !ubicando, modifier = Modifier.weight(1f)) {
+                if (ubicando) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(17.dp))
+                Text(" Mi ubicación", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Button(onClick = onMapa, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(17.dp))
                 Text(" Ver mapa")
             }
         }
+        avisoUbicacion?.let { NotaInformativa(it) }
         if (seleccion == null) AvisoError(state.error)
         if (state.cargando && state.farmacias.isEmpty()) IndicadorCargando()
 
-        val titulo = when {
-            busqueda.isNotBlank() -> "Resultados de la búsqueda"
-            origen != null -> "Farmacias cerca tuyo"
-            else -> "Farmacias con stock"
+        val titulo = if (busqueda.isNotBlank()) "Resultados de la búsqueda" else "Farmacias con stock"
+        val detalle = when {
+            filtradas.isEmpty() -> "Sin coincidencias"
+            busqueda.isNotBlank() -> "Las ${mostradas.size} que mejor coinciden"
+            origen != null && origenEtiqueta != null && origenEtiqueta != "Tu ubicación" ->
+                "Las ${mostradas.size} más cercanas a $origenEtiqueta"
+            origen != null -> "Las ${mostradas.size} más cercanas a vos"
+            else -> "Activá tu ubicación para ver las más cercanas"
         }
-        val detalle = if (filtradas.isEmpty()) "Sin coincidencias"
-            else "Mostrando ${mostradas.size} de ${plural(filtradas.size, "farmacia", "farmacias")}"
         SeccionTitulo(titulo, detalle)
 
         if (state.farmacias.isEmpty() && !state.cargando && state.error == null) {
@@ -275,13 +256,6 @@ fun DisponibilidadScreen(
                         "en ${farmacia.nombre} necesitás iniciar sesión con tu cuenta de paciente.")
                 })
         }
-        if (filtradas.size > mostradas.size) {
-            TextButton(onClick = { visibles += TANDA_FARMACIAS }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.ExpandMore, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(" Ver más farmacias (${filtradas.size - mostradas.size} restantes)",
-                    color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            }
-        }
         if (seleccion != null) {
             Column(Modifier.onGloballyPositioned { posicionConfirmar = it.positionInParent().y },
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -292,6 +266,25 @@ fun DisponibilidadScreen(
                         if (!logueado) {
                             NotaInformativa("Iniciá sesión con una cuenta de paciente para confirmar la reserva.")
                             Button(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }
+                        } else if (bajoReceta && receta == null) {
+                            NotaInformativa("Este medicamento se vende bajo receta. Adjuntala para poder reservar.")
+                            Button(onClick = onAdjuntarReceta, modifier = Modifier.fillMaxWidth()) { Text("Adjuntar receta") }
+                        } else if (bajoReceta && receta != null) {
+                            RecetaListaFila(receta.cantidad)
+                            val alcanza = receta.cantidad <= seleccion.cantidadDisponible
+                            if (!alcanza) AvisoError("Esta farmacia tiene ${plural(seleccion.cantidadDisponible, "unidad", "unidades")} " +
+                                "y tu receta indica ${receta.cantidad}. Elegí otra farmacia.")
+                            AvisoError(state.error)
+                            Button(onClick = {
+                                vm.reservar(farmaciaId = seleccion.farmaciaId, cantidad = receta.cantidad,
+                                    codigoPrescripcion = receta.codigo)
+                            }, enabled = !state.reservando && alcanza && state.confirmacion == null,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Text(if (state.reservando) "Reservando..." else "Confirmar reserva")
+                            }
+                            Text("La farmacia revisa tu receta. Cuando la confirme, te mostramos el PIN y tenés 4 horas para retirarlo.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
                             CampoTexto(value = cantidad,
                                 onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) cantidad = it },
@@ -299,19 +292,12 @@ fun DisponibilidadScreen(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 isError = cantidad.isNotEmpty() && !esCantidadValida,
                                 singleLine = true, modifier = Modifier.fillMaxWidth())
-                            if (bajoReceta) {
-                                CampoTexto(value = prescripcion, onValueChange = { prescripcion = it },
-                                    label = { Text("Código de la receta") },
-                                    supportingText = { Text("Este medicamento se vende bajo receta.") },
-                                    singleLine = true, modifier = Modifier.fillMaxWidth())
-                            }
                             AvisoError(state.error)
                             Button(onClick = {
                                 vm.reservar(farmaciaId = seleccion.farmaciaId,
                                     cantidad = requireNotNull(numero),
-                                    codigoPrescripcion = if (bajoReceta) prescripcion else null)
-                            }, enabled = !state.reservando && esCantidadValida &&
-                                (!bajoReceta || prescripcion.isNotBlank()) && state.confirmacion == null,
+                                    codigoPrescripcion = null)
+                            }, enabled = !state.reservando && esCantidadValida && state.confirmacion == null,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Text(if (state.reservando) "Reservando..." else "Confirmar reserva")
                             }
@@ -323,49 +309,18 @@ fun DisponibilidadScreen(
                 }
             }
         }
-        NotaInformativa("Los datos de stock y las prescripciones son de demostración. Confirmá siempre con la farmacia.")
     }
 }
 
-/** Desde dónde se ordenan las farmacias: la ubicación del usuario, una dirección o ninguna. */
+/** Indica que la receta del paso anterior ya está adjunta y cuántas unidades autoriza. */
 @Composable
-private fun BarraUbicacion(etiqueta: String?, ubicando: Boolean, onUsarUbicacion: () -> Unit, onOlvidar: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(38.dp).background(
-                if (etiqueta != null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                if (ubicando) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                else Icon(if (etiqueta != null) Icons.Default.MyLocation else Icons.Default.LocationOff,
-                    contentDescription = null,
-                    tint = if (etiqueta != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(if (etiqueta != null) "Ordenadas por cercanía" else "Ubicación desactivada",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(when {
-                    ubicando -> "Buscando tu ubicación…"
-                    etiqueta != null -> etiqueta
-                    else -> "Activala para ver las más cercanas"
-                }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (etiqueta == null) {
-                TextButton(onClick = onUsarUbicacion, enabled = !ubicando) {
-                    Text("Activar", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                }
-            } else {
-                IconButton(onClick = onUsarUbicacion, enabled = !ubicando) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "Usar mi ubicación actual", tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onOlvidar, enabled = !ubicando) {
-                    Icon(Icons.Default.Close, contentDescription = "Dejar de ordenar por cercanía",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+private fun RecetaListaFila(cantidad: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column {
+            Text("Receta adjunta", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("Cantidad: ${plural(cantidad, "unidad", "unidades")} (según tu receta)",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

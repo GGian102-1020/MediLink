@@ -10,7 +10,7 @@ export function Button({ children, variant = 'primary', busy, size, block, ...pr
   </button>;
 }
 export function PageTitle({ eyebrow, title, subtitle, action }: { eyebrow?: string; title: string; subtitle?: string; action?: ReactNode }) {
-  return <div className="page-title"><div><div className="eyebrow">{eyebrow || 'MEDILINK / PORTAL'}</div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{action && <div className="page-action">{action}</div>}</div>;
+  return <div className="page-title"><div><div className="eyebrow">{eyebrow || 'MEDIFARM / PORTAL'}</div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{action && <div className="page-action">{action}</div>}</div>;
 }
 export function Panel({ children, className = '', title, subtitle, action }: { children: ReactNode; className?: string; title?: string; subtitle?: string; action?: ReactNode }) {
   return <section className={`panel ${className}`}>{title && <div className="panel-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{action}</div>}{children}</section>;
@@ -24,7 +24,7 @@ export function Pagination({ data, onChange }: { data: Pick<Page<unknown>, 'page
   return <div className="pagination"><span>{data.totalElements} resultados · Página {data.page + 1} de {data.totalPages}</span><div><Button variant="secondary" disabled={data.page === 0} onClick={() => onChange(data.page - 1)} aria-label="Página anterior"><ChevronLeft size={17}/></Button><Button variant="secondary" disabled={data.page >= data.totalPages - 1} onClick={() => onChange(data.page + 1)} aria-label="Página siguiente"><ChevronRight size={17}/></Button></div></div>;
 }
 export function Badge({ value, tone, label, dot = true }: { value: string; tone?: 'success' | 'warning' | 'danger' | 'neutral' | 'info'; label?: string; dot?: boolean }) {
-  const t = tone || ({ ACTIVA: 'success', ACTIVO: 'success', COMPLETADA: 'info', HABILITADA: 'success', VENCIDA: 'warning', CANCELADA: 'danger', INACTIVA: 'neutral', DESHABILITADA: 'danger', ANULADA: 'danger', BAJO_RECETA: 'warning', VENTA_LIBRE: 'info' } as Record<string, 'success'|'warning'|'danger'|'neutral'|'info'>)[value] || 'neutral';
+  const t = tone || ({ PENDIENTE: 'warning', ACTIVA: 'success', ACTIVO: 'success', COMPLETADA: 'info', HABILITADA: 'success', VENCIDA: 'warning', CANCELADA: 'danger', INACTIVA: 'neutral', DESHABILITADA: 'danger', ANULADA: 'danger', BAJO_RECETA: 'warning', VENTA_LIBRE: 'info' } as Record<string, 'success'|'warning'|'danger'|'neutral'|'info'>)[value] || 'neutral';
   return <span className={`badge badge-${t}`}>{dot && <span className="badge-dot" />}{label || readable(value)}</span>;
 }
 export function Field({ label, hint, children, className = '' }: { label: string; hint?: string; children: ReactNode; className?: string }) { return <label className={`field ${className}`}><span className="field-label">{label}</span>{children}{hint && <small className="field-hint">{hint}</small>}</label>; }

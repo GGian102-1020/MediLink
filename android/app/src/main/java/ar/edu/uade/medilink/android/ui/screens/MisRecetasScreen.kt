@@ -40,6 +40,11 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
+import java.time.LocalDate
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ar.edu.uade.medilink.android.data.AdjuntoReceta
 import ar.edu.uade.medilink.android.data.PrescripcionDto
@@ -67,7 +72,7 @@ internal fun MisRecetasScreen(vm: MisRecetasVm) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Encabezado("Mis recetas", "Adjuntá o vinculá recetas ficticias de MediLink.")
+            Encabezado("Mis recetas", "Adjuntá o vinculá recetas ficticias de MediFarm.")
         }
         item {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -138,12 +143,7 @@ internal fun MisRecetasScreen(vm: MisRecetasVm) {
             }
         }
         items(estado.lista, key = { it.id }) { receta ->
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DatosPrescripcion(receta, estado.medicamentos)
-                    TextButton(onClick = { vm.abrirDetalle(receta.id) }) { Text("Ver detalle") }
-                }
-            }
+            FilaReceta(receta, estado.medicamentos) { vm.abrirDetalle(receta.id) }
         }
         if (estado.hayMas) {
             item {
@@ -205,6 +205,42 @@ private fun ProgresoReceta(mensaje: String) {
     LinearProgressIndicator(Modifier.fillMaxWidth())
     Text(mensaje, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         style = MaterialTheme.typography.bodySmall)
+}
+
+/** Estado que ve el paciente: ANULADA, vencida por fecha, sin saldo (utilizada) o activa. */
+internal fun estadoVisibleReceta(receta: PrescripcionDto, hoy: LocalDate = LocalDate.now()): String = when {
+    receta.estado == "ANULADA" -> "ANULADA"
+    runCatching { LocalDate.parse(receta.fechaVencimiento.take(10)).isBefore(hoy) }.getOrDefault(false) -> "VENCIDA"
+    receta.items.isNotEmpty() && receta.items.all { it.cantidadDisponible <= 0 } -> "UTILIZADA"
+    else -> receta.estado
+}
+
+/** Nombre legible de la receta: el medicamento, o la presentación mientras se carga el nombre. */
+internal fun tituloReceta(receta: PrescripcionDto, medicamentos: Map<Long, String>): String {
+    val nombres = receta.items.map { medicamentos[it.presentacionId] ?: it.descripcionPresentacion }.distinct()
+    return when {
+        nombres.isEmpty() -> "Receta"
+        nombres.size == 1 -> nombres.first()
+        else -> "${nombres.first()} y ${nombres.size - 1} más"
+    }
+}
+
+/** Fila compacta del listado: medicamento y estado. El código y las cantidades quedan en "Ver detalle". */
+@Composable
+private fun FilaReceta(receta: PrescripcionDto, medicamentos: Map<Long, String>, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(tituloReceta(receta, medicamentos), style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                EstadoPildora(estadoVisibleReceta(receta))
+            }
+            Text("Vence ${fechaLegible(receta.fechaVencimiento)}", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 @Composable

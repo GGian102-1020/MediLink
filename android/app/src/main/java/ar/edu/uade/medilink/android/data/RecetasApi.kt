@@ -48,9 +48,27 @@ internal interface RecetasApi {
     @POST("api/me/recetas-demo/escaneo")
     suspend fun escanear(@Part archivo: MultipartBody.Part, @Tag envio: EnvioReceta): VinculacionRecetaDto
 
+    /** Receta (PDF/imagen) adjunta para reservar un medicamento BAJO_RECETA. */
+    @Multipart
+    @POST("api/me/recetas-adjuntas")
+    suspend fun adjuntar(
+        @Part archivo: MultipartBody.Part,
+        @Part("presentacionId") presentacionId: okhttp3.RequestBody,
+        @Part("cantidad") cantidad: okhttp3.RequestBody,
+    ): RecetaAdjuntaDto
+
     @GET("api/me/prescripciones")
     suspend fun listar(@Query("page") pagina: Int, @Query("size") tamanio: Int): PageDto<PrescripcionDto>
 
     @GET("api/me/prescripciones/{id}")
     suspend fun detalle(@Path("id") id: Long): PrescripcionDto
 }
+
+internal data class RecetaAdjuntaDto(
+    val codigoPrescripcion: String,
+    val prescripcionId: Long,
+    val nombreArchivo: String,
+    val contentType: String,
+    val tamanoBytes: Long,
+    val fechaVencimiento: String,
+)

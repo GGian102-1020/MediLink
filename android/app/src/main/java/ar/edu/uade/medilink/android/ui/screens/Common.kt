@@ -23,7 +23,7 @@ val screenPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)
 
 @Composable
 fun Encabezado(titulo: String, subtitulo: String) {
-    // El logo ya está en la barra superior: no repetimos "MEDILINK" sobre cada título.
+    // El logo ya está en la barra superior: no repetimos "MEDIFARM" sobre cada título.
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 5.dp)) {
         Text(titulo, style = MaterialTheme.typography.headlineSmall, letterSpacing = (-0.2).sp,
             color = MaterialTheme.colorScheme.onSurface)

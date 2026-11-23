@@ -277,12 +277,71 @@ class ReservasPostgresTest {
         var second=reservations.crear(rxCmd(rx,3),key(),f.userActor(),null).dto();
         // Existing authorization survives later annulment (RN-29).
         db.update("UPDATE prescripcion SET estado='ANULADA' WHERE id_prescripcion=?",rx.prescription());
-        reservations.retirar(f.pharmacy(),second.codigoVisible(),second.pinRetiro(),f.operatorActor(),null);
+        // BAJO_RECETA starts PENDIENTE: no PIN and no pickup until the pharmacy confirms the prescription.
+        assertEquals("PENDIENTE",second.estado());
+        assertNull(second.pinRetiro());
+        assertEquals("RESERVATION_PENDING_CONFIRMATION",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
+            ()->reservations.retirar(f.pharmacy(),second.codigoVisible(),"000000",f.operatorActor(),null)).codigo());
+        assertEquals("ACTIVA",reservations.confirmar(f.pharmacy(),second.codigoVisible(),f.operatorActor(),null).dto().estado());
+        var confirmed=reservations.propia(second.codigoVisible(),f.userActor());
+        assertNotNull(confirmed.fechaHoraConfirmacion());
+        reservations.retirar(f.pharmacy(),second.codigoVisible(),confirmed.pinRetiro(),f.operatorActor(),null);
         assertEquals(0,count("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_item_prescripcion=?",rx.item()));
         assertEquals(3,count("SELECT cantidad_utilizada FROM item_prescripcion WHERE id_item_prescripcion=?",rx.item()));
         assertEquals(7,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",rx.stock()));
         assertEquals("PRESCRIPTION_INVALID",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
             ()->reservations.crear(rxCmd(rx,1),key(),f.userActor(),null)).codigo());
+    }
+    @Test void pharmacyRejectsPendingPrescriptionAndRestoresStockAndRx() {
+        RxFixture rx=rx(2);
+        var pending=reservations.crear(rxCmd(rx,1),key(),f.userActor(),null).dto();
+        assertEquals("PENDIENTE",pending.estado());
+        assertEquals("VALIDATION_ERROR",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
+            ()->reservations.rechazarReceta(f.pharmacy(),pending.codigoVisible(),"  ",f.operatorActor(),null)).codigo());
+        var rejected=reservations.rechazarReceta(f.pharmacy(),pending.codigoVisible(),"Receta ilegible",f.operatorActor(),null).dto();
+        assertEquals("CANCELADA",rejected.estado());
+        assertEquals("Receta rechazada: Receta ilegible",rejected.motivoCancelacion());
+        assertEquals(0,count("SELECT cantidad_comprometida FROM item_prescripcion WHERE id_item_prescripcion=?",rx.item()));
+        assertEquals(10,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",rx.stock()));
+        assertEquals("INVALID_STATE_TRANSITION",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
+            ()->reservations.confirmar(f.pharmacy(),pending.codigoVisible(),f.operatorActor(),null)).codigo());
+    }
+    @Autowired ar.edu.uade.medlink.chat.ChatService chat;
+    @Test void chatIsWritableOnlyWhileAReservationIsOpenAndClosedHistoryIsPurged() {
+        var hola=new ar.edu.uade.medlink.chat.ChatDtos.EnviarMensajeRequest("Hola");
+        var r=created(1);
+        var abierta=chat.conversacionesUsuario(f.userActor()).getFirst();
+        assertTrue(abierta.abierta()); assertEquals(r.codigoVisible(),abierta.codigoReserva()); assertNull(abierta.fechaHoraBorrado());
+        chat.enviarUsuario(f.pharmacy(),hola,f.userActor());
+        chat.enviarFarmacia(f.pharmacy(),f.user(),hola,f.operatorActor());
+        reservations.cancelarPropia(r.codigoVisible(),f.userActor(),null);
+        var cerrada=chat.estadoUsuario(f.pharmacy(),f.userActor());
+        assertFalse(cerrada.abierta()); assertEquals("CANCELADA",cerrada.estadoReserva());
+        assertEquals(T.plus(Duration.ofDays(7)),cerrada.fechaHoraBorrado().toInstant());
+        assertEquals("CHAT_CLOSED",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
+            ()->chat.enviarUsuario(f.pharmacy(),hola,f.userActor())).codigo());
+        assertEquals("CHAT_CLOSED",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
+            ()->chat.enviarFarmacia(f.pharmacy(),f.user(),hola,f.operatorActor())).codigo());
+        var farmacia=chat.conversacionesFarmacia(f.pharmacy(),null,f.operatorActor()).getFirst();
+        assertFalse(farmacia.abierta()); assertEquals(r.codigoVisible(),farmacia.codigoReserva());
+        // Recent closure: the history survives the purge.
+        chat.purgarConversacionesCerradas();
+        assertEquals(2,count("SELECT count(*) FROM mensaje_chat WHERE id_farmacia=? AND id_usuario=?",f.pharmacy(),f.user()));
+        // A pharmacy whose only reservation ended more than 7 days ago loses its messages and leaves the list.
+        long old=create("INSERT INTO farmacia(nombre,direccion) VALUES ('Vieja','Calle 1') RETURNING id_farmacia");
+        Instant before=T.minus(Duration.ofDays(30));
+        db.update("""
+            INSERT INTO reserva(codigo_visible,id_usuario,id_farmacia,id_presentacion,cantidad,estado_persistido,
+                fecha_hora_creacion,fecha_hora_vencimiento,farmacia_nombre_snapshot,farmacia_direccion_snapshot,
+                medicamento_nombre_snapshot,presentacion_descripcion_snapshot)
+            VALUES ('ZZZZZZZZZZZZ',?,?,?,1,'VENCIDA',?,?,'Vieja','Calle 1','M','P')
+            """,f.user(),old,f.presentation(),ts(before),ts(before.plus(Duration.ofHours(4))));
+        db.update("INSERT INTO mensaje_chat(id_farmacia,id_usuario,autor,id_cuenta_autor,texto,fecha_hora) " +
+            "VALUES (?,?,'USUARIO',?,'viejo',?)",old,f.user(),f.account(),ts(before));
+        assertEquals(1,chat.purgarConversacionesCerradas());
+        assertEquals(0,count("SELECT count(*) FROM mensaje_chat WHERE id_farmacia=?",old));
+        assertTrue(chat.conversacionesUsuario(f.userActor()).stream().noneMatch(c->c.farmaciaId()==old));
+        assertEquals(2,count("SELECT count(*) FROM mensaje_chat WHERE id_farmacia=? AND id_usuario=?",f.pharmacy(),f.user()));
     }
     @Test void suspendedUserCannotReserveAndSuspensionStillVisibleAfterReplay() {
         long from=T.minus(Duration.ofDays(2)).toEpochMilli();
