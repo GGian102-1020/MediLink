@@ -327,6 +327,63 @@ class RecetaDemoPostgresTest {
         sinVinculacion(r);
     }
 
+    @Test void reservaValidaDocumentoMedicamentoYCantidadYConservaElOriginalParaLaFarmacia() throws Exception {
+        var r=receta();
+        byte[] original=descargarPdf(r.id(),"pdf");
+        when(extractor.disponible()).thenReturn(true);
+        when(extractor.extraer(any())).thenReturn(lectura(r,r.concentracion()));
+        for (String[] invalid:List.of(
+            new String[]{Long.toString(presentacion+999),"1","RECETA_MEDICAMENTO_NO_COINCIDE"},
+            new String[]{Long.toString(presentacion),"2","RECETA_CANTIDAD_INSUFICIENTE"})) {
+            mvc.perform(multipart("/api/me/recetas-demo/escaneo")
+                .file(new MockMultipartFile("archivo","original.pdf","application/pdf",original))
+                .param("presentacionId",invalid[0]).param("cantidad",invalid[1])
+                .header("Authorization",bearer(paciente))).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo").value(invalid[2]));
+            sinVinculacion(r);
+        }
+        mvc.perform(multipart("/api/me/recetas-demo/escaneo")
+            .file(new MockMultipartFile("archivo","original.pdf","application/pdf",original))
+            .param("presentacionId",Long.toString(presentacion)).param("cantidad","1")
+            .header("Authorization",bearer(paciente))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.codigo").value("RECETA_VERIFICADA"));
+        long id=repositorio.porId(r.id()).orElseThrow().prescripcionId();
+        assertArrayEquals(original,db.queryForObject("SELECT contenido FROM receta_adjunta WHERE id_prescripcion=?",byte[].class,id));
+        var reserva=reservas.crear(new CrearReservaRequest(farmacia,presentacion,1,r.codigoReceta()),UUID.randomUUID(),paciente,null).dto();
+        assertEquals("PENDIENTE",reserva.estado());
+        byte[] descargado=mvc.perform(get("/api/farmacias/{id}/reservas/{codigo}/receta",farmacia,reserva.codigoVisible())
+            .header("Authorization",bearer(operador))).andExpect(status().isOk())
+            .andExpect(content().contentType("application/pdf")).andReturn().getResponse().getContentAsByteArray();
+        assertArrayEquals(original,descargado);
+        reservas.confirmar(farmacia,reserva.codigoVisible(),operador,null);
+        assertEquals("ACTIVA",reservas.propia(reserva.codigoVisible(),paciente).estado());
+    }
+
+    @Test void codigoDeReservaValidaEnElMismoPasoSinReclamarUnaRecetaIncorrecta() throws Exception {
+        var r=receta();
+        mvc.perform(post("/api/me/recetas-demo/vinculacion").header("Authorization",bearer(paciente))
+            .contentType("application/json").content(json.writeValueAsString(new Vincular(r.codigoReceta(),presentacion+999,1))))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.codigo").value("RECETA_MEDICAMENTO_NO_COINCIDE"));
+        sinVinculacion(r);
+        mvc.perform(post("/api/me/recetas-demo/vinculacion").header("Authorization",bearer(paciente))
+            .contentType("application/json").content(json.writeValueAsString(new Vincular(r.codigoReceta(),presentacion,1))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.prescripcion.codigoExterno").value(r.codigoReceta()));
+    }
+
+    @Test void codigoPreexistenteSoloSirveAlTitularYConSaldoSuficiente() throws Exception {
+        String codigo="ADJ-"+UUID.randomUUID();
+        prescripciones.crear(new ar.edu.uade.medlink.prescripcion.dto.PrescripcionCreateRequest(codigo,usuario,
+            hoy(),hoy().plusDays(3),List.of(new ar.edu.uade.medlink.prescripcion.dto.PrescripcionCreateRequest.Item(presentacion,1))),admin,null);
+        for (var caso:List.of(paciente,otro)) {
+            mvc.perform(post("/api/me/recetas-demo/vinculacion").header("Authorization",bearer(caso))
+                .contentType("application/json").content(json.writeValueAsString(new Vincular(codigo,presentacion,1))))
+                .andExpect(caso==paciente ? status().isOk() : status().isNotFound());
+        }
+        mvc.perform(post("/api/me/recetas-demo/vinculacion").header("Authorization",bearer(paciente))
+            .contentType("application/json").content(json.writeValueAsString(new Vincular(codigo,presentacion,2))))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.codigo").value("RECETA_CANTIDAD_INSUFICIENTE"));
+    }
+
     @Test void pdfOriginalYAlteradoConservanCodigosYProducenResultadosDistintos() throws Exception {
         var r=receta();
         String concentracionAlterada="200 mcg";
@@ -508,7 +565,7 @@ class RecetaDemoPostgresTest {
             var recetasAnteriores=jdbc.queryForObject(snapshot,String.class);
             org.flywaydb.core.Flyway.configure().dataSource(origen).load().migrate();
             assertEquals(antes,tablas.stream().map(t->filas(jdbc,t)).toList());
-            assertEquals(12,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+            assertEquals(13,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM reserva WHERE pin_retiro !~ '^[0-9]{6}$' OR intentos_pin_fallidos <> 0",Integer.class));
             assertEquals(recetasAnteriores,jdbc.queryForObject(snapshot,String.class));
             assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM receta_demo WHERE codigo_verificacion IS NULL",Integer.class));

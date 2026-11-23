@@ -57,7 +57,7 @@ export function ChatPage() {
   }, [seleccionado, refreshChat]);
 
   return <>
-    <PageHeader title="Chat" subtitle="Hablá con los pacientes que reservaron en tu farmacia. Responden desde la app MediFarm."
+    <PageHeader title="Chat" subtitle="Hablá con los pacientes que reservaron en tu farmacia. Responden desde la app MediFind."
       actions={<IconButton label="Actualizar" bordered onClick={() => void cargarLista()}><RefreshCcw size={16} className={cargandoLista ? 'spin' : ''}/></IconButton>}/>
     <Panel className="chat-panel">
       <div className={`chat ${seleccionado ? 'chat-abierto' : ''}`}>

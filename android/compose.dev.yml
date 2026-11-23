@@ -2,5 +2,20 @@
 # El backend NO se expone en 0.0.0.0 ni en la red local.
 services:
   backend:
+    environment:
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@medifind.test}
+    depends_on:
+      mailpit:
+        condition: service_started
     ports:
       - "127.0.0.1:18081:8081"
+  # Captura correos de demostración; no los entrega a destinatarios externos.
+  mailpit:
+    image: axllent/mailpit:v1.27.4
+    profiles: ["api"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"

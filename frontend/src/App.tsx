@@ -2,12 +2,12 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { Loading } from './components/UI';
 import { AppLayout } from './components/Layout';
-import { LoginPage, ProfilePage } from './pages/Auth';
+import { LoginPage, ProfilePage, RecoverPasswordPage } from './pages/Auth';
 import { OperatorDashboard, PharmacyReservations, PharmacyStock, StockMovements } from './pages/Operator';
 import { ChatPage } from './pages/Chat';
 
 /*
- * Web de MediFarm = dashboard de farmacia. Solo cuentas OPERADOR.
+ * Web de MediFind = dashboard de farmacia. Solo cuentas OPERADOR.
  * Los pacientes usan la app Android. Sin sesión solo se ve el login.
  */
 function Protected() {
@@ -25,6 +25,7 @@ export default function App() {
   return <Routes>
     <Route index element={<Inicio/>}/>
     <Route path="ingresar" element={<LoginPage/>}/>
+    <Route path="recuperar-clave" element={<RecoverPasswordPage/>}/>
     <Route element={<Protected/>}>
       <Route path="panel" element={<OperatorDashboard/>}/>
       <Route path="perfil" element={<ProfilePage/>}/>

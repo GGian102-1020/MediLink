@@ -17,14 +17,40 @@ import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-/** La sesion reside en memoria. No se guardan JWT ni credenciales en disco. */
-class SessionStore {
-    private val mutableLogin = MutableStateFlow<LoginDto?>(null)
-    val login = mutableLogin.asStateFlow()
-    val token: String? get() = mutableLogin.value?.accessToken
+data class SavedSession(val login: LoginDto, val expiresAt: Long)
 
-    fun set(login: LoginDto) { mutableLogin.value = login }
-    fun clear() { mutableLogin.value = null }
+interface SessionPersistence {
+    fun read(): SavedSession?
+    fun write(value: SavedSession?)
+}
+
+/** Persiste solo el JWT cifrado y su vencimiento; nunca la contraseña. */
+class SessionStore(
+    private val persistence: SessionPersistence? = null,
+    private val now: () -> Long = System::currentTimeMillis,
+) {
+    private var saved = persistence?.read()?.takeIf { it.expiresAt > now() }
+    init { if (saved == null) persistence?.write(null) }
+    private val mutableLogin = MutableStateFlow(saved?.login)
+    val login = mutableLogin.asStateFlow()
+    @get:Synchronized val token: String? get() {
+        if (saved?.expiresAt?.let { it <= now() } == true) clear()
+        return mutableLogin.value?.accessToken
+    }
+
+    @Synchronized fun set(login: LoginDto) {
+        saved = SavedSession(login, now() + login.expiresInSeconds * 1_000)
+        persistence?.write(saved)
+        mutableLogin.value = login
+    }
+    @Synchronized fun clear() {
+        saved = null
+        persistence?.write(null)
+        mutableLogin.value = null
+    }
+    @Synchronized fun clearIfTokenMatches(expected: String) {
+        if (token == expected) clear()
+    }
 }
 
 class MediLinkRepository internal constructor(
@@ -53,8 +79,11 @@ class MediLinkRepository internal constructor(
                 .build()
             val response = chain.proceed(request)
             // Si la API revoco o vencio este JWT, la UI vuelve al modo no autenticado.
-            if (response.code == 401 && currentToken != null && session.token == currentToken) {
-                session.clear()
+            val errorCode = if (response.code == 401 || response.code == 403) runCatching {
+                JsonParser.parseString(response.peekBody(16_384).string()).asJsonObject.get("codigo")?.asString
+            }.getOrNull() else null
+            if (errorCode in setOf("INVALID_TOKEN", "ACCOUNT_DISABLED") && currentToken != null) {
+                session.clearIfTokenMatches(currentToken)
             }
             response
         }
@@ -81,8 +110,14 @@ class MediLinkRepository internal constructor(
         }).build()).build().create(RecetasApi::class.java)
 
     suspend fun misPrescripciones(pagina: Int) = recetas.listar(pagina, 20)
+    suspend fun configuracionRecetas() = recetas.configuracion()
     suspend fun detallePrescripcion(id: Long) = recetas.detalle(id)
     suspend fun vincularReceta(codigo: String) = recetas.vincular(VincularRecetaRequest(codigo.trim()))
+    suspend fun vincularRecetaParaReserva(codigo: String, presentacionId: Long, cantidad: Int) =
+        recetas.vincular(VincularRecetaRequest(codigo.trim(), presentacionId, cantidad))
+    internal suspend fun escanearRecetaParaReserva(adjunto: AdjuntoReceta, presentacionId: Long, cantidad: Int,
+        enviado: () -> Unit) = escaneo.escanear(adjunto.multipart(), EnvioReceta(enviado),
+            presentacionId.toString().toRequestBody(TEXTO), cantidad.toString().toRequestBody(TEXTO))
     internal suspend fun adjuntarReceta(adjunto: AdjuntoReceta, presentacionId: Long, cantidad: Int) =
         recetas.adjuntar(adjunto.multipart(), presentacionId.toString().toRequestBody(TEXTO),
             cantidad.toString().toRequestBody(TEXTO))
@@ -142,6 +177,15 @@ class MediLinkRepository internal constructor(
 
     suspend fun misReservas(pagina: Int, estado: String? = null) = parity.reservasUsuario(estado, pagina)
     suspend fun miPerfil() = parity.me()
+    suspend fun recuperarClave(correo: String) {
+        val response = api.recuperarClave(RecuperarClaveRequest(correo.trim()))
+        if (!response.isSuccessful) throw HttpException(response)
+    }
+    suspend fun restablecerClave(correo: String, codigo: String, clave: String) {
+        val response = api.restablecerClave(RestablecerClaveRequest(correo.trim(), codigo.trim(), clave))
+        if (!response.isSuccessful) throw HttpException(response)
+        session.clear()
+    }
     suspend fun cambiarClave(actual: String, nueva: String) = parity.cambiarClave(CambiarClaveRequest(actual, nueva))
     suspend fun detalleReserva(codigo: String) = parity.detalleUsuario(codigo)
     suspend fun cancelar(codigo: String) = api.cancelar(codigo)
@@ -155,14 +199,14 @@ class MediLinkRepository internal constructor(
         api.enviarMensaje(farmaciaId, EnviarMensajeRequest(texto.trim()))
 }
 
-const val MENSAJE_SOLO_PACIENTES = "La app MediFarm es para pacientes. Ingresá con una cuenta de paciente."
+const val MENSAJE_SOLO_PACIENTES = "La app MediFind es para pacientes. Ingresá con una cuenta de paciente."
 const val MENSAJE_CUENTA_FARMACIA =
-    "Las cuentas de farmacia se usan desde el dashboard web de MediFarm, no desde la app."
+    "Las cuentas de farmacia se usan desde el dashboard web de MediFind, no desde la app."
 
 /** Mensaje legible basado en los errores REST reales de MediLink. */
 fun mensajeDeError(error: Throwable): String = when (error) {
     is IllegalArgumentException -> error.message ?: "Datos incorrectos."
-    is IOException -> "No se pudo conectar con MediFarm. Revisá el servidor y adb reverse."
+    is IOException -> "No se pudo conectar con MediFind. Revisá el servidor y adb reverse."
     is HttpException -> {
         val apiMessage = try {
             val json = error.response()?.errorBody()?.string()

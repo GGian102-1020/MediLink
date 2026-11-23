@@ -30,3 +30,7 @@ frontend/dist/
 frontend/coverage/
 frontend/.vite/
 /dist/
+
+# Paquetes de recetas generados para la demostración local (sin credenciales).
+recetas-demo-pdf/portables*/
+recetas-demo-pdf/MediFind-Recetas-*.zip

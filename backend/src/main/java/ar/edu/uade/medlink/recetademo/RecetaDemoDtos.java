@@ -22,7 +22,10 @@ public final class RecetaDemoDtos {
                          LocalDate fechaVencimiento, long presentacionId, String medicamento,
                          String concentracion, String presentacion, int cantidadAutorizada) { }
     public record Lote(UUID lote, List<Receta> recetas) { }
-    public record Vincular(@NotBlank @Size(max=64) String codigoReceta) { }
+    public record Vincular(@NotBlank @Size(max=64) String codigoReceta,
+        @Positive Long presentacionId, @Min(1) @Max(10) Integer cantidad) {
+        public Vincular(String codigoReceta) { this(codigoReceta,null,null); }
+    }
     public enum Verificacion { RECETA_VERIFICADA, RECETA_VERIFICADA_LEGADA }
     public record Vinculacion(boolean nueva, PrescripcionDTO prescripcion,
                               @JsonInclude(JsonInclude.Include.NON_NULL) Verificacion codigo) { }

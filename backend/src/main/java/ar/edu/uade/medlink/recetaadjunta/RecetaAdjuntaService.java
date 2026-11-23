@@ -79,6 +79,20 @@ public class RecetaAdjuntaService {
             valido.contentType(), valido.contenido().length, vence);
     }
 
+    /** Conserva el documento analizado para que la farmacia pueda revisarlo en la reserva. */
+    @Transactional
+    public void guardarVerificada(long prescripcionId, MultipartFile archivo, CurrentAccount actor) {
+        if (actor == null || !"USUARIO".equals(actor.rol())) throw ApiException.forbidden();
+        long usuario = db.query("SELECT id_usuario FROM usuario WHERE id_cuenta=?", (r,n)->r.getLong(1), actor.id())
+            .stream().findFirst().orElseThrow(ApiException::forbidden);
+        prescripciones.detallePropio(prescripcionId,usuario);
+        Archivo valido=validar(archivo);
+        db.update("INSERT INTO receta_adjunta (id_prescripcion,nombre_archivo,content_type,tamano_bytes,contenido,sha256,fecha_hora_carga) "
+            + "VALUES (?,?,?,?,?,?,?) ON CONFLICT (id_prescripcion) DO NOTHING",
+            prescripcionId,valido.nombre(),valido.contentType(),valido.contenido().length,valido.contenido(),
+            sha256(valido.contenido()),Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MILLIS)));
+    }
+
     /** Archivo de la receta adjunta a una reserva de la farmacia del operador. */
     @Transactional(readOnly = true)
     public Archivo deReservaDeFarmacia(long farmacia, String codigoReserva, CurrentAccount actor) {

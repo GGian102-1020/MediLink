@@ -72,15 +72,22 @@ internal fun MisRecetasScreen(vm: MisRecetasVm) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Encabezado("Mis recetas", "Adjuntá o vinculá recetas ficticias de MediFarm.")
+            Encabezado("Mis recetas", "Adjuntá o vinculá recetas ficticias de MediFind.")
         }
         item {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        onClick = { mostrarSelector = true }, enabled = !estado.ocupado,
+                        onClick = { mostrarSelector = true }, enabled = !estado.ocupado && estado.escaneoHabilitado == true,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Adjuntar receta") }
+                    ) { Text("Adjuntar y verificar receta") }
+                    when (estado.escaneoHabilitado) {
+                        false -> Text("El análisis automático todavía no está disponible. Podés reintentar con Actualizar listado o vincular el código de una receta de demostración.",
+                            style = MaterialTheme.typography.bodyMedium)
+                        null -> Text(estado.errorConfiguracion ?: "Consultando disponibilidad del escaneo…",
+                            style = MaterialTheme.typography.bodySmall)
+                        true -> Text("La cámara y los archivos usan la misma verificación de recetas de demostración.", style = MaterialTheme.typography.bodySmall)
+                    }
                     Text("Foto o PDF de una página (JPG, PNG o WebP), hasta 6 MB.",
                         style = MaterialTheme.typography.bodySmall)
                     estado.adjunto?.let { adjunto ->

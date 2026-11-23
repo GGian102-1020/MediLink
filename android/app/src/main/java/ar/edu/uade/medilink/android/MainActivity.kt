@@ -1,6 +1,11 @@
 package ar.edu.uade.medilink.android
 
 import android.os.Bundle
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
+import ar.edu.uade.medilink.android.data.SessionStore
+import ar.edu.uade.medilink.android.data.EncryptedSessionPersistence
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -63,6 +68,7 @@ import androidx.navigation.navArgument
 import ar.edu.uade.medilink.android.data.ArchivosReceta
 import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.ui.screens.AuthScreen
+import ar.edu.uade.medilink.android.ui.screens.RecuperarClaveScreen
 import ar.edu.uade.medilink.android.ui.screens.CatalogoScreen
 import ar.edu.uade.medilink.android.ui.screens.ChatScreen
 import ar.edu.uade.medilink.android.ui.screens.ReservaConRecetaScreen
@@ -101,14 +107,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** La sesión vive en memoria: sobrevive rotaciones pero no al cierre del proceso. */
-class MediLinkAppVm : ViewModel() {
-    val repository = MediLinkRepository()
+/** Restaura la sesión vigente aunque Android recree el proceso en segundo plano. */
+class MediLinkAppVm(application: Application, private val savedState: SavedStateHandle) : AndroidViewModel(application) {
+    val repository = MediLinkRepository(SessionStore(EncryptedSessionPersistence(application)))
     /** Modo invitado: navega sin cuenta; toda acción que requiera sesión muestra un aviso. */
-    var invitado by mutableStateOf(false)
+    private var guest by mutableStateOf(savedState.get<Boolean>("invitado") ?: false)
+    var invitado: Boolean
+        get() = guest
+        set(value) { guest = value; savedState["invitado"] = value }
 }
 
-private val RUTAS_ACCESO = setOf("splash", "login", "registro")
+private val RUTAS_ACCESO = setOf("splash", "login", "registro", "recuperar-clave")
 
 private data class DestinoBarra(val ruta: String, val titulo: String, val icono: ImageVector)
 
@@ -220,7 +229,7 @@ private fun MediLinkApp() {
                             Spacer(Modifier.width(8.dp))
                             Text(buildAnnotatedString {
                                 withStyle(SpanStyle(color = if (modoOscuro) Color.White else MediColors.Navy)) { append("Medi") }
-                                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("Farm") }
+                                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("Find") }
                             }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
                     },
@@ -387,7 +396,11 @@ private fun MediLinkApp() {
                     val vm: AuthVm = viewModel(factory = VmsFactory(repository))
                     AuthScreen(vm, onSuccess = entrarAlHome,
                         onRegistro = { nav.navigate("registro") { launchSingleTop = true } },
-                        onInvitado = entrarComoInvitado)
+                        onInvitado = entrarComoInvitado,
+                        onRecuperar = { nav.navigate("recuperar-clave") { launchSingleTop = true } })
+                }
+                composable("recuperar-clave") {
+                    RecuperarClaveScreen(repository, onVolver = { nav.popBackStack() })
                 }
                 composable("registro") {
                     val vm: AuthVm = viewModel(factory = VmsFactory(repository))

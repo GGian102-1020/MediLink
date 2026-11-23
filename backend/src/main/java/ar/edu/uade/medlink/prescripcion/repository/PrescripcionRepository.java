@@ -10,6 +10,10 @@ public interface PrescripcionRepository extends JpaRepository<Prescripcion,Long>
     boolean existsByCodigoExterno(String codigoExterno);
     Optional<Prescripcion> findByIdAndUsuarioId(long id, long usuarioId);
 
+    @Query(value="SELECT p.* FROM prescripcion p JOIN usuario u ON u.id_usuario=p.id_usuario "
+        + "WHERE p.codigo_externo=:codigo AND u.id_cuenta=:cuenta",nativeQuery=true)
+    Optional<Prescripcion> findByCodigoDeCuenta(@Param("codigo") String codigo,@Param("cuenta") long cuenta);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Prescripcion p where p.id=:id")
     Optional<Prescripcion> findLocked(@Param("id") long id);

@@ -62,6 +62,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ar.edu.uade.medilink.android.data.DisponibilidadDto
+import ar.edu.uade.medilink.android.data.obtenerUbicacion
+import ar.edu.uade.medilink.android.data.PERMISOS_UBICACION
 import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.data.mensajeDeError
 import ar.edu.uade.medilink.android.ui.viewmodel.DisponibilidadVm
@@ -131,25 +133,27 @@ fun DisponibilidadScreen(
     // Al cambiar la búsqueda o el origen se vuelve a mostrar solo la primera tanda.
 
     fun usarMiUbicacion() {
+        if (ubicando) return
         scope.launch {
             ubicando = true; avisoUbicacion = null
             try {
-                repository.origen.value = obtenerUbicacion(context)
-                repository.origenEtiqueta.value = "Tu ubicación"
+                val ubicacion = obtenerUbicacion(context)
+                repository.origen.value = ubicacion.punto
+                repository.origenEtiqueta.value = ubicacion.etiqueta
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { avisoUbicacion = mensajeDeError(e) }
             finally { ubicando = false }
         }
     }
-    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
-        if (concedido) usarMiUbicacion()
+    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { concedidos ->
+        if (concedidos.values.any { it }) usarMiUbicacion()
         else avisoUbicacion = "Sin permiso de ubicación. Podés buscar por dirección o barrio."
     }
     val tienePermiso = {
         context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
     val pedirUbicacion = {
-        if (tienePermiso()) usarMiUbicacion() else permiso.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) usarMiUbicacion() else permiso.launch(PERMISOS_UBICACION)
     }
     // Primera vez: se intenta ubicar al usuario para mostrarle primero lo más cercano.
     LaunchedEffect(Unit) {
@@ -157,7 +161,7 @@ fun DisponibilidadScreen(
             if (tienePermiso()) usarMiUbicacion()
             else if (!repository.permisoUbicacionPedido) {
                 repository.permisoUbicacionPedido = true
-                permiso.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                permiso.launch(PERMISOS_UBICACION)
             }
         }
     }
@@ -318,7 +322,7 @@ private fun RecetaListaFila(cantidad: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Column {
-            Text("Receta adjunta", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("Receta verificada", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text("Cantidad: ${plural(cantidad, "unidad", "unidades")} (según tu receta)",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

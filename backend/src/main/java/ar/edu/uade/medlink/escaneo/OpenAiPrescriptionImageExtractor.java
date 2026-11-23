@@ -109,7 +109,7 @@ class OpenAiPrescriptionImageExtractor implements PrescriptionImageExtractor {
         var pendiente=cliente.sendAsync(request,HttpResponse.BodyHandlers.ofString());
         try {
             var respuesta=pendiente.get(timeout.toMillis(),TimeUnit.MILLISECONDS);
-            if (respuesta.statusCode()!=200) throw falloProveedor();
+            if (respuesta.statusCode()!=200) throw falloProveedor(respuesta.statusCode(),respuesta.body());
             return interpretar(respuesta.body());
         } catch (TimeoutException ex) {
             pendiente.cancel(true);
@@ -156,6 +156,23 @@ class OpenAiPrescriptionImageExtractor implements PrescriptionImageExtractor {
     private static ApiException falloProveedor() {
         return new ApiException(HttpStatus.BAD_GATEWAY,"ESCANEO_PROVEEDOR_ERROR",
             "No se pudo analizar el archivo. Volvé a intentar o ingresá el código.");
+    }
+
+    private static ApiException falloProveedor(int status,String body) {
+        // Solo se mapea el código; nunca se expone ni se registra el cuerpo del proveedor.
+        String code="";
+        try { code=JSON.readTree(body).path("error").path("code").asText(); }
+        catch (RuntimeException ignored) { }
+        if (status==401 || "invalid_api_key".equals(code))
+            return new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"ESCANEO_CREDENCIALES_INVALIDAS",
+                "La configuración del servicio de análisis necesita una clave válida.");
+        if ("insufficient_quota".equals(code) || "billing_hard_limit_reached".equals(code))
+            return new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"ESCANEO_SIN_SALDO",
+                "El servicio de análisis no tiene saldo disponible.");
+        if ("model_not_found".equals(code) || "model_not_available".equals(code))
+            return new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"ESCANEO_MODELO_NO_DISPONIBLE",
+                "El modelo configurado para el análisis no está disponible.");
+        return falloProveedor();
     }
 
     private static ApiException tiempoAgotado() {

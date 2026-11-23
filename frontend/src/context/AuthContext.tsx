@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { authApi, getAccessToken, setAccessToken } from '../lib/api';
+import { ApiError, authApi, getAccessToken, setAccessToken } from '../lib/api';
 import type { Cuenta, Me } from '../lib/types';
 
 type AuthState = { me: Me | null; loading: boolean; signIn: (email: string, password: string) => Promise<Cuenta>; signOut: () => Promise<void>; refresh: () => Promise<void> };
@@ -10,7 +10,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refresh() {
     if (!getAccessToken()) { setMe(null); return; }
     try { setMe(await authApi.me()); }
-    catch { setAccessToken(null); setMe(null); }
+    catch (error) {
+      // Una caída de red al volver a la pestaña no revoca la sesión.
+      if (error instanceof ApiError && (error.status === 401 || error.codigo === 'ACCOUNT_DISABLED')) {
+        setAccessToken(null); setMe(null);
+      }
+    }
   }
   useEffect(() => {
     void refresh().finally(() => setLoading(false));

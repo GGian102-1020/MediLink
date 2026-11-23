@@ -9,6 +9,11 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface MediLinkApi {
+    @POST("api/auth/password-recovery")
+    suspend fun recuperarClave(@Body body: RecuperarClaveRequest): retrofit2.Response<Unit>
+
+    @POST("api/auth/password-reset")
+    suspend fun restablecerClave(@Body body: RestablecerClaveRequest): retrofit2.Response<Unit>
     @GET("api/medicamentos")
     suspend fun medicamentos(
         @Query("nombre") nombre: String?,

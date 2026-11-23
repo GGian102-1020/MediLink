@@ -1,5 +1,6 @@
 # Archivos generados por Android Studio y Gradle
 .gradle/
+.kotlin/
 **/build/
 local.properties
 *.apk

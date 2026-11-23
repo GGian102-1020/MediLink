@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +30,8 @@ import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ar.edu.uade.medilink.android.data.TIPOS_RECETA
+import ar.edu.uade.medilink.android.data.impedimentoParaReserva
 import ar.edu.uade.medilink.android.ui.viewmodel.RecetaLista
 import ar.edu.uade.medilink.android.ui.viewmodel.ReservaConRecetaVm
 
@@ -70,9 +74,15 @@ internal fun ReservaConRecetaScreen(
     var cantidad by rememberSaveable { mutableStateOf("1") }
     var usarCodigo by rememberSaveable { mutableStateOf(false) }
     var codigo by rememberSaveable { mutableStateOf("") }
+    var usarCargada by rememberSaveable { mutableStateOf(false) }
+    var selectorAbierto by rememberSaveable { mutableStateOf(false) }
+    var seleccionId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val recetaElegida = state.recetas.firstOrNull { it.id == seleccionId }
     val tope = 10
     val numero = cantidad.toIntOrNull()
     val cantidadOk = numero != null && numero in 1..tope
+    val ocupado = state.enviando || state.preparando || state.esperandoSelector
+    val puedeAdjuntar = !ocupado && state.escaneoHabilitado == true
 
     val camara = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture(), vm::finalizarCaptura)
     val documentos = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), vm::finalizarArchivo)
@@ -81,15 +91,47 @@ internal fun ReservaConRecetaScreen(
         catch (_: ActivityNotFoundException) { vm.falloSelector("No encontramos una app de cámara en el dispositivo.") }
     }
     val elegirArchivo = {
-        try { documentos.launch(TIPOS_RECETA) }
+        try { vm.abrirArchivo(); documentos.launch(TIPOS_RECETA) }
         catch (_: ActivityNotFoundException) { vm.falloSelector("No encontramos un selector de archivos en el dispositivo.") }
     }
     LaunchedEffect(state.lista) { state.lista?.let { vm.navegacionHecha(); onContinuar(it) } }
 
+    if (selectorAbierto) AlertDialog(
+        onDismissRequest = { selectorAbierto = false },
+        title = { Text("Elegí una de tus recetas") },
+        text = {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Se comprueban la presentación, la vigencia y la cantidad disponible.")
+                if (state.cargandoRecetas) CircularProgressIndicator()
+                AvisoError(state.errorRecetas)
+                if (!state.cargandoRecetas && state.errorRecetas == null && state.recetas.isEmpty())
+                    Text("Todavía no tenés recetas cargadas en esta cuenta.")
+                state.recetas.forEach { receta ->
+                    val impedimento = receta.impedimentoParaReserva(state.presentacion?.id ?: -1L, numero ?: 0)
+                    OutlinedButton(onClick = {
+                        seleccionId = receta.id; usarCargada = true; usarCodigo = false; selectorAbierto = false
+                    }, enabled = !state.cargandoRecetas && state.errorRecetas == null && impedimento == null,
+                        colors = ButtonDefaults.outlinedButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Text(receta.items.joinToString { it.descripcionPresentacion }, fontWeight = FontWeight.Bold)
+                            Text("Vence: ${receta.fechaVencimiento}", style = MaterialTheme.typography.bodySmall)
+                            val disponible = receta.items.firstOrNull { it.presentacionId == state.presentacion?.id }?.cantidadDisponible
+                            Text(impedimento ?: "Disponibles: $disponible · ${receta.codigoExterno}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = vm::cargarRecetas, enabled = !state.cargandoRecetas) { Text("Actualizar") } },
+        dismissButton = { TextButton(onClick = { selectorAbierto = false }) { Text("Cerrar") } },
+    )
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Paso 1 de 2", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        Encabezado("Adjuntá tu receta", "Este medicamento se vende bajo receta. Adjuntala y después elegí la farmacia donde retirarlo.")
+        Encabezado("Verificá tu receta", "Elegí una receta que ya cargaste o adjuntá una nueva. Vamos a verificar el medicamento y la cantidad antes de elegir farmacia.")
 
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             modifier = Modifier.fillMaxWidth()) {
@@ -100,6 +142,7 @@ internal fun ReservaConRecetaScreen(
         }
 
         CampoTexto(value = cantidad,
+            enabled = !ocupado,
             onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) cantidad = it },
             label = { Text("Cantidad (máximo $tope)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -107,8 +150,21 @@ internal fun ReservaConRecetaScreen(
             supportingText = { Text("Debe coincidir con lo indicado en la receta.") },
             singleLine = true, modifier = Modifier.fillMaxWidth())
 
-        if (!usarCodigo) {
+        OutlinedButton(onClick = { selectorAbierto = true; vm.cargarRecetas() }, enabled = !ocupado,
+            modifier = Modifier.fillMaxWidth()) { Text("Elegir una receta de Mis recetas") }
+        if (usarCargada && recetaElegida != null) {
+            SeccionTitulo("Receta seleccionada", recetaElegida.codigoExterno)
+            Text("Vence: ${recetaElegida.fechaVencimiento}")
+            recetaElegida.impedimentoParaReserva(state.presentacion?.id ?: -1L, numero ?: 0)?.let { AvisoError(it) }
+            TextButton(onClick = { usarCargada = false }, enabled = !ocupado) { Text("Prefiero adjuntar una nueva") }
+        } else if (!usarCodigo) {
             SeccionTitulo("Tu receta", "PDF o imagen (JPG, PNG o WebP), hasta 6 MB.")
+            if (state.escaneoHabilitado != true) {
+                NotaInformativa(state.errorConfiguracion ?: if (state.escaneoHabilitado == false)
+                    "El análisis automático todavía no está disponible. Podés reintentar aquí o usar el código de una receta de demostración."
+                    else "Consultando el análisis de recetas…")
+                TextButton(onClick = vm::consultarEscaneo, enabled = !ocupado) { Text("Reintentar conexión") }
+            }
             val adjunto = state.adjunto
             when {
                 state.preparando -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
@@ -118,49 +174,51 @@ internal fun ReservaConRecetaScreen(
                     nombre = adjunto.nombre,
                     detalle = buildString {
                         append(if (adjunto.esImagen) "Imagen" else "PDF")
-                        if (state.escaneado) append(" · escaneada con la cámara")
+                        if (state.escaneado) append(" · fotografiada con la cámara")
                         append(" · ${tamanoLegible(adjunto.archivo.length())}")
                     },
                     icono = if (adjunto.esImagen) Icons.Default.Image else Icons.Default.PictureAsPdf,
-                    habilitado = !state.enviando,
+                    habilitado = !ocupado,
                     onQuitar = vm::quitarAdjunto,
                 )
                 else -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OpcionAdjuntar("Escanear", "Sacale una foto con la cámara", Icons.Default.DocumentScanner,
-                        Modifier.weight(1f), escanear)
-                    OpcionAdjuntar("Subir archivo", "PDF o imagen del teléfono", Icons.Default.UploadFile,
-                        Modifier.weight(1f), elegirArchivo)
+                    OpcionAdjuntar("Escanear", "Fotografiá la receta para verificarla", Icons.Default.DocumentScanner,
+                        Modifier.weight(1f), puedeAdjuntar, escanear)
+                    OpcionAdjuntar("Subir archivo", "Verificar un PDF o imagen del teléfono", Icons.Default.UploadFile,
+                        Modifier.weight(1f), puedeAdjuntar, elegirArchivo)
                 }
             }
             if (adjunto != null && !state.enviando) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = escanear, modifier = Modifier.weight(1f)) { Text("Escanear otra") }
-                    OutlinedButton(onClick = elegirArchivo, modifier = Modifier.weight(1f)) { Text("Elegir otro") }
+                    OutlinedButton(onClick = escanear, enabled = puedeAdjuntar, modifier = Modifier.weight(1f)) { Text("Escanear otra") }
+                    OutlinedButton(onClick = elegirArchivo, enabled = puedeAdjuntar, modifier = Modifier.weight(1f)) { Text("Elegir otro") }
                 }
             }
         } else {
-            SeccionTitulo("Código de receta electrónica", "Lo encontrás impreso en tu receta (por ejemplo, MLD-…).")
-            CampoTexto(value = codigo, onValueChange = { codigo = it.take(80) },
+            SeccionTitulo("Código de receta electrónica", "Ingresá el código MLD-… de tu receta de demostración. También verificaremos el medicamento y la cantidad.")
+            CampoTexto(value = codigo, onValueChange = { codigo = it.take(80) }, enabled = !ocupado,
                 label = { Text("Código de la receta") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         }
-        TextButton(onClick = { usarCodigo = !usarCodigo }, enabled = !state.enviando,
+        TextButton(onClick = { usarCodigo = !usarCodigo; usarCargada = false }, enabled = !ocupado,
             modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text(if (usarCodigo) "Prefiero adjuntar la receta" else "Tengo un código de receta electrónica",
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
         }
 
         AvisoError(state.error)
-        val listo = cantidadOk && !state.enviando &&
-            if (usarCodigo) codigo.isNotBlank() else state.adjunto != null && !state.preparando
+        val listo = cantidadOk && !ocupado &&
+            if (usarCargada) recetaElegida != null && recetaElegida.impedimentoParaReserva(state.presentacion?.id ?: -1L, numero ?: 0) == null
+            else if (usarCodigo) codigo.isNotBlank() else state.adjunto != null && state.escaneoHabilitado == true
         Button(onClick = {
             val n = requireNotNull(numero)
-            if (usarCodigo) vm.continuarConCodigo(codigo, n) else vm.continuar(n)
+            if (usarCargada) vm.continuarConReceta(requireNotNull(seleccionId), n)
+            else if (usarCodigo) vm.continuarConCodigo(codigo, n) else vm.continuar(n)
         }, enabled = listo, modifier = Modifier.fillMaxWidth().height(52.dp)) {
             if (state.enviando) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                 Spacer(Modifier.width(10.dp))
-                Text("Enviando receta…")
-            } else Text("Continuar", fontWeight = FontWeight.Bold)
+                Text(if (usarCodigo || usarCargada) "Verificando receta…" else if (state.analizando) "Analizando y verificando…" else "Enviando receta…")
+            } else Text("Verificar y continuar", fontWeight = FontWeight.Bold)
         }
         Text("En el siguiente paso vas a ver las farmacias que tienen este medicamento. La farmacia revisa tu receta antes de entregarlo.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -181,8 +239,8 @@ private fun Resumen(icono: ImageVector, titulo: String, detalle: String?) {
 }
 
 @Composable
-private fun OpcionAdjuntar(titulo: String, detalle: String, icono: ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Surface(onClick = onClick, modifier = modifier.height(150.dp), shape = RoundedCornerShape(20.dp),
+private fun OpcionAdjuntar(titulo: String, detalle: String, icono: ImageVector, modifier: Modifier, habilitado: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, enabled = habilitado, modifier = modifier.height(150.dp), shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = .35f))) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally) {
@@ -209,7 +267,7 @@ private fun ArchivoAdjunto(nombre: String, detalle: String, icono: ImageVector, 
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Receta adjunta", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("Archivo listo para verificar", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
                 Text(nombre, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(detalle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

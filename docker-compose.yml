@@ -49,8 +49,25 @@ services:
       MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS: ${MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS:-25}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-true}
+      MAIL_FROM: ${MAIL_FROM:-}
     expose:
       - "8081"
+
+  frontend:
+    profiles: ["api"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
 
   gateway:
     profiles: ["api"]

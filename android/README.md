@@ -1,5 +1,7 @@
 # MediLink Android — MVP de pacientes
 
+Para iniciar todo el entorno y conectar el celular: `scripts/iniciar-demo.ps1`. El dashboard del operador queda como servicio de Docker. Recetas guardadas en el celular y paquete para otras computadoras: [DEMO_ANDROID_PORTABLE.md](../docs/DEMO_ANDROID_PORTABLE.md).
+
 Este directorio es **un cliente Android nativo independiente** (Kotlin + Jetpack Compose).
 No cambia los controladores Java, PostgreSQL, las migraciones, ni el frontend React.
 La API REST existente es la fuente de verdad para stock, sesiones y reservas.
@@ -18,8 +20,9 @@ La API REST existente es la fuente de verdad para stock, sesiones y reservas.
 - **Mapa embebido** (osmdroid + teselas de OpenStreetMap, sin API key): pines de las farmacias más
   cercanas, tarjeta de detalle, ruta a pie o en auto (OSRM público, solo demo), "Navegar" en una app
   externa y "Reservar acá", que vuelve a Disponibilidad con la farmacia elegida.
-- Registro e inicio de sesión de pacientes (JWT en memoria, sin persistencia de claves).
+- Registro e inicio de sesión de pacientes (sesión cifrada con Android Keystore; no se guarda la contraseña).
 - Creación de reservas con `Idempotency-Key` estable por intento y prescripción de demo.
+- Recetas: cámara y PDF/imagen usan la misma verificación con IA desde **Mis recetas** y desde el medicamento. Antes de elegir farmacia se validan presentación, vigencia y cantidad; el original queda disponible para el operador. Un error conserva el adjunto en la misma pantalla. El ingreso por código hace estas validaciones sin IA.
 - Listado paginado de reservas, actualización y cancelación voluntaria con confirmación.
 - Pantalla de perfil y cierre de sesión (se revoca el JWT del servidor si hay conexión).
 - Pruebas unitarias del mecanismo de idempotencia.
@@ -116,7 +119,7 @@ en bases con información real/compartida ni usar `docker compose down -v`.
 - Mapa: osmdroid dentro de Compose (`AndroidView`), con ciclo de vida atado a la pantalla.
 - Estado/lógica de presentación: ViewModels + StateFlow.
 - Acceso remoto: Repository + Retrofit + OkHttp + Gson.
-- Manejo de sesión: solo en memoria; no se persiste JWT ni contraseñas.
+- Manejo de sesión: JWT y vencimiento cifrados con AES-GCM y Android Keystore, sin backup. Se restaura al recrear el proceso y se elimina al cerrar sesión o invalidarse. El vencimiento del servidor sigue siendo de 30 minutos; nunca se guarda la contraseña.
 - El backend conserva autorización por rol y las transacciones de reserva.
 - Clave de idempotencia: misma solicitud/mismo reintento → mismo UUID; si cambia
   el cuerpo → UUID nuevo; se reinicia después de confirmar correctamente.

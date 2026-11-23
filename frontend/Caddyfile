@@ -1,0 +1,12 @@
+:80 {
+    handle /api/* {
+        reverse_proxy backend:8081 {
+            header_up -Origin
+        }
+    }
+    handle {
+        root * /usr/share/caddy
+        try_files {path} /index.html
+        file_server
+    }
+}

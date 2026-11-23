@@ -3,5 +3,5 @@
 # Usar solo en redes de confianza (casa), no en WiFi publicas.
 services:
   backend:
-    ports:
+    ports: !override
       - "0.0.0.0:18081:8081"

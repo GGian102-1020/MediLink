@@ -71,6 +71,11 @@ public class PrescripcionService {
         return dto(prescripciones.findByIdAndUsuarioId(id,usuarioId).orElseThrow(ApiException::notFound));
     }
 
+    public PrescripcionDTO porCodigoPropio(String codigo,CurrentAccount actor) {
+        if (actor==null || !"USUARIO".equals(actor.rol())) throw ApiException.forbidden();
+        return dto(prescripciones.findByCodigoDeCuenta(codigo.strip(),actor.id()).orElseThrow(ApiException::notFound));
+    }
+
     @Transactional
     public PrescripcionDTO crear(@Valid PrescripcionCreateRequest req, CurrentAccount actor, HttpServletRequest request) {
         MedicamentoService.admin(actor);

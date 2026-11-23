@@ -79,6 +79,19 @@ class RecetasApiTest {
         assertTrue(cuerpo.contains("%PDF-ficticio"))
     }
 
+    @Test fun reservaVerificaDocumentoOCodigoAntesDeElegirFarmacia() = runBlocking {
+        responder(200, """{"nueva":true,"prescripcion":$receta,"codigo":"RECETA_VERIFICADA"}""")
+        repo.escanearRecetaParaReserva(adjunto(),5,2) {}
+        val upload=solicitud()
+        assertEquals("/api/me/recetas-demo/escaneo",upload.path)
+        val multipart=upload.body.readUtf8()
+        assertTrue(multipart.contains("name=\"presentacionId\""))
+        assertTrue(multipart.contains("name=\"cantidad\""))
+        responder(200, """{"nueva":false,"prescripcion":$receta}""")
+        repo.vincularRecetaParaReserva(" MLD-DEMO ",5,2)
+        assertEquals("""{"codigoReceta":"MLD-DEMO","presentacionId":5,"cantidad":2}""",solicitud().body.readUtf8())
+    }
+
     @Test fun interpretaLosErroresRealesDelEscaneo() = runBlocking {
         val archivo = adjunto().multipart()
         for ((status, codigo, texto) in listOf(
@@ -120,6 +133,22 @@ class RecetasApiTest {
         assertNull(sesion.token)
         assertFalse(puedeVerMisRecetas(sesion.login.value?.perfil?.rol))
         solicitud()
+        Unit
+    }
+
+    @Test fun credencialesIncorrectasNoRevocanLaSesionActual() = runBlocking {
+        responder(401, """{"codigo":"INVALID_CREDENTIALS"}""")
+        val error = runCatching { repo.login("paciente@demo.test", "incorrecta") }.exceptionOrNull()
+        assertTrue(error is HttpException)
+        assertEquals("jwt-de-prueba", sesion.token)
+        solicitud()
+        Unit
+    }
+
+    @Test fun configuracionPermiteDistinguirEscaneoApagadoDeUnErrorDeRed() = runBlocking {
+        responder(200, """{"escaneoHabilitado":false}""")
+        assertFalse(repo.configuracionRecetas().escaneoHabilitado)
+        assertEquals("/api/me/recetas-demo/configuracion", solicitud().path)
         Unit
     }
 

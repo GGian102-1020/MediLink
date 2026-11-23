@@ -30,7 +30,7 @@ data class ItemPrescripcionDto(
     val cantidadDisponible: Int,
 )
 
-data class VincularRecetaRequest(val codigoReceta: String)
+data class VincularRecetaRequest(val codigoReceta: String, val presentacionId: Long? = null, val cantidad: Int? = null)
 
 data class VinculacionRecetaDto(
     val nueva: Boolean,
@@ -41,12 +41,16 @@ data class VinculacionRecetaDto(
 internal class EnvioReceta(val enviado: () -> Unit)
 
 internal interface RecetasApi {
+    @GET("api/me/recetas-demo/configuracion")
+    suspend fun configuracion(): ConfiguracionRecetasDto
     @POST("api/me/recetas-demo/vinculacion")
     suspend fun vincular(@Body body: VincularRecetaRequest): VinculacionRecetaDto
 
     @Multipart
     @POST("api/me/recetas-demo/escaneo")
-    suspend fun escanear(@Part archivo: MultipartBody.Part, @Tag envio: EnvioReceta): VinculacionRecetaDto
+    suspend fun escanear(@Part archivo: MultipartBody.Part, @Tag envio: EnvioReceta,
+        @Part("presentacionId") presentacionId: okhttp3.RequestBody? = null,
+        @Part("cantidad") cantidad: okhttp3.RequestBody? = null): VinculacionRecetaDto
 
     /** Receta (PDF/imagen) adjunta para reservar un medicamento BAJO_RECETA. */
     @Multipart
@@ -63,6 +67,8 @@ internal interface RecetasApi {
     @GET("api/me/prescripciones/{id}")
     suspend fun detalle(@Path("id") id: Long): PrescripcionDto
 }
+
+data class ConfiguracionRecetasDto(val escaneoHabilitado: Boolean)
 
 internal data class RecetaAdjuntaDto(
     val codigoPrescripcion: String,

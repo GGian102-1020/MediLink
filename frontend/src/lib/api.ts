@@ -35,15 +35,16 @@ export async function api<T>(path: string, options: RequestInit & { idempotencyK
   headers.set('X-Correlation-Id', crypto.randomUUID());
   if (init.body instanceof FormData) headers.delete('Content-Type');
   else if (init.body !== undefined && init.body !== null) headers.set('Content-Type', 'application/json');
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  const requestToken = accessToken;
+  if (requestToken) headers.set('Authorization', `Bearer ${requestToken}`);
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
   let response: Response;
   try { response = await fetch(path, { ...init, headers, cache: 'no-store' }); }
-  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediFarm. Revisá que la API esté en funcionamiento.'); }
+  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediFind. Revisá que la API esté en funcionamiento.'); }
   if (!response.ok) {
     let err: ApiErrorBody = {};
     try { err = await response.json() as ApiErrorBody; } catch { /* respuesta inesperada */ }
-    if (response.status === 401 && accessToken) {
+    if ((err.codigo === 'INVALID_TOKEN' || err.codigo === 'ACCOUNT_DISABLED') && requestToken && accessToken === requestToken) {
       setAccessToken(null);
       window.dispatchEvent(new Event('medlink:session-expired'));
     }
@@ -56,14 +57,15 @@ export async function api<T>(path: string, options: RequestInit & { idempotencyK
 export async function getBlob(path: string): Promise<Blob> {
   if (!path.startsWith('/api/')) throw new Error('Ruta API inválida');
   const headers = new Headers({ 'X-Correlation-Id': crypto.randomUUID() });
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  const requestToken = accessToken;
+  if (requestToken) headers.set('Authorization', `Bearer ${requestToken}`);
   let response: Response;
   try { response = await fetch(path, { headers, cache: 'no-store' }); }
-  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediFarm.'); }
+  catch { throw new ApiError(0, 'NETWORK_ERROR', 'No se pudo conectar con MediFind.'); }
   if (!response.ok) {
     let err: ApiErrorBody = {};
     try { err = await response.json() as ApiErrorBody; } catch { /* respuesta binaria o vacía */ }
-    if (response.status === 401 && accessToken) { setAccessToken(null); window.dispatchEvent(new Event('medlink:session-expired')); }
+    if ((err.codigo === 'INVALID_TOKEN' || err.codigo === 'ACCOUNT_DISABLED') && requestToken && accessToken === requestToken) { setAccessToken(null); window.dispatchEvent(new Event('medlink:session-expired')); }
     throw new ApiError(response.status, err.codigo || `HTTP_${response.status}`, err.mensaje || `No se pudo descargar el archivo (${response.status}).`, err.correlationId);
   }
   return await response.blob();

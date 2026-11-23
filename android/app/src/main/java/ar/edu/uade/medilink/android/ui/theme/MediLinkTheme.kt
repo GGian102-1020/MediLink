@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
- * Paleta tomada del logo MediFarm: azul marino de "Medi", la cruz azul→celeste
+ * Paleta tomada del logo MediFind: azul marino de "Medi", la cruz azul→celeste
  * y el verde agua de "link". No cambia endpoints, sesión ni reglas de negocio.
  */
 object MediColors {

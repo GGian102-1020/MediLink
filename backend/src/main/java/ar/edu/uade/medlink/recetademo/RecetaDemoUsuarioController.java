@@ -2,6 +2,7 @@ package ar.edu.uade.medlink.recetademo;
 
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.escaneo.RecetaDemoEscaneoService;
+import ar.edu.uade.medlink.escaneo.RecetaVerificadaService;
 import ar.edu.uade.medlink.security.CurrentAccount;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -20,23 +21,32 @@ import static ar.edu.uade.medlink.recetademo.RecetaDemoDtos.*;
 public class RecetaDemoUsuarioController {
     private final RecetaDemoService recetas;
     private final RecetaDemoEscaneoService escaneo;
+    private final RecetaVerificadaService verificacion;
 
-    RecetaDemoUsuarioController(RecetaDemoService recetas,RecetaDemoEscaneoService escaneo) {
+    RecetaDemoUsuarioController(RecetaDemoService recetas,RecetaDemoEscaneoService escaneo,RecetaVerificadaService verificacion) {
         this.recetas=recetas;
         this.escaneo=escaneo;
+        this.verificacion=verificacion;
+    }
+
+    @GetMapping("/configuracion")
+    public ResponseEntity<java.util.Map<String,Boolean>> configuracion() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+            .body(java.util.Map.of("escaneoHabilitado",escaneo.disponible()));
     }
 
     @PostMapping("/vinculacion")
     public ResponseEntity<Vinculacion> vincular(@RequestBody @Valid Vincular entrada,
         @AuthenticationPrincipal CurrentAccount actor,HttpServletRequest request) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-            .body(recetas.vincular(entrada.codigoReceta(),actor,request));
+            .body(verificacion.vincularCodigo(entrada.codigoReceta(),entrada.presentacionId(),entrada.cantidad(),actor,request));
     }
 
     @PostMapping(value="/escaneo",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Vinculacion> escanear(@RequestPart(value="archivo",required=false) MultipartFile archivo,
+        @RequestParam(required=false) Long presentacionId,@RequestParam(required=false) Integer cantidad,
         @AuthenticationPrincipal CurrentAccount actor,HttpServletRequest request) {
         if (archivo==null) throw ApiException.validation("Adjuntá el archivo de la receta.");
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(escaneo.escanear(archivo,actor,request));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(escaneo.escanear(archivo,presentacionId,cantidad,actor,request));
     }
 }

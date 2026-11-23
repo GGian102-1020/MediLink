@@ -86,6 +86,21 @@ class OpenAiPrescriptionImageExtractorTest {
         }
     }
 
+    @Test void distingueCredencialesSaldoYModeloSinExponerElCuerpo() throws Exception {
+        for (String[] caso:List.of(
+            new String[]{"401","invalid_api_key","ESCANEO_CREDENCIALES_INVALIDAS"},
+            new String[]{"429","insufficient_quota","ESCANEO_SIN_SALDO"},
+            new String[]{"404","model_not_found","ESCANEO_MODELO_NO_DISPONIBLE"})) {
+            String body=json.writeValueAsString(Map.of("error",Map.of("code",caso[1],"message","detalle-privado")));
+            var server=servidor(Integer.parseInt(caso[0]),body,new AtomicReference<>());
+            try {
+                var error=assertThrows(ApiException.class,()->extractor(server).extraer(imagen));
+                assertEquals(caso[2],error.codigo());
+                assertFalse(error.getMessage().contains("detalle-privado"));
+            } finally { server.stop(0); }
+        }
+    }
+
     private OpenAiPrescriptionImageExtractor extractor(HttpServer servidor) {
         return new OpenAiPrescriptionImageExtractor(true,"test-key","modelo-falso",3,
             URI.create("http://127.0.0.1:"+servidor.getAddress().getPort()+"/v1/responses"));

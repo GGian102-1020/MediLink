@@ -1,5 +1,7 @@
 # Arranque local — backend + frontend MediLink
 
+**Arranque recomendado para Android y operador:** ejecutar `scripts/iniciar-demo.ps1` desde la raíz. El dashboard corre dentro de Docker y permanece encendido al cerrar el chat o la consola. Para llevar los PDFs de prueba a otro celular o computadora, consultar [DEMO_ANDROID_PORTABLE.md](DEMO_ANDROID_PORTABLE.md).
+
 Proyecto universitario (MVP). El stock y las cuentas de demo son **ficticios**: no usar datos sanitarios reales
 ni exponer las credenciales de demostración fuera de la máquina local.
 
@@ -27,10 +29,13 @@ curl.exe -k https://localhost:8443/api/medicamentos
 # 4. Datos de prueba: UNA SOLA VEZ y solo en una base local nueva y descartable.
 docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/medlink/02_datos_prueba.sql'
 
-# 5. Frontend MediLink (el proxy de Vite reenvía /api al gateway).
-Set-Location frontend
-npm ci
-npm run dev
+# 5. El dashboard ya corre en Docker en http://127.0.0.1:5173.
+# No hace falta mantener npm ni una terminal abiertos.
+# Solo para desarrollo con recarga automática:
+# docker compose --profile api stop frontend
+# Set-Location frontend
+# npm ci
+# npm run dev
 ```
 
 Abrir `http://127.0.0.1:5173`. Cuenta de operador de prueba: `carla.mendez@farmacia-central.test` / `Password123!`

@@ -33,7 +33,7 @@ if (-not $SinBackend) {
         if (-not (Test-Path .\.env)) { throw 'Falta .env en la raiz de MediLink (ver .env.example).' }
         # Docker y Gradle escriben progreso en stderr: no tratarlo como error (PowerShell 5.1).
         $ErrorActionPreference = 'Continue'
-        docker compose -f .\docker-compose.yml -f .\android\compose.lan.yml --profile api up -d --build 2>&1 | ForEach-Object { "$_" }
+        docker compose -f .\docker-compose.yml -f .\android\compose.dev.yml -f .\android\compose.lan.yml --profile api up -d --build 2>&1 | ForEach-Object { "$_" }
         $ErrorActionPreference = 'Stop'
         if ($LASTEXITCODE -ne 0) { throw 'docker compose fallo.' }
     } finally { Pop-Location }

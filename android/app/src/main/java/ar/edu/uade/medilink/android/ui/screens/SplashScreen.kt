@@ -59,7 +59,7 @@ import androidx.compose.runtime.getValue
 
 /**
  * Pantalla de bienvenida: la cruz del logo entra con rebote, un pulso con los colores
- * de la marca, el texto "MediFarm" sube y aparece; luego avisa con [onTerminado].
+ * de la marca, el texto "MediFind" sube y aparece; luego avisa con [onTerminado].
  * Siempre sobre blanco, igual que el logo original.
  */
 @Composable
@@ -95,7 +95,7 @@ fun SplashScreen(onTerminado: () -> Unit) {
 
     Box(
         modifier = Modifier.fillMaxSize().background(Color.White)
-            .semantics { contentDescription = "MediFarm, cargando" },
+            .semantics { contentDescription = "MediFind, cargando" },
         contentAlignment = Alignment.Center,
     ) {
         // Manchas suaves de color detrás del logo.
@@ -136,7 +136,7 @@ fun SplashScreen(onTerminado: () -> Unit) {
             Text(
                 buildAnnotatedString {
                     withStyle(SpanStyle(color = MediColors.Navy)) { append("Medi") }
-                    withStyle(SpanStyle(color = MediColors.Primario)) { append("Farm") }
+                    withStyle(SpanStyle(color = MediColors.Primario)) { append("Find") }
                 },
                 fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp,
                 modifier = Modifier.offset(y = subidaTexto.value.dp).alpha(alfaTexto.value),

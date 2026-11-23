@@ -192,6 +192,8 @@
 @media (max-width: 480px) { .reserva-exitosa-datos { grid-template-columns: 1fr; } }
 
 /* ===== Login único del dashboard de farmacia ===== */
+.recovery-link{display:block;text-align:center;color:#087f86;font-size:14px;margin:14px 0;background:none;border:0;cursor:pointer;width:100%}
+.recovery-card h2{font-size:20px;margin-bottom:12px}.recovery-card p{font-size:14px;line-height:1.6;color:#657c93;margin-bottom:20px}
 .login-only { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: #0d1b33; }
 .login-card { width: 100%; max-width: 380px; background: #fff; border-radius: 20px; padding: 36px 28px 30px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 24px 60px rgba(0, 0, 0, .25); }
 .login-logo { align-self: center; }

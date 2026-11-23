@@ -2,7 +2,6 @@ package ar.edu.uade.medlink.escaneo;
 
 import ar.edu.uade.medlink.common.error.ApiException;
 import ar.edu.uade.medlink.recetademo.RecetaDemoDtos.Vinculacion;
-import ar.edu.uade.medlink.recetademo.RecetaDemoService;
 import ar.edu.uade.medlink.security.CurrentAccount;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
@@ -17,7 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class RecetaDemoEscaneoService {
     private final PrescriptionImageExtractor extractor;
     private final ArchivoReceta archivos;
-    private final RecetaDemoService recetas;
+    private final RecetaVerificadaService recetas;
     private final Clock clock;
     private final Semaphore cupos=new Semaphore(3);
     private final Map<Long,Integer> porCuenta=new HashMap<>();
@@ -25,16 +24,24 @@ public class RecetaDemoEscaneoService {
     private int intentos;
 
     RecetaDemoEscaneoService(PrescriptionImageExtractor extractor,ArchivoReceta archivos,
-                             RecetaDemoService recetas,Clock clock) {
+                             RecetaVerificadaService recetas,Clock clock) {
         this.extractor=extractor;
         this.archivos=archivos;
         this.recetas=recetas;
         this.clock=clock;
     }
 
+    public boolean disponible() { return extractor.disponible(); }
+
     // External I/O and file preparation happen before opening the claim transaction.
     public Vinculacion escanear(MultipartFile archivo,CurrentAccount actor,HttpServletRequest request) {
+        return escanear(archivo,null,null,actor,request);
+    }
+
+    public Vinculacion escanear(MultipartFile archivo,Long presentacionId,Integer cantidad,
+        CurrentAccount actor,HttpServletRequest request) {
         if (actor==null || !"USUARIO".equals(actor.rol())) throw ApiException.forbidden();
+        RecetaVerificadaService.validarSeleccion(presentacionId,cantidad);
         if (!extractor.disponible())
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"ESCANEO_NO_CONFIGURADO",
                 "El escaneo con IA no está configurado. Podés ingresar el código.");
@@ -42,7 +49,7 @@ public class RecetaDemoEscaneoService {
         try {
             registrarIntento(actor.id());
             var lectura=extractor.extraer(archivos.preparar(archivo));
-            return recetas.verificarYVincular(lectura,actor,request);
+            return recetas.vincularDocumento(lectura,archivo,presentacionId,cantidad,actor,request);
         } finally {
             cupos.release();
         }

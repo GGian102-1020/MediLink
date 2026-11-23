@@ -24,6 +24,8 @@ internal enum class AccionReceta { PREPARANDO, VINCULANDO, ENVIANDO, ANALIZANDO 
 internal fun puedeVerMisRecetas(rol: String?) = rol == "USUARIO"
 
 internal data class MisRecetasState(
+    val escaneoHabilitado: Boolean? = null,
+    val errorConfiguracion: String? = null,
     val lista: List<PrescripcionDto> = emptyList(),
     val cargando: Boolean = false,
     val hayMas: Boolean = false,
@@ -58,7 +60,19 @@ internal class MisRecetasVm(
         actualizar()
     }
 
-    fun actualizar() = cargar(reiniciar = true)
+    fun actualizar() {
+        cargar(reiniciar = true)
+        viewModelScope.launch {
+            try {
+                val config = repository.configuracionRecetas()
+                mutable.update { it.copy(escaneoHabilitado = config.escaneoHabilitado, errorConfiguracion = null) }
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                mutable.update { it.copy(escaneoHabilitado = null,
+                    errorConfiguracion = "No pudimos consultar el escaneo. Podés volver a intentar con Actualizar listado.") }
+            }
+        }
+    }
 
     fun mas() {
         if (mutable.value.hayMas && !mutable.value.cargando) cargar(reiniciar = false)
@@ -189,6 +203,7 @@ internal class MisRecetasVm(
     }
 
     fun escanear() {
+        if (mutable.value.escaneoHabilitado != true) return
         val adjunto = mutable.value.adjunto ?: return
         ejecutar(AccionReceta.ENVIANDO) {
             repository.escanearReceta(adjunto.multipart()) {

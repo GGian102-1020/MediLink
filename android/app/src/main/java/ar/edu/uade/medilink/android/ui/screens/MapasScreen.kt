@@ -9,10 +9,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import android.location.Geocoder
-import android.location.Location
-import android.location.LocationManager
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -77,17 +74,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import ar.edu.uade.medilink.android.data.DisponibilidadDto
+import ar.edu.uade.medilink.android.data.obtenerUbicacion
+import ar.edu.uade.medilink.android.data.PERMISOS_UBICACION
 import ar.edu.uade.medilink.android.data.MediLinkRepository
 import ar.edu.uade.medilink.android.data.PuntoGeo
 import ar.edu.uade.medilink.android.data.mensajeDeError
 import ar.edu.uade.medilink.android.ui.theme.MediColors
 import java.util.Locale
-import java.util.concurrent.Executors
-import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -108,41 +104,6 @@ import androidx.compose.runtime.setValue
 private fun DisponibilidadDto.punto(): PuntoGeo? = try {
     if (latitud == null || longitud == null) null else PuntoGeo(latitud, longitud)
 } catch (_: IllegalArgumentException) { null }
-
-/** LocationManager evita exigir Play Services. No pide localización en segundo plano. */
-@Suppress("DEPRECATION")
-internal suspend fun obtenerUbicacion(context: Context): PuntoGeo = suspendCancellableCoroutine { cont ->
-    if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-        cont.resumeWith(Result.failure(IllegalArgumentException("Falta el permiso de ubicación.")))
-        return@suspendCancellableCoroutine
-    }
-    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    try {
-        val provider = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-            .firstOrNull { locationManager.isProviderEnabled(it) }
-            ?: throw IllegalArgumentException("Activá la ubicación del dispositivo o buscá una dirección.")
-        if (Build.VERSION.SDK_INT >= 30) {
-            val executor = Executors.newSingleThreadExecutor()
-            val cancellationSignal = android.os.CancellationSignal()
-            cont.invokeOnCancellation { cancellationSignal.cancel(); executor.shutdown() }
-            locationManager.getCurrentLocation(provider, cancellationSignal, executor) { location: Location? ->
-                executor.shutdown()
-                if (cont.isActive) {
-                    if (location == null) cont.resumeWith(Result.failure(IllegalArgumentException("No se obtuvo ubicación.")))
-                    else cont.resume(PuntoGeo(location.latitude, location.longitude).redondeado())
-                }
-            }
-        } else {
-            val location = locationManager.getLastKnownLocation(provider)
-                ?: throw IllegalArgumentException("No hay ubicación reciente. Buscá una dirección.")
-            cont.resume(PuntoGeo(location.latitude, location.longitude).redondeado())
-        }
-    } catch (e: SecurityException) {
-        if (cont.isActive) cont.resumeWith(Result.failure(e))
-    } catch (e: Exception) {
-        if (cont.isActive) cont.resumeWith(Result.failure(e))
-    }
-}
 
 @Suppress("DEPRECATION")
 internal suspend fun geocodificar(context: Context, texto: String): PuntoGeo = withContext(Dispatchers.IO) {
@@ -182,7 +143,7 @@ private suspend fun calcularRuta(origen: PuntoGeo, destino: PuntoGeo, aPie: Bool
         val url = "$base/${origen.lng},${origen.lat};${destino.lng},${destino.lat}" +
             "?overview=full&geometries=geojson&steps=true"
         val request = Request.Builder().url(url)
-            .header("User-Agent", "MediFarm-Android-Academic-Demo/0.2")
+            .header("User-Agent", "MediFind-Android-Academic-Demo/0.2")
             .build()
         val client = OkHttpClient()
         client.newCall(request).execute().use { response ->
@@ -287,6 +248,7 @@ fun MapasScreen(
     var ubicando by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var camaraInicial by rememberSaveable { mutableStateOf(false) }
+    var centrarEnUbicacion by remember { mutableStateOf(false) }
     val seleccion = farmacias.find { it.farmaciaId == seleccionId }
 
     LaunchedEffect(presentacionId, origen) {
@@ -300,24 +262,27 @@ fun MapasScreen(
     }
 
     fun usarMiUbicacion() {
+        if (ubicando) return
         scope.launch {
             ubicando = true
             try {
-                repository.origen.value = obtenerUbicacion(context)
-                repository.origenEtiqueta.value = "Tu ubicación"
+                val ubicacion = obtenerUbicacion(context)
+                repository.origen.value = ubicacion.punto
+                repository.origenEtiqueta.value = ubicacion.etiqueta
+                centrarEnUbicacion = true
                 ruta = null; error = null
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = mensajeDeError(e) }
             finally { ubicando = false }
         }
     }
-    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) usarMiUbicacion() else error = "Sin permiso de ubicación no podemos mostrarte la ruta."
+    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { concedidos ->
+        if (concedidos.values.any { it }) usarMiUbicacion() else error = "Sin permiso de ubicación no podemos mostrarte la ruta."
     }
     val pedirUbicacion = {
-        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+        if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
             usarMiUbicacion()
-        else permiso.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        else permiso.launch(PERMISOS_UBICACION)
     }
     val calcular: (DisponibilidadDto, Boolean) -> Unit = { f, pie ->
         val desde = repository.origen.value
@@ -364,6 +329,13 @@ fun MapasScreen(
     val iconoNormal = remember { iconoFarmacia(context, MediColors.Navy.toArgb(), 30) }
     val iconoElegido = remember { iconoFarmacia(context, MediColors.Primario.toArgb(), 44) }
     val iconoYo = remember { iconoOrigen(context) }
+
+    LaunchedEffect(origen, centrarEnUbicacion) {
+        if (centrarEnUbicacion && origen != null) {
+            mapa.controller.animateTo(origen!!.geo(), 15.5, 450L)
+            centrarEnUbicacion = false
+        }
+    }
 
     // Redibuja pines, origen y ruta cuando cambia algo.
     LaunchedEffect(farmacias, seleccionId, origen, ruta) {
@@ -460,10 +432,8 @@ fun MapasScreen(
             }
         }
         // Botón "mi ubicación".
-        SmallFloatingActionButton(onClick = {
-            val o = origen
-            if (o != null && !ubicando) mapa.controller.animateTo(o.geo(), 15.5, 450L) else pedirUbicacion()
-        }, containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.primary,
+        SmallFloatingActionButton(onClick = { if (!ubicando) pedirUbicacion() },
+            containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.primary,
             modifier = Modifier.align(Alignment.TopEnd).padding(14.dp).size(48.dp)) {
             if (ubicando) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
             else Icon(Icons.Default.MyLocation, contentDescription = "Mi ubicación")

@@ -22,7 +22,7 @@ const operatorDashboardNav: OperatorNavItem[] = [
 const extraTitles: Record<string, string> = { '/perfil': 'Mi cuenta' };
 
 function OperatorBrand() {
-  return <Link to="/panel" className="dash-brand" aria-label="MediFarm, ir al resumen"><img src="/logo-mark.png" alt="" width={28} height={27}/><span>Medi<b>Farm</b></span></Link>;
+  return <Link to="/panel" className="dash-brand" aria-label="MediFind, ir al resumen"><img src="/logo-mark.png" alt="" width={28} height={27}/><span>Medi<b>Find</b></span></Link>;
 }
 
 function ProfileMenu() {

@@ -107,7 +107,8 @@ private val CORREO_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
 /** Login obligatorio: encabezado oscuro con círculos y tarjeta blanca (diseño de pantallas.zip). */
 @Composable
-fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit, onInvitado: () -> Unit) {
+fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit, onInvitado: () -> Unit,
+    onRecuperar: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var correo by rememberSaveable { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
@@ -141,6 +142,7 @@ fun AuthScreen(vm: AuthVm, onSuccess: () -> Unit, onRegistro: () -> Unit, onInvi
         Spacer(Modifier.height(18.dp))
         CampoPildora("Contraseña", contrasena, { contrasena = it }, esClave = true,
             accion = ImeAction.Done, onAccion = { if (puedeEntrar) entrar() })
+        TextButton(onClick = onRecuperar, enabled = !state.cargando) { Text("¿Olvidaste tu contraseña?") }
         if (state.error != null) {
             Spacer(Modifier.height(14.dp))
             AvisoError(state.error)
@@ -439,7 +441,7 @@ private fun PantallaAuth(
     }
 }
 
-/** La cruz del logo dentro de una caja blanca redondeada, con "MediFarm" debajo. */
+/** La cruz del logo dentro de una caja blanca redondeada, con "MediFind" debajo. */
 @Composable
 private fun LogoEnCaja(modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -453,7 +455,7 @@ private fun LogoEnCaja(modifier: Modifier = Modifier) {
         Text(
             buildAnnotatedString {
                 withStyle(SpanStyle(color = MediColors.Navy)) { append("Medi") }
-                withStyle(SpanStyle(color = MediColors.Primario)) { append("Farm") }
+                withStyle(SpanStyle(color = MediColors.Primario)) { append("Find") }
             },
             fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp,
         )
