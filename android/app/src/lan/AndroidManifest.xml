@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- SOLO variante LAN: permite HTTP hacia la PC del backend en la red WiFi local. -->
+    <application android:networkSecurityConfig="@xml/lan_network_security_config" />
+</manifest>

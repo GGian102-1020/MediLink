@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Variante LAN (pruebas en la misma WiFi): HTTP permitido porque el backend local no tiene HTTPS. -->
+<!-- No usar esta variante para distribuir fuera de la red local. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

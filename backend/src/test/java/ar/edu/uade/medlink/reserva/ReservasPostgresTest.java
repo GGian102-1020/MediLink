@@ -306,6 +306,47 @@ class ReservasPostgresTest {
         assertEquals("INVALID_STATE_TRANSITION",assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,
             ()->reservations.confirmar(f.pharmacy(),pending.codigoVisible(),f.operatorActor(),null)).codigo());
     }
+    OffsetDateTime at(Instant t) { return t.atOffset(ZoneOffset.ofHours(-3)); }
+    String apiError(org.junit.jupiter.api.function.Executable action) {
+        return assertThrows(ar.edu.uade.medlink.common.error.ApiException.class,action).codigo();
+    }
+    @Test void operatorExtendsAndShortensDeadlineWithin24HoursAndItIsAudited() {
+        var r=created(1);
+        var extended=reservations.ajustarVencimiento(f.pharmacy(),r.codigoVisible(),at(T.plus(Duration.ofHours(9))),
+            "El paciente llega tarde",f.operatorActor(),null).dto();
+        assertEquals("ACTIVA",extended.estado());
+        assertEquals(Duration.ofHours(9).toSeconds(),extended.segundosRestantes());
+        var shortened=reservations.ajustarVencimiento(f.pharmacy(),r.codigoVisible(),at(T.plus(Duration.ofHours(2))),
+            null,f.operatorActor(),null).dto();
+        assertEquals(Duration.ofHours(2).toSeconds(),shortened.segundosRestantes());
+        var max=reservations.ajustarVencimiento(f.pharmacy(),r.codigoVisible(),at(T.plus(Duration.ofHours(24))),
+            null,f.operatorActor(),null).dto();
+        assertEquals(Duration.ofHours(24).toSeconds(),max.segundosRestantes());
+        assertEquals(3,count("SELECT count(*) FROM auditoria WHERE accion='AJUSTAR_VENCIMIENTO_RESERVA' AND entidad_id=?",r.id()));
+        // Stock stays reserved: adjusting the deadline is not a stock movement.
+        assertEquals(9,count("SELECT cantidad_disponible FROM stock WHERE id_stock=?",f.stock()));
+    }
+    @Test void deadlineAdjustmentRejectsPastBeyond24HoursPendingAndWrongRoles() {
+        var r=created(1);
+        assertEquals("VALIDATION_ERROR",apiError(()->reservations.ajustarVencimiento(f.pharmacy(),r.codigoVisible(),
+            at(T.plus(Duration.ofHours(24)).plusSeconds(1)),null,f.operatorActor(),null)));
+        assertEquals("VALIDATION_ERROR",apiError(()->reservations.ajustarVencimiento(f.pharmacy(),r.codigoVisible(),
+            at(T.plus(Duration.ofMinutes(1))),null,f.operatorActor(),null)));
+        assertEquals("VALIDATION_ERROR",apiError(()->reservations.ajustarVencimiento(f.pharmacy(),r.codigoVisible(),
+            null,null,f.operatorActor(),null)));
+        apiError(()->reservations.ajustarVencimiento(f.pharmacy(),r.codigoVisible(),
+            at(T.plus(Duration.ofHours(5))),null,f.userActor(),null));
+        // The DB enforces the 24 h cap even if the service is bypassed.
+        assertThrows(RuntimeException.class,()->db.update("UPDATE reserva SET fecha_hora_vencimiento=? WHERE id_reserva=?",
+            ts(T.plus(Duration.ofHours(25))),r.id()));
+        RxFixture rx=rx(2);
+        var pending=reservations.crear(rxCmd(rx,1),key(),f.userActor(),null).dto();
+        assertEquals("INVALID_STATE_TRANSITION",apiError(()->reservations.ajustarVencimiento(f.pharmacy(),
+            pending.codigoVisible(),at(T.plus(Duration.ofHours(5))),null,f.operatorActor(),null)));
+        reservations.cancelarPropia(r.codigoVisible(),f.userActor(),null);
+        assertEquals("INVALID_STATE_TRANSITION",apiError(()->reservations.ajustarVencimiento(f.pharmacy(),
+            r.codigoVisible(),at(T.plus(Duration.ofHours(5))),null,f.operatorActor(),null)));
+    }
     @Autowired ar.edu.uade.medlink.chat.ChatService chat;
     @Test void chatIsWritableOnlyWhileAReservationIsOpenAndClosedHistoryIsPurged() {
         var hola=new ar.edu.uade.medlink.chat.ChatDtos.EnviarMensajeRequest("Hola");

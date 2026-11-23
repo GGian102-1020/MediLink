@@ -149,3 +149,25 @@ segui directamente [RELEASE_ANDROID.md](RELEASE_ANDROID.md). Si mas adelante
 queres probar login, catalogo y reservas con backend local desde otro celular,
 esa es una tarea aparte que requiere exponer la API por HTTPS.
 No usar datos personales reales en la demostracion.
+
+## Celular por WiFi, con el backend en tu PC (sin hosting)
+
+La variante `lan` apunta al backend corriendo en tu PC a través de la red WiFi.
+PC y celular tienen que estar en la **misma red**. Desde la raíz `MediLink`:
+
+```powershell
+& .\android\scripts\build-apk-lan.ps1
+# Detecta la IP de la PC, levanta Docker con android/compose.lan.yml
+# (backend publicado en 0.0.0.0:18081), compila :app:assembleLan
+# y deja el APK en dist\MediLink-lan.apk
+```
+
+Pasar `dist\MediLink-lan.apk` al celular (cable, Drive, WhatsApp) e instalarlo
+permitiendo "orígenes desconocidos". Se instala junto a la app debug (`.lan`).
+
+- La IP queda fija dentro del APK: si la PC cambia de IP, volver a correr el script
+  (o reservar la IP en el router). Para forzarla: `-Ip 192.168.1.50`.
+- Si el celular no conecta: abrir `http://<IP>:18081/api/health` en el navegador del
+  celular; si no carga, permitir el puerto 18081 en el Firewall de Windows y marcar la
+  red WiFi como **Privada**.
+- Esta variante usa HTTP sin cifrar: usarla solo en redes de confianza.

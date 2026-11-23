@@ -29,7 +29,7 @@ public class AuditService {
     private static final Set<String> SUMMARY_FIELDS=Set.of("nombre","apellido","cuentaId","farmaciaId",
         "estado","tokenVersion","direccion","telefono","emailContacto","medicamentoId",
         "concentracionTexto","formaFarmaceutica","cantidadEnvase","unidadExpendio","condicionDispensa",
-        "presentacionId","cantidadDisponible","fechaHoraInicio","fechaHoraFin",
+        "presentacionId","cantidadDisponible","fechaHoraInicio","fechaHoraFin","fechaHoraVencimiento",
         "id_farmacia","cantidad_disponible","causa",
         "fechaEmision","fechaVencimiento","cantidadItems"); // Existing seed summaries use these physical names.
 

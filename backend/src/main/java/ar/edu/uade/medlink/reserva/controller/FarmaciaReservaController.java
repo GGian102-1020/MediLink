@@ -62,6 +62,18 @@ public class FarmaciaReservaController {
         if (result.expired()) throw ApiException.conflict("RESERVATION_EXPIRED","La reserva venció.");
         return result.dto();
     }
+    public record AjusteVencimientoRequest(OffsetDateTime fechaHoraVencimiento,String motivo) { }
+    /** Pharmacy extends or shortens the pickup deadline (max 24 h from the start of the window). */
+    @PostMapping("/{codigo}/vencimiento")
+    @PreAuthorize("hasRole('OPERADOR')")
+    public ReservaDTO ajustarVencimiento(@PathVariable long id,@PathVariable String codigo,
+        @RequestBody(required=false) AjusteVencimientoRequest body,
+        @AuthenticationPrincipal CurrentAccount actor,HttpServletRequest request) {
+        var result=service.ajustarVencimiento(id,codigo,body==null?null:body.fechaHoraVencimiento(),
+            body==null?null:body.motivo(),actor,request);
+        if (result.expired()) throw ApiException.conflict("RESERVATION_EXPIRED","La reserva venció.");
+        return result.dto();
+    }
     public record RechazoRecetaRequest(String motivo) { }
     /** Pharmacy rejects the prescription of a PENDIENTE reservation; stock is returned. */
     @PostMapping("/{codigo}/rechazo-receta")

@@ -168,15 +168,47 @@ function RecetaAdjunta({ url, pendiente }: { url: string; pendiente: boolean }) 
   </div>;
 }
 
+/** Same caps as the backend: max 24 h from the start of the window, at least 5 min in the future. */
+const HOUR = 3_600_000;
+const MAX_VENCIMIENTO_MS = 24 * HOUR;
+const MIN_MARGEN_MS = 5 * 60_000;
+const DEADLINE_STEPS = [-1, 1, 3, 4, 5];
+function toLocalInput(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function deadlineLimit(r: Reserva) { return new Date(Date.parse(r.fechaHoraConfirmacion ?? r.fechaHoraCreacion) + MAX_VENCIMIENTO_MS); }
+
+function DeadlineForm({ r, value, onValue, reason, onReason, onSubmit }: { r: Reserva; value: string; onValue: (v: string) => void; reason: string; onReason: (v: string) => void; onSubmit: () => void }) {
+  const current = new Date(r.fechaHoraVencimiento); const limit = deadlineLimit(r);
+  const min = new Date(Date.now() + MIN_MARGEN_MS);
+  const inRange = (d: Date) => d >= min && d <= limit;
+  return <form id="deadline-form" className="stack" onSubmit={(e: FormEvent) => { e.preventDefault(); onSubmit(); }}>
+    <div className="divider"/>
+    <Field label="Atajos" hint={`Desde el vencimiento actual (${dateTime(r.fechaHoraVencimiento)}).`}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {DEADLINE_STEPS.map(h => { const d = new Date(current.getTime() + h * HOUR); return <Button key={h} type="button" size="sm" variant="secondary" disabled={!inRange(d)} onClick={() => onValue(toLocalInput(d))}>{h > 0 ? `+${h}` : h} h</Button>; })}
+        <Button type="button" size="sm" variant="secondary" disabled={limit < min} onClick={() => onValue(toLocalInput(limit))}>Máximo</Button>
+      </div>
+    </Field>
+    <Field label="Nuevo vencimiento" hint={`Límite: ${dateTime(limit.toISOString())} (24 h desde el inicio de la reserva).`}>
+      <input type="datetime-local" value={value} min={toLocalInput(min)} max={toLocalInput(limit)} onChange={e => onValue(e.target.value)} required autoFocus/>
+    </Field>
+    <Field label="Motivo (opcional)" hint="Queda registrado en la auditoría."><input value={reason} maxLength={500} onChange={e => onReason(e.target.value)} placeholder="Ej.: el paciente avisó que llega más tarde"/></Field>
+  </form>;
+}
+
 function ReservationDetail({ pharmacyId, code, onClose, onChanged, version }: { pharmacyId: number; code: string; onClose: () => void; onChanged: () => void; version: number }) {
   const detail = useResource(() => get<Reserva>(`${reservasUrl(pharmacyId)}/${encodeURIComponent(code)}`), [pharmacyId, code, version]);
-  const [mode, setMode] = useState<'view' | 'cancel' | 'pickup' | 'reject'>('view');
+  const [mode, setMode] = useState<'view' | 'cancel' | 'pickup' | 'reject' | 'deadline'>('view');
+  const [deadline, setDeadline] = useState(''); const [deadlineReason, setDeadlineReason] = useState('');
   const [cause, setCause] = useState<string>('PRODUCTO_NO_DISPONIBLE'); const [reason, setReason] = useState(''); const [restitution, setRestitution] = useState('RESTITUIR'); const [realStock, setRealStock] = useState(0);
   const [confirmation, setConfirmation] = useState<'cancelacion' | 'confirmar' | 'rechazar' | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const [pin, setPin] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const r = detail.data; const active = r?.estado === 'ACTIVA'; const pending = r?.estado === 'PENDIENTE';
   const path = r ? `${reservasUrl(pharmacyId)}/${encodeURIComponent(r.codigoVisible)}` : '';
+  const deadlineChanged = !!r && !!deadline && deadline !== toLocalInput(new Date(r.fechaHoraVencimiento));
 
   async function pickup(e: FormEvent) {
     e.preventDefault(); if (!r || !/^\d{6}$/.test(pin)) return;
@@ -221,13 +253,37 @@ function ReservationDetail({ pharmacyId, code, onClose, onChanged, version }: { 
     } catch (err) { setConfirmation(null); setError(err instanceof Error ? err.message : 'No se pudo rechazar la receta.'); detail.reload(); }
     finally { setBusy(false); }
   }
-  function go(next: typeof mode) { setMode(next); setError(''); setPin(''); }
+  async function changeDeadline() {
+    if (!r || !deadlineChanged) return;
+    const next = new Date(deadline);
+    if (Number.isNaN(next.getTime())) { setError('Elegí una fecha y hora válidas.'); return; }
+    if (next > deadlineLimit(r)) { setError('El vencimiento no puede superar las 24 horas desde el inicio de la reserva.'); return; }
+    if (next.getTime() < Date.now() + MIN_MARGEN_MS) { setError('El nuevo vencimiento debe ser al menos 5 minutos en el futuro.'); return; }
+    setBusy(true); setError('');
+    try {
+      await post<Reserva>(`${path}/vencimiento`, { fechaHoraVencimiento: next.toISOString(), motivo: deadlineReason.trim() || null });
+      toast.success('Vencimiento actualizado', { description: `${r.codigoVisible} · vence ${dateTime(next.toISOString())}` });
+      setMode('view'); setDeadlineReason(''); detail.reload(); onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar el vencimiento.');
+      if (err instanceof ApiError && err.codigo !== 'VALIDATION_ERROR') { setMode('view'); detail.reload(); }
+    }
+    finally { setBusy(false); }
+  }
+  function go(next: typeof mode) {
+    setMode(next); setError(''); setPin('');
+    if (next === 'deadline' && r) setDeadline(toLocalInput(new Date(r.fechaHoraVencimiento)));
+  }
 
   const footer = r && pending ? mode === 'reject'
     ? <><Button variant="secondary" onClick={() => go('view')} disabled={busy}>Volver</Button><Button variant="danger" type="submit" form="reject-form" disabled={!rejectReason.trim()}>Rechazar receta</Button></>
     : <><Button variant="ghost" onClick={() => go('reject')}><XCircle size={16}/> Rechazar receta</Button><Button onClick={() => setConfirmation('confirmar')}><CheckCircle2 size={16}/> Confirmar reserva</Button></>
     : r && active ? mode === 'view'
-    ? <><Button variant="ghost" onClick={() => go('cancel')}>Cancelación operativa</Button><Button onClick={() => go('pickup')}><CheckCircle2 size={16}/> Confirmar retiro</Button></>
+    ? <><Button key="cancel" variant="ghost" onClick={() => go('cancel')}>Cancelación operativa</Button><Button key="deadline" type="button" variant="secondary" onClick={() => go('deadline')}><Clock3 size={16}/> Cambiar vencimiento</Button><Button key="pickup" onClick={() => go('pickup')}><CheckCircle2 size={16}/> Confirmar retiro</Button></>
+    : mode === 'deadline'
+      // Distinct keys: React must not reuse the "Cambiar vencimiento" button as this submit button,
+      // or the same click that opens the form would also submit it.
+      ? <><Button key="deadline-back" variant="secondary" onClick={() => go('view')} disabled={busy}>Volver</Button><Button key="deadline-save" type="submit" form="deadline-form" busy={busy} disabled={!deadlineChanged}><Clock3 size={16}/> Guardar vencimiento</Button></>
     : mode === 'pickup'
       ? <><Button variant="secondary" onClick={() => go('view')} disabled={busy}>Volver</Button><Button type="submit" form="pickup-form" busy={busy} disabled={!/^\d{6}$/.test(pin)}><CheckCircle2 size={16}/> Confirmar retiro</Button></>
       : <><Button variant="secondary" onClick={() => go('view')}>Volver</Button><Button variant="danger" type="submit" form="cancel-form">Cancelar reserva</Button></>
@@ -256,6 +312,7 @@ function ReservationDetail({ pharmacyId, code, onClose, onChanged, version }: { 
           <div className="divider"/>
           <Field label="Motivo del rechazo" hint="El paciente va a ver este motivo en su reserva."><textarea value={rejectReason} maxLength={470} onChange={e => setRejectReason(e.target.value)} placeholder="Ej.: la receta está vencida o es ilegible" required autoFocus/></Field>
         </form>}
+        {active && mode === 'deadline' && <DeadlineForm r={r} value={deadline} onValue={setDeadline} reason={deadlineReason} onReason={setDeadlineReason} onSubmit={() => void changeDeadline()}/>}
         {active && mode === 'pickup' && <form id="pickup-form" className="stack" onSubmit={pickup}>
           <div className="divider"/>
           <Field label="PIN de retiro" hint="Pedile al paciente el PIN de 6 dígitos que ve en su reserva. Después de 5 intentos incorrectos, la reserva se bloquea para retiro.">

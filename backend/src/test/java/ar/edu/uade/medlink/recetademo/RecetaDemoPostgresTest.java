@@ -508,7 +508,7 @@ class RecetaDemoPostgresTest {
             var recetasAnteriores=jdbc.queryForObject(snapshot,String.class);
             org.flywaydb.core.Flyway.configure().dataSource(origen).load().migrate();
             assertEquals(antes,tablas.stream().map(t->filas(jdbc,t)).toList());
-            assertEquals(11,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+            assertEquals(12,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM reserva WHERE pin_retiro !~ '^[0-9]{6}$' OR intentos_pin_fallidos <> 0",Integer.class));
             assertEquals(recetasAnteriores,jdbc.queryForObject(snapshot,String.class));
             assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM receta_demo WHERE codigo_verificacion IS NULL",Integer.class));

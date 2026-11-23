@@ -382,6 +382,52 @@ public class ReservaService {
             Map.of("estado","PENDIENTE"),Map.of("estado","ACTIVA"),request);
         return new Outcome(store.get(code,t,actor.rol()),false);
     }
+    /** Tope del vencimiento ajustado por la farmacia, contado desde el inicio del plazo (confirmación o creación). */
+    public static final Duration MAX_VENCIMIENTO=Duration.ofHours(24);
+    /** El nuevo vencimiento debe quedar al menos este margen en el futuro. */
+    public static final Duration MIN_MARGEN_VENCIMIENTO=Duration.ofMinutes(5);
+
+    /** Pharmacy moves the pickup deadline (extend or shorten), up to 24 h from the start of the window. */
+    @Transactional
+    public Outcome ajustarVencimiento(long pharmacy,String code,OffsetDateTime nuevo,String motivo,
+                                      CurrentAccount actor,HttpServletRequest request) {
+        requireRole(actor,"OPERADOR");
+        if (nuevo==null) throw ApiException.validation("Indicá la nueva fecha y hora de vencimiento.");
+        String reason=motivo==null||motivo.isBlank()?null:motivo.strip();
+        if (reason!=null&&reason.length()>500) throw ApiException.validation("Motivo demasiado largo.");
+        scope(pharmacy,actor);
+        Instant t=now();
+        var target=store.item(code);
+        if (target.farmacia()!=pharmacy) throw ApiException.notFound();
+        var ctx=store.context(target);
+        lockContext(ctx,target.id(),actor.id());
+        activePharmacyForOperator(pharmacy,actor);
+        var current=store.item(code);
+        if (!current.estado().equals("ACTIVA")) throw invalidState();
+        if (!current.vencimiento().isAfter(t)) {
+            expire(current,ctx,t,request);
+            return new Outcome(store.get(code,t,actor.rol()),true);
+        }
+        if (current.pendiente())
+            throw ApiException.conflict("INVALID_STATE_TRANSITION",
+                "Confirmá la receta antes de cambiar el vencimiento.");
+        Instant inicio=db.queryForObject("SELECT coalesce(fecha_hora_confirmacion,fecha_hora_creacion) " +
+            "FROM reserva WHERE id_reserva=?",(r,n)->r.getObject(1,OffsetDateTime.class).toInstant(),current.id());
+        Instant limite=inicio.plus(MAX_VENCIMIENTO);
+        Instant destino=nuevo.toInstant().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        if (destino.isBefore(t.plus(MIN_MARGEN_VENCIMIENTO)))
+            throw ApiException.validation("El nuevo vencimiento debe ser al menos 5 minutos en el futuro.");
+        if (destino.isAfter(limite))
+            throw ApiException.validation("El vencimiento no puede superar las 24 horas desde el inicio de la reserva.");
+        if (destino.equals(current.vencimiento())) return new Outcome(store.get(code,t,actor.rol()),false);
+        int updated=db.update("UPDATE reserva SET fecha_hora_vencimiento=? WHERE id_reserva=? " +
+            "AND estado_persistido='ACTIVA'",Timestamp.from(destino),current.id());
+        if (updated!=1) throw invalidState();
+        audit.record(actor.id(),actor.rol(),"AJUSTAR_VENCIMIENTO_RESERVA","RESERVA",current.id(),current.usuario(),reason,
+            Map.of("fechaHoraVencimiento",current.vencimiento().toString()),
+            Map.of("fechaHoraVencimiento",destino.toString()),request);
+        return new Outcome(store.get(code,t,actor.rol()),false);
+    }
     /** Pharmacy rejects the prescription: operational cancellation that returns the stock and releases the Rx. */
     @Transactional
     public Outcome rechazarReceta(long pharmacy,String code,String motivo,CurrentAccount actor,HttpServletRequest request) {

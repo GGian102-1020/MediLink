@@ -9,6 +9,14 @@ plugins {
 // para la entrega universitaria; funciones online necesitan API luego.
 // La firma privada sigue siendo obligatoria (nunca claves en Git).
 val releaseApiUrl = providers.environmentVariable("MEDILINK_API_BASE_URL").orNull?.trim().orEmpty()
+val lanApiUrl = providers.environmentVariable("MEDILINK_LAN_API_URL").orNull?.trim().orEmpty()
+
+fun isLanHttpApiBase(raw: String): Boolean = try {
+    val uri = URI(raw)
+    val host = uri.host.orEmpty()
+    uri.scheme in setOf("http", "https") && host.isNotBlank() &&
+        host != "localhost" && !host.startsWith("127.") && raw.endsWith('/')
+} catch (_: Exception) { false }
 val releaseStoreFile = providers.environmentVariable("MEDILINK_RELEASE_KEYSTORE_FILE").orNull.orEmpty()
 val releaseStorePassword = providers.environmentVariable("MEDILINK_RELEASE_STORE_PASSWORD").orNull.orEmpty()
 val releaseKeyAlias = providers.environmentVariable("MEDILINK_RELEASE_KEY_ALIAS").orNull.orEmpty()
@@ -59,6 +67,14 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-recetas-dev"
             buildConfigField("String", "BASE_URL", "\"http://localhost:18081/\"")
+        }
+        create("lan") {
+            // Celular en la misma red WiFi que la PC que corre el backend (sin hosting).
+            // Uso: $env:MEDILINK_LAN_API_URL="http://192.168.x.x:18081/"; .\gradlew.bat :app:assembleLan
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".lan"
+            versionNameSuffix = "-lan"
+            buildConfigField("String", "BASE_URL", "\"${lanApiUrl.ifBlank { "http://192.168.0.0:18081/" }}\"")
         }
         release {
             isMinifyEnabled = false
@@ -134,4 +150,16 @@ val validateReleaseDistribution = tasks.register("validateReleaseDistribution") 
 }
 tasks.matching { it.name in setOf("preReleaseBuild", "assembleRelease", "bundleRelease") }.configureEach {
     dependsOn(validateReleaseDistribution)
+}
+
+// La variante LAN exige la URL real de la PC en la red local (no localhost).
+val validateLanApi = tasks.register("validateLanApi") {
+    doLast {
+        check(isLanHttpApiBase(lanApiUrl)) {
+            "Defini MEDILINK_LAN_API_URL con la IP de tu PC, ej. http://192.168.1.50:18081/ (terminada en /)"
+        }
+    }
+}
+tasks.matching { it.name in setOf("preLanBuild", "assembleLan") }.configureEach {
+    dependsOn(validateLanApi)
 }
