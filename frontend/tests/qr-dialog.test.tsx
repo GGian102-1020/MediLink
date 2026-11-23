@@ -13,7 +13,7 @@ describe('Ventana de descarga Android por QR', () => {
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
     expect(html).toContain('<svg');
-    expect(html).toContain('Código QR de GitHub Releases de MediLink');
+    expect(html).toContain('Código QR de GitHub Releases de MediFind');
     expect(html).toContain(`href="${ANDROID_RELEASES_URL}"`);
     expect(html).toContain('no pudimos confirmar un APK público disponible');
     expect(html).toContain('Este QR abre GitHub Releases');

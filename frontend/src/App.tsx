@@ -42,9 +42,9 @@ const steps = [
 
 function Brand({ light = false }: { light?: boolean }) {
   return (
-    <a className={`brand${light ? ' brand-light' : ''}`} href="#inicio" aria-label="MediLink, volver al inicio">
+    <a className={`brand${light ? ' brand-light' : ''}`} href="#inicio" aria-label="MediFind, volver al inicio">
       <img src="/medilink-mark.png" width="43" height="43" alt="" aria-hidden="true" />
-      <span>Medi<span className="brand-accent">Link</span></span>
+      <span>Medi<span className="brand-accent">Find</span></span>
     </a>
   );
 }
@@ -140,7 +140,7 @@ export default function App() {
                 <a className="button button-primary" href="#descargar"><Smartphone size={21} aria-hidden="true" /> Conseguir la app <ArrowRight size={19} aria-hidden="true" /></a>
                 <a className="button button-outline" href="#como-funciona">Cómo funciona <ArrowDown size={18} aria-hidden="true" /></a>
               </div>
-              <div className="hero-benefits" aria-label="Beneficios de MediLink">
+              <div className="hero-benefits" aria-label="Beneficios de MediFind">
                 <span><Check size={17} aria-hidden="true" /> Buscá en un lugar</span>
                 <span><Check size={17} aria-hidden="true" /> Consultá disponibilidad</span>
                 <span><Check size={17} aria-hidden="true" /> Reservá desde Android</span>
@@ -155,7 +155,7 @@ export default function App() {
             <div className="section-intro">
               <p className="section-kicker">SIMPLE, COMO DEBERÍA SER</p>
               <h2 id="how-title">Tu medicamento, en <span>3 pasos.</span></h2>
-              <p>Menos tiempo buscando, más claridad para saber dónde ir. MediLink te acompaña desde la búsqueda hasta el retiro.</p>
+              <p>Menos tiempo buscando, más claridad para saber dónde ir. MediFind te acompaña desde la búsqueda hasta el retiro.</p>
             </div>
             <ol className="steps-grid">
               {steps.map(({ number, icon: Icon, title, description }) => (
@@ -175,7 +175,7 @@ export default function App() {
             <div className="download-panel">
               <div className="download-copy">
                 <p className="download-kicker"><Smartphone size={17} aria-hidden="true" /> PENSADA PARA ANDROID</p>
-                <h2 id="download-title">Todo MediLink.<br /><span>En tu bolsillo.</span></h2>
+                <h2 id="download-title">Todo MediFind.<br /><span>En tu bolsillo.</span></h2>
                 <p>La experiencia completa está en la app: buscá, consultá disponibilidad y administrá tus reservas desde tu teléfono.</p>
                 <DownloadButton onClick={() => setQrOpen(true)} isOpen={isQrOpen} published={download.published} />
                 {download.published ? (

@@ -1,9 +1,13 @@
-# MediLink — Landing pública
+# MediFind — Landing pública
 
-Este frontend **solo** presenta MediLink y dirige al usuario a la aplicación **Android**.
+Este frontend **solo** presenta MediFind y dirige al usuario a la aplicación **Android**.
 No permite ingresar, registrarse, consultar stock ni gestionar reservas desde el navegador.
 Es una SPA de una sola pantalla, con enlaces internos a `#inicio`, `#como-funciona` y `#descargar`.
 No consume la API REST ni necesita el backend levantado para funcionar.
+
+La marca comercial es **MediFind**. Los identificadores técnicos, el repositorio,
+las URLs de Releases y el archivo `MediLink-android.apk` conservan sus nombres
+para mantener la compatibilidad de la descarga.
 
 ## Desarrollo
 

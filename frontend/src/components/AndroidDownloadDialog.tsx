@@ -88,8 +88,8 @@ export function AndroidDownloadDialog({ download, onClose }: Props) {
           <X size={22} aria-hidden="true" />
         </button>
         <div className="qr-symbol" aria-hidden="true"><QrCode size={25} /></div>
-        <p className="qr-kicker">MEDILINK PARA ANDROID</p>
-        <h2 id="android-qr-title">{download.published ? 'Llevá MediLink a tu celular' : 'Consultá las descargas de MediLink'}</h2>
+        <p className="qr-kicker">MEDIFIND PARA ANDROID</p>
+        <h2 id="android-qr-title">{download.published ? 'Llevá MediFind a tu celular' : 'Consultá las descargas de MediFind'}</h2>
         <p id="android-qr-description" className="qr-intro">
           {download.published
             ? 'Escaneá el QR con tu Android para descargar el APK firmado. Desde el mismo celular, usá el botón de abajo.'
@@ -104,7 +104,7 @@ export function AndroidDownloadDialog({ download, onClose }: Props) {
             marginSize={4}
             bgColor="#FFFFFF"
             fgColor="#133a58"
-            title={download.published ? 'Código QR del enlace de Android' : 'Código QR de GitHub Releases de MediLink'}
+            title={download.published ? 'Código QR del enlace de Android' : 'Código QR de GitHub Releases de MediFind'}
           />
         </div>
         <p className="qr-scan-hint">Apuntá la cámara de tu teléfono al código QR</p>
