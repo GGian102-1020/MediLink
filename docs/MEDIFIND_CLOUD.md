@@ -1,6 +1,6 @@
 # MediFind cloud
 
-Estado al 26/11/2026: **copia anonimizada migrada y backend Render Free desplegado**, con pruebas públicas funcionales y de seguridad aprobadas. La prueba de suspensión/reanudación se registra más abajo al finalizar su observación. Sitios Cloudflare y release Android continúan pendientes de autorización; el escaneo externo OpenAI permanece deshabilitado y sin clave desplegada.
+Estado al 26/11/2026: **copia anonimizada migrada y backend Render Free desplegado**, con pruebas públicas funcionales, de seguridad y de suspensión/reanudación aprobadas. Sitios Cloudflare y release Android continúan pendientes de autorización; el escaneo externo OpenAI permanece deshabilitado y sin clave desplegada.
 
 ## Referencia y recuperación
 
@@ -102,9 +102,11 @@ Pruebas públicas aprobadas: inicio de sesión de los tres roles con contraseña
 
 Neon después de esa prueba tiene **30 reservas** (29 migradas más la prueba cancelada), **16 prescripciones** (15 migradas más la vinculación normal de la receta), 28 recetas demo y cinco adjuntos. El stock de la presentación 9 en la farmacia 2 volvió de la operación a su valor inicial **4**; cantidad comprometida y utilizada de esa receta: 0/0. Stock no negativo, cantidades de prescripciones válidas, sin constraints inválidos, triggers deshabilitados ni migraciones fallidas. Tamaño medido en ese punto: **13.828.096 bytes (13,19 MiB)**. No se restauró nuevamente la base.
 
-Memoria observada en métricas reales de Render después de las pruebas: muestra reciente **290,6 MiB**, pico observado **348,6 MiB**, límite **512 MiB**. Son muestras del período de prueba, no una garantía de consumo máximo futuro. Evidencias: `.local-cloud/render-security-config.json`, `public-api-tests.json`, `public-readiness-tests.json`, `auth-proxy-test.json` y `neon-public-integrity.json`.
+Memoria observada en métricas reales de Render durante las pruebas: última muestra del período, a las 19:11 UTC y después de reanudar, **333,1 MiB**; pico observado por instancia **348,6 MiB**, límite **512 MiB**. Son muestras del período de prueba, no una garantía de consumo máximo futuro ni una lectura actual cuando el servicio está dormido. Evidencias: `.local-cloud/render-security-config.json`, `render-memory.json`, `public-api-tests.json`, `public-readiness-tests.json`, `auth-proxy-test.json` y `neon-public-integrity.json`.
 
-Suspensión/reanudación: **en observación**. Última petición de prueba a las 18:44:41 UTC; se deja la API sin tráfico durante al menos 21 minutos, sin pings de mantenimiento, para observar suspensión de Render y Neon y luego verificar catálogo, sesión ya emitida y reserva persistida. Consultar `.local-cloud/cold-start-test.json` cuando finalice; no declarar esta prueba aprobada antes de obtener el resultado.
+Suspensión/reanudación: **aprobada mediante observación real**. Última petición a las 18:44:41 UTC; los logs registraron cierre ordenado de Tomcat y Hikari a las 18:59:41 UTC, tras 15 minutos sin tráfico y sin una orden de suspensión manual. Neon se suspendió a las 19:04:46 UTC, comprobado mediante su API de control sin consultas SQL. Tras **1.284 segundos de inactividad** se inició una petición normal al catálogo a las 19:06:05 UTC: el primer intento devolvió HTTP 200 y JSON válido en **156 segundos (2 min 36 s)**. No se usaron pings para mantener el servicio despierto.
+
+Después del arranque frío se verificaron el catálogo real de Neon, la sesión emitida antes de suspender, el rechazo del rol paciente en administración y la reserva 30 aún cancelada. La sesión conservó su vigencia normal de 30 minutos; no se amplió su TTL. La prueba terminó a las 19:08:45 UTC. Evidencias: `.local-cloud/render-idle-observation.json`, `neon-idle-final.json` y `cold-start-test.json`. Una comprobación SQL final mantuvo 30 reservas, 16 prescripciones, 28 recetas, cinco adjuntos y stock 4, sin cantidades inválidas, constraints sin validar, triggers deshabilitados ni migraciones fallidas.
 
 ## Revisión previa a activar servicios públicos
 
@@ -113,13 +115,13 @@ La autorización vigente cubre la migración anterior, el commit/push de la prep
 | Componente que se propone publicar | Configuración preparada | Condición para activarlo |
 | --- | --- | --- |
 | Código de despliegue | Rama `deploy/medifind-cloud`; fuentes funcionales preservados; secretos, dumps y firmas excluidos | Auditado y subido con autorización |
-| Backend Render | Un servicio Docker Free en `medi's workspace`, Virginia, Java 21, 512 MiB, heap 256 MiB, pool 3/0, health `/api/health`, despliegues manuales | Desplegado con Billing comprobado y pruebas públicas aprobadas; reanudación en observación |
+| Backend Render | Un servicio Docker Free en `medi's workspace`, Virginia, Java 21, 512 MiB, heap 256 MiB, pool 3/0, health `/api/health`, despliegues manuales | Desplegado; Billing, pruebas públicas y reanudación aprobados |
 | Acceso a Neon | Solo rol `medifind_app`, TLS verificado; migración ya aplicada y validada | Configurado privadamente y comprobado mediante la API pública |
 | Seguridad | JWT propio de cloud; roles y farmacia verificados; límites de autenticación; generador de documentos alterados cerrado; OpenAI sin clave | Comprobaciones públicas aprobadas, incluida la corrección de headers falsificados |
 | Landing, operador y administración Pages | Tres proyectos estáticos Free, CORS limitado a los orígenes efectivos, sin claves del backend | API HTTPS real; aprobación final de publicación y artefactos comprobados |
 | Android cloud preliminar | Identidad `.cloud`, firma independiente, versión `1.0.0-cloud.1`, versionCode 3; diseño y funcionalidades preservados | URL real de Render, compilación, firma, instalación y pruebas antes de aprobar la release |
 
-Render ya está activado con los controles y resultados anteriores. Queda finalizar la observación real de suspensión/reanudación. OpenAI queda deshabilitado y sin clave. Pages y la release Android requieren otra etapa autorizada; no se publicaron como parte del backend.
+Render ya está activado y verificado, incluida la suspensión y reanudación naturales. OpenAI queda deshabilitado y sin clave. Pages y la release Android requieren otra etapa autorizada; no se publicaron como parte del backend.
 
 La clave OpenAI todavía no se transfirió a Render ni se hicieron llamadas nuevas al proveedor en esta etapa. El correo cloud sigue pendiente de proveedor/remitente gratuito y verificable; las cinco farmacias siguen sin coordenadas de origen. No se declararán completos esos flujos sin resolverlos o informar su limitación.
 
@@ -152,7 +154,7 @@ Hecho antes de publicar:
 - Migración real a Neon: 22 tablas iguales a la copia congelada, 30 relaciones sin huérfanos, 35 triggers activos, Flyway validado por Java y rol de aplicación con TLS verificado. Base local original: 21 tablas nuevamente comparadas y preservadas.
 - Configuración Render validada contra el esquema oficial, sin aplicar cambios ni publicar servicios.
 
-Render: arranque, catálogo, stock, reservas, vinculación de receta y permisos por Internet aprobados; reactivación en observación hasta finalizar la espera real. Pendiente de otra etapa autorizada: prueba documental externa con un PDF académico y OpenAI habilitado de manera controlada; APK compilado/firma/instalación/flujos; sitios HTTPS, descarga y QR; permisos de esos sitios públicos; entrega de correo si existe proveedor compatible. No se afirma una prueba en teléfono físico: no hay uno conectado actualmente. Tampoco se presenta el health check como sustituto de estas pruebas.
+Render: arranque, catálogo, stock, reservas, vinculación de receta, permisos por Internet y reactivación tras suspensión natural aprobados. Pendiente de otra etapa autorizada: prueba documental externa con un PDF académico y OpenAI habilitado de manera controlada; APK compilado/firma/instalación/flujos; sitios HTTPS, descarga y QR; permisos de esos sitios públicos; entrega de correo si existe proveedor compatible. No se afirma una prueba en teléfono físico: no hay uno conectado actualmente. Tampoco se presenta el health check como sustituto de estas pruebas.
 
 ## Actualización, respaldo y vuelta a local
 
