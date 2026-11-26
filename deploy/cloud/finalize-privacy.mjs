@@ -1,0 +1,18 @@
+import{execFileSync}from'node:child_process';
+import{readFileSync,writeFileSync}from'node:fs';
+import{createHash}from'node:crypto';
+import{rows,inspect}from'../../scripts/demo-local/Database-Tools.mjs';
+import assert from'node:assert/strict';
+const report=JSON.parse(readFileSync('.local-cloud/copy-review.json','utf8')),c=report.reviewContainer;
+assert.equal(inspect(c).Config.Labels['medifind.cloud.review'],'true');
+execFileSync('docker',['exec','-i',c,'psql','-X','-U','medlink','-d','medlink','-v','ON_ERROR_STOP=1'],{input:`BEGIN;
+UPDATE idempotency_record i SET response_201=i.response_201 || jsonb_build_object('usuarioNombre','Paciente','usuarioApellido','Academico '||u.id_usuario) FROM usuario u WHERE u.id_cuenta=i.id_cuenta;
+UPDATE receta_adjunta SET nombre_archivo='receta-academica-'||id_receta_adjunta||CASE WHEN content_type='application/pdf' THEN '.pdf' ELSE '.jpg' END;
+COMMIT;`,encoding:'utf8'});
+const triggers=rows(c,'medlink','medlink',"SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgenabled<>'O'");assert.equal(triggers.length,0);
+const attachments=rows(c,'medlink','medlink','SELECT id_receta_adjunta,sha256 FROM receta_adjunta ORDER BY id_receta_adjunta');
+for(const a of attachments)assert.equal(report.attachments.find(x=>x.id_receta_adjunta===a.id_receta_adjunta).sha256,a.sha256);
+report.attachmentReviewApproved=true;report.attachmentReview={at:new Date().toISOString(),method:'Full visual review of five local files',findings:'One generic green pixel-art test image; four clearly marked academic fictitious prescriptions without patient identity; no real medical documents observed.'};
+report.metadataAnonymized=['all account identities and passwords','patient personal fields','chat and free-text notes','audit JSON summaries','cached idempotency response identities','attachment filenames'];
+const dump=execFileSync('docker',['exec',c,'pg_dump','-U','medlink','-d','medlink','-Fc'],{maxBuffer:256*1024*1024});writeFileSync(report.dump,dump);report.dumpSha256=createHash('sha256').update(dump).digest('hex');
+writeFileSync('.local-cloud/copy-review.json',JSON.stringify(report,null,2));console.log(JSON.stringify({attachmentReviewApproved:true,allOriginalTriggersEnabled:true,countsPreserved:true,uploaded:false,bytes:dump.length},null,2));

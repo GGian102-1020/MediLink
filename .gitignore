@@ -34,3 +34,17 @@ frontend/.vite/
 # Paquetes de recetas generados para la demostración local (sin credenciales).
 recetas-demo-pdf/portables*/
 recetas-demo-pdf/MediFind-Recetas-*.zip
+
+# Local runtime and independent web applications (never publish generated files).
+.local-demo/
+landing/node_modules/
+landing/dist/
+landing/dist-local/
+landing/coverage/
+admin-web/node_modules/
+admin-web/dist/
+admin-web/coverage/
+admin-web/.vite/
+output/pdf/
+.local-cloud/
+.wrangler/

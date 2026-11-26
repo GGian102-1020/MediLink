@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: medifind-api
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: deploy/medifind-cloud
+    dockerfilePath: ./deploy/cloud/Dockerfile
+    dockerContext: .
+    autoDeployTrigger: off
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET_BASE64
+        sync: false
+      - key: MEDLINK_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: MEDLINK_RECETAS_ESCANEO_ENABLED
+        value: 'true'
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.4-mini
+      - key: MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS
+        value: '60'
+      - key: MEDIFIND_SCAN_DAILY_LIMIT
+        value: '20'

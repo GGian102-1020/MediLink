@@ -1,0 +1,16 @@
+.git
+.env
+**/*.env
+.local-demo
+.local-cloud
+**/node_modules
+**/build
+**/.gradle
+**/target
+**/dist*
+**/*.dump
+**/*.backup
+**/*.jks
+**/*.keystore
+recetas-demo-pdf
+output

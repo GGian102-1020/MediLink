@@ -1,0 +1,33 @@
+// Only connectivity, build identity and signing; no Android UI/source changes.
+gradle.beforeProject { p ->
+    p.plugins.withId('com.android.application') {
+      p.extensions.getByName('androidComponents').finalizeDsl { android ->
+        def url = System.getenv('MEDIFIND_CLOUD_API_URL') ?: ''
+        def uri = url ? new URI(url) : null
+        if (!uri || uri.scheme != 'https' || !uri.host?.endsWith('.onrender.com') ||
+            uri.userInfo || uri.query || uri.fragment || !url.endsWith('/')) {
+            throw new GradleException('MEDIFIND_CLOUD_API_URL must be the verified HTTPS Render URL ending in /')
+        }
+        def store = System.getenv('MEDIFIND_CLOUD_KEYSTORE') ?: ''
+        def password = System.getenv('MEDIFIND_CLOUD_KEY_PASSWORD') ?: ''
+        if (!new File(store).isFile() || password.length()<24) throw new GradleException('Cloud signing is not configured')
+        def signing = android.signingConfigs.create('medifindCloud') {
+            storeFile = new File(store)
+            storePassword = password
+            keyAlias = 'medifind-cloud'
+            keyPassword = password
+        }
+        android.buildTypes.create('cloud') {
+            initWith(android.buildTypes.getByName('release'))
+            signingConfig = signing
+            applicationIdSuffix = '.cloud'
+            versionNameSuffix = '-cloud.1'
+            buildConfigField 'String','BASE_URL','"'+url+'"'
+            resValue 'string','app_name','MediFind Cloud'
+            matchingFallbacks = ['release']
+        }
+        android.defaultConfig.versionCode = 3
+        android.defaultConfig.versionName = '1.0.0'
+      }
+    }
+}
