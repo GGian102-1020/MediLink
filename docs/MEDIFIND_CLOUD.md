@@ -1,6 +1,6 @@
 # MediFind cloud
 
-Estado al 26/11/2026: **copia anonimizada migrada y verificada en Neon Free** con autorización expresa del usuario. Backend Render, sitios Cloudflare y release Android todavía no publicados; requieren aprobación final después de revisar esta configuración y las verificaciones de seguridad.
+Estado al 26/11/2026: **copia anonimizada migrada y verificada en Neon Free**. El usuario autorizó subir la rama y desplegar un único backend Render Free, condicionado a comprobar previamente la facturación. Sitios Cloudflare y release Android continúan pendientes de autorización; el escaneo externo OpenAI debe permanecer deshabilitado durante esta etapa.
 
 ## Referencia y recuperación
 
@@ -86,24 +86,24 @@ Dockerfile: `deploy/cloud/Dockerfile`, Java 21, build Maven reproducible desde l
 
 La clase `CloudRequestGuard` añade límites a autenticación, serializa escaneos y aplica un presupuesto de IA persistente. No altera la comparación documental ni la lógica de recetas/reservas. La generación de PDFs alterados está deshabilitada. Se excluye la configuración automática de una cuenta Spring que no utiliza el JWT de la aplicación y que generaba una contraseña innecesaria en logs. CORS admite únicamente los orígenes Pages reales que se publiquen, nunca `*`.
 
-Variables privadas necesarias: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_BASE64` (32 bytes aleatorios codificados en Base64), `OPENAI_API_KEY`; sin valores en Git. Variables no secretas: `OPENAI_MODEL=gpt-5.4-mini`, `MEDLINK_RECETAS_ESCANEO_ENABLED=true`, `MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS=60`, `MEDIFIND_SCAN_DAILY_LIMIT=20`, `MEDLINK_CORS_ALLOWED_ORIGINS`, `PORT`. El puerto lo asigna Render. Las variables de correo solo se añaden con un proveedor y remitente autorizado/verificado.
+Variables privadas necesarias: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_BASE64` (32 bytes aleatorios codificados en Base64), sin valores en Git. Render generará el secreto JWT mediante `generateValue: true`. **Etapa inicial autorizada: `MEDLINK_RECETAS_ESCANEO_ENABLED=false` y ninguna clave OpenAI desplegada**. Una futura habilitación controlada requiere nueva autorización. Variables no secretas: `OPENAI_MODEL=gpt-5.4-mini`, `MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS=60`, `MEDIFIND_SCAN_DAILY_LIMIT=20`, `MEDLINK_CORS_ALLOWED_ORIGINS`, `PORT`. El puerto lo asigna Render. CORS inicialmente no admite orígenes web, ya que Pages no se publica en esta etapa. Las variables de correo solo se añaden con un proveedor y remitente autorizado/verificado.
 
 Usar Free y despliegue manual (`autoDeployTrigger: 'off'`); previews deshabilitados; no crear Render Postgres, discos, cron ni servicios pagos. Health `/api/health`. La especificación está en `deploy/cloud/render.yaml`, con el repositorio y la rama de despliegue explícitos y nombre `medifind-api-ggian102`. Se validó con el esquema JSON oficial de Render descargado el 26/11/2026 mediante `validate-render-config.mjs`; no se aplicó ni creó recursos. La validación de esquema no sustituye la aprobación del plan ni las pruebas posteriores al despliegue.
 
 ## Revisión previa a activar servicios públicos
 
-La autorización recibida cubre la migración anterior y la preparación. **No autoriza todavía crear el backend público, desplegar Pages ni publicar una release.** Tampoco se subió la rama de despliegue a GitHub. Se conservarán la release estable y el APK LAN actuales.
+La autorización vigente cubre la migración anterior, el commit/push de la preparación revisada y **un único backend Render Free**, después de comprobar que no se habiliten cargos. **No autoriza desplegar Pages, publicar una release ni habilitar OpenAI externo.** Se conservarán la release estable y el APK LAN actuales.
 
 | Componente que se propone publicar | Configuración preparada | Condición para activarlo |
 | --- | --- | --- |
-| Código de despliegue | Rama `deploy/medifind-cloud`; fuentes funcionales preservados; secretos, dumps y firmas excluidos | Revisión y aprobación de publicación |
-| Backend Render | Un servicio Docker Free en `medi's workspace`, Virginia, Java 21, 512 MiB, heap 256 MiB, pool 3/0, health `/api/health`, despliegues manuales | Aprobación final y comprobación de Billing para evitar cargos |
+| Código de despliegue | Rama `deploy/medifind-cloud`; fuentes funcionales preservados; secretos, dumps y firmas excluidos | Autorizado tras auditoría de secretos e historial no publicado |
+| Backend Render | Un servicio Docker Free en `medi's workspace`, Virginia, Java 21, 512 MiB, heap 256 MiB, pool 3/0, health `/api/health`, despliegues manuales | Autorizado; falta comprobar Billing antes de crearlo |
 | Acceso a Neon | Solo rol `medifind_app`, TLS verificado; migración ya aplicada y validada | Cargar secretos privados únicamente en el backend autorizado |
 | Seguridad | JWT propio de cloud; roles y farmacia verificados localmente; límites de autenticación e IA; generador de documentos alterados cerrado | Repetir comprobaciones contra la URL real después del despliegue |
 | Landing, operador y administración Pages | Tres proyectos estáticos Free, CORS limitado a los orígenes efectivos, sin claves del backend | API HTTPS real; aprobación final de publicación y artefactos comprobados |
 | Android cloud preliminar | Identidad `.cloud`, firma independiente, versión `1.0.0-cloud.1`, versionCode 3; diseño y funcionalidades preservados | URL real de Render, compilación, firma, instalación y pruebas antes de aprobar la release |
 
-Para activar Render falta: aprobación final del servicio y del código que se publicará; confirmar si la cuenta tiene un medio de pago y revisar sus límites de facturación, sin añadir tarjetas ni aceptar consumo pago; subir la rama aprobada; suministrar DB/JWT/OpenAI mediante el canal privado; crear el servicio Free con health HTTP y comprobar arranque, conexión, operaciones, permisos y reanudación tras inactividad. No alcanza con un health 200. La conexión de GitHub en Render se comprobará al preparar el plan; si requiere OAuth se solicitará esa autorización sin pedir claves.
+Para activar Render falta: comprobar si la cuenta tiene un medio de pago y revisar sus límites de facturación, sin añadir tarjetas ni aceptar consumo pago; subir la rama aprobada; suministrar DB mediante el canal privado y generar JWT en Render; crear el servicio Free con health HTTP y comprobar arranque, conexión, operaciones, permisos y reanudación tras inactividad. No alcanza con un health 200. La conexión de GitHub en Render se comprobará al preparar el plan; si requiere OAuth se solicitará esa autorización sin pedir claves. OpenAI queda deshabilitado y sin clave.
 
 La clave OpenAI todavía no se transfirió a Render ni se hicieron llamadas nuevas al proveedor en esta etapa. El correo cloud sigue pendiente de proveedor/remitente gratuito y verificable; las cinco farmacias siguen sin coordenadas de origen. No se declararán completos esos flujos sin resolverlos o informar su limitación.
 
