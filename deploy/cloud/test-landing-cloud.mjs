@@ -1,0 +1,47 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {createRequire} from 'node:module';
+import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+
+const require=createRequire(resolve('.local-cloud/browser-tests/package.json'));
+const {chromium}=require('playwright');
+const landing='https://medifind-ggian102.pages.dev';
+const download=JSON.parse(readFileSync('.local-cloud/release-download-check.json','utf8'));
+assert.equal(download.anonymousDownloadVerified,true);
+assert.ok(download.url.includes('/releases/download/cloud-v1.0.0-rc.1/'));
+const report={at:new Date().toISOString(),landing,apk:download.url,checks:[],success:false};
+const browser=await chromium.launch({channel:'chrome',headless:true});
+let stage='public landing';
+try {
+    const context=await browser.newContext({viewport:{width:1440,height:1000}});
+    const page=await context.newPage();const latestRequests=[];const pageErrors=[];
+    page.on('request',r=>{if(r.url().includes('/releases/latest'))latestRequests.push(r.url());});
+    page.on('pageerror',e=>pageErrors.push(e.name));
+    const response=await page.goto(landing,{waitUntil:'networkidle'});
+    assert.equal(response.status(),200);
+    assert.equal(response.headers()['x-content-type-options'],'nosniff');
+    await page.screenshot({path:resolve('.local-cloud/landing-cloud.png'),fullPage:true});
+    await page.getByRole('button',{name:'Descargar Android con QR'}).click();
+    const dialog=page.getByRole('dialog');await dialog.waitFor();
+    assert.equal(await dialog.locator('.qr-open-link').getAttribute('href'),download.url);
+    await dialog.locator('.qr-code').screenshot({path:resolve('.local-cloud/qr-cloud.png')});
+    stage='decode actual public QR pixels';
+    execFileSync('java',['-cp','.local-cloud/jdbc-preflight/BOOT-INF/lib/core-3.5.4.jar','deploy/cloud/VerifyCloudQr.java','.local-cloud/qr-cloud.png',download.url],{stdio:'pipe'});
+    report.checks.push({name:'Public QR pixels decode to the exact button URL and anonymously verified signed APK',passed:true});
+    await page.getByRole('button',{name:'Cerrar código QR'}).click();
+    stage='mobile landing';await page.setViewportSize({width:390,height:844});
+    await page.goto(landing,{waitUntil:'networkidle'});
+    await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,left:0,behavior:'instant'});});
+    await page.waitForFunction(()=>window.scrollY===0);
+    await page.screenshot({path:resolve('.local-cloud/landing-mobile.png'),fullPage:true});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Mobile layout overflows horizontally');
+    await page.getByRole('button',{name:'Descargar Android con QR'}).click();
+    assert.equal(await page.locator('.qr-open-link').getAttribute('href'),download.url);
+    await page.locator('.qr-code').screenshot({path:resolve('.local-cloud/qr-cloud-mobile.png')});
+    execFileSync('java',['-cp','.local-cloud/jdbc-preflight/BOOT-INF/lib/core-3.5.4.jar','deploy/cloud/VerifyCloudQr.java','.local-cloud/qr-cloud-mobile.png',download.url],{stdio:'pipe'});
+    assert.equal(latestRequests.length,0);assert.deepEqual(pageErrors,[]);
+    report.checks.push({name:'Desktop and mobile rendering, mobile QR decoding, no releases/latest requests or page errors',passed:true});
+    report.success=true;
+} catch(error) {report.failedStage=stage;report.errorType=error.name;process.exitCode=1;}
+finally {await browser.close();writeFileSync('.local-cloud/landing-qr-tests.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));}

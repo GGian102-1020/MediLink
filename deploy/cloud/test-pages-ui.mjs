@@ -26,12 +26,20 @@ async function status(page,token,path) {
 try {
     stage='operator login and CORS';const opContext=await browser.newContext({viewport:{width:1440,height:1000}});const op=await opContext.newPage();
     const opToken=await login(op,operatorUrl,'OPERADOR');await op.waitForURL('**/panel',{timeout:60000});
-    await op.goto(operatorUrl+'/farmacias/2/stock');await op.getByRole('heading',{name:/stock/i}).first().waitFor();
+    await op.getByRole('link',{name:'Stock',exact:true}).click();await op.waitForURL('**/operacion/stock');await op.getByRole('heading',{name:'Stock',exact:true}).waitFor();
     assert.equal(await status(op,opToken,'/api/farmacias/2/stock'),200);
     assert.equal(await status(op,opToken,'/api/farmacias/1/stock'),403);
     assert.equal(await status(op,opToken,'/api/admin/usuarios'),403);
+    // Presentation 0 does not exist: even an authorization regression cannot alter stock.
+    // A 403, rather than a 404/validation response, proves the pharmacy guard ran first.
+    const foreignWrite=await op.evaluate(async({api,token})=>{
+        const response=await fetch(api+'/api/farmacias/1/stock/0',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({cantidadDisponible:0,motivo:'Prueba negativa de aislamiento cloud; presentación inexistente'})});
+        await response.text();return response.status;
+    },{api,token:opToken});
+    assert.equal(foreignWrite,403);note('Operator write to another pharmacy rejected before resource lookup; no business mutation');
     await op.screenshot({path:resolve('.local-cloud/operator-cloud.png'),fullPage:true});
     note('Operator login, real CORS, own pharmacy stock and server-side rejection of another pharmacy/admin');
+    await op.getByRole('link',{name:'Reservas',exact:true}).click();await op.waitForURL('**/operacion/reservas');await op.getByRole('heading',{name:'Reservas',exact:true}).waitFor();note('Operator reservations interface opens through its actual navigation');
     stage='operator URL tampering';await op.goto(operatorUrl+'/admin/usuarios');await op.waitForURL('**/panel');note('Operator cannot open administrative route by URL');
     stage='administrator login';const adminContext=await browser.newContext({viewport:{width:1440,height:1000}});const admin=await adminContext.newPage();
     const adminToken=await login(admin,adminUrl,'ADMINISTRADOR');await admin.waitForURL('**/panel');

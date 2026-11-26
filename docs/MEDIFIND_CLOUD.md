@@ -1,6 +1,6 @@
 # MediFind cloud
 
-Estado al 26/11/2026: **copia anonimizada migrada y backend Render Free desplegado**. El usuario autorizó también Android Cloud, su release preliminar verificada y los tres sitios Pages gratuitos. Los dos paneles están publicados y probados; Android superó compilación, firma, auditoría e instalación/navegación en emulador. Se registrarán a continuación la publicación efectiva del APK, la landing y el QR. OpenAI permanece deshabilitado y sin clave desplegada.
+Estado al 26/11/2026: **Neon verificado, backend Render Free y tres sitios Cloudflare Pages publicados; Android Cloud firmado y publicado como prerelease `cloud-v1.0.0-rc.1`**. El APK superó pruebas unitarias e instalación/navegación/autenticación en emulador contra Render y Neon. El QR público, el botón y la descarga anónima corresponden al mismo APK comprobado. OpenAI permanece deshabilitado y sin clave desplegada. La base local, los fuentes originales, el APK LAN y la release estable se conservaron.
 
 ## Referencia y recuperación
 
@@ -19,7 +19,16 @@ Los 94 archivos Android y los 184 archivos backend originales siguen sin cambios
 
 Arquitectura: Android cloud y sitios Pages se conectan por HTTPS a Render; Render conecta por TLS verificado a Neon. El contenido adjunto y el estado de negocio se guardan en PostgreSQL, no en el disco efímero de Render. Las claves de OpenAI y JWT permanecen exclusivamente en el backend. No se usarán Pages Functions, Workers de pago, R2, dominios comprados ni servidores para mantener despierto Render.
 
-Backend HTTPS real: **https://medifind-api-ggian102-mey9.onrender.com**. Health: `/api/health`. Panel operador: **https://medifind-operador-ggian102.pages.dev**. Administración: **https://medifind-admin-ggian102.pages.dev**. Proyecto de landing: **https://medifind-ggian102.pages.dev**, pendiente en este punto del enlace final al APK verificado.
+| Acceso público | URL |
+| --- | --- |
+| Landing y QR de descarga | https://medifind-ggian102.pages.dev |
+| Panel operador | https://medifind-operador-ggian102.pages.dev |
+| Administración | https://medifind-admin-ggian102.pages.dev |
+| Backend HTTPS | https://medifind-api-ggian102-mey9.onrender.com |
+| Release preliminar | https://github.com/GGian102-1020/MediLink/releases/tag/cloud-v1.0.0-rc.1 |
+| APK directo | https://github.com/GGian102-1020/MediLink/releases/download/cloud-v1.0.0-rc.1/MediFind-cloud-1.0.0-rc.1-438f15a7e450.apk |
+
+Health: `/api/health`. Las rutas privadas requieren iniciar sesión con las cuentas cloud; no se publican sus credenciales.
 
 ## Límites y costos
 
@@ -86,7 +95,7 @@ Dockerfile: `deploy/cloud/Dockerfile`, Java 21, build Maven reproducible desde l
 
 La clase `CloudRequestGuard` añade límites a autenticación, serializa escaneos y aplica un presupuesto de IA persistente. No altera la comparación documental ni la lógica de recetas/reservas. La generación de PDFs alterados está deshabilitada. Se excluye la configuración automática de una cuenta Spring que no utiliza el JWT de la aplicación y que generaba una contraseña innecesaria en logs. CORS admite únicamente los orígenes Pages reales que se publiquen, nunca `*`.
 
-Variables privadas necesarias: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_BASE64` (32 bytes aleatorios codificados en Base64), sin valores en Git. Render generará el secreto JWT mediante `generateValue: true`. **Etapa inicial autorizada: `MEDLINK_RECETAS_ESCANEO_ENABLED=false` y ninguna clave OpenAI desplegada**. Una futura habilitación controlada requiere nueva autorización. Variables no secretas: `OPENAI_MODEL=gpt-5.4-mini`, `MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS=60`, `MEDIFIND_SCAN_DAILY_LIMIT=20`, `MEDLINK_CORS_ALLOWED_ORIGINS`, `PORT`. El puerto lo asigna Render. CORS inicialmente no admite orígenes web, ya que Pages no se publica en esta etapa. Las variables de correo solo se añaden con un proveedor y remitente autorizado/verificado.
+Variables privadas configuradas: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_BASE64` (32 bytes aleatorios codificados en Base64), sin valores en Git. Render generó el secreto JWT mediante `generateValue: true`. **`MEDLINK_RECETAS_ESCANEO_ENABLED=false` y ninguna clave OpenAI desplegada**. Una futura habilitación controlada requiere nueva autorización. Variables no secretas: `OPENAI_MODEL=gpt-5.4-mini`, `MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS=60`, `MEDIFIND_SCAN_DAILY_LIMIT=20`, `MEDLINK_CORS_ALLOWED_ORIGINS`, `PORT`. El puerto lo asigna Render. CORS admite exactamente `https://medifind-operador-ggian102.pages.dev` y `https://medifind-admin-ggian102.pages.dev`. La landing distribuye el APK sin llamar a la API; no requiere autorización CORS. No se admiten localhost, comodines ni aliases de preview. Las variables de correo solo se añaden con un proveedor y remitente autorizado/verificado.
 
 Usar Free y despliegue manual (`autoDeployTrigger: 'off'`); previews deshabilitados; no crear Render Postgres, discos, cron ni servicios pagos. Health `/api/health`. La especificación está en `deploy/cloud/render.yaml`, con el repositorio y la rama de despliegue explícitos y nombre `medifind-api-ggian102`. Se validó antes de aplicarla con el esquema JSON oficial de Render descargado el 26/11/2026 mediante `validate-render-config.mjs`. La validación de esquema se complementó con la aprobación del plan y las pruebas reales posteriores al despliegue.
 
@@ -96,7 +105,7 @@ Servicio: `srv-dc47mhajnfac73bpn770`, nombre `medifind-api-ggian102-mey9`, regi�
 
 La prueba pública detectó que la configuración heredada de headers reenviados permitía falsificar la IP usada por el limitador. Se corrigió **solo en el perfil cloud**, con `server.forward-headers-strategy=none`: esta API JSON no genera redirects ni URLs absolutas y Render termina TLS, por lo que no necesita confiar en headers `Forwarded` del cliente. El límite ahora usa el origen real de la conexión del proxy de Render: 10 solicitudes de autenticación/minuto por ese origen y 60/minuto globales, con ventanas fijas y almacenamiento acotado. Varios usuarios pueden compartir el límite del proxy; es una protección conservadora para esta instancia académica Free. Las pruebas públicas posteriores confirmaron HTTP 429 incluso al falsificar tanto `X-Forwarded-For` como `Forwarded`. No se alteró el entorno local, que conserva su configuración anterior.
 
-Verificación privada de variables: conexión y contraseña coinciden con el usuario de aplicación Neon, JWT válido generado por Render, ausencia de clave OpenAI, escaneo `false`, CORS sin orígenes web habilitados y health HTTP correcto. El endpoint health conserva su respuesta original y verifica el proceso; las consultas de negocio y las comprobaciones SQL independientes verificaron Neon, sin confundir health 200 con una prueba completa.
+Verificación privada de variables: conexión y contraseña coinciden con el usuario de aplicación Neon, JWT válido generado por Render, ausencia de clave OpenAI, escaneo `false`, CORS limitado a los dos paneles publicados y health HTTP correcto. El cambio de CORS quedó en la Blueprint y se aplicó en Render; el despliegue `dep-dc4a9parlj7c73dp8h8g` llegó a `live` a las 21:35:43 UTC. Una actualización de variables por MCP inicia su propio despliegue, aunque autoDeploy de código esté apagado; no hace falta solicitar otro. El endpoint health conserva su respuesta original y verifica el proceso; las consultas de negocio y las comprobaciones SQL independientes verificaron Neon, sin confundir health 200 con una prueba completa.
 
 Pruebas públicas aprobadas: inicio de sesión de los tres roles con contraseñas rotadas; catálogo de 12 medicamentos activos, cinco farmacias y disponibilidad; 401 sin token o JWT inválido; 403 de paciente/operador en administración y de operador contra otra farmacia; origen web no autorizado rechazado; generación alterada 404; escaneo externo 503 y configuración deshabilitada. Se vinculó la receta académica existente 19, vigente hasta el 21/02/2027, sin cambiar fechas ni cantidades autorizadas; se creó la reserva de prueba 30, se verificó idempotencia y visibilidad por farmacia y se canceló conservando historial.
 
@@ -108,20 +117,20 @@ Suspensión/reanudación: **aprobada mediante observación real**. Última petic
 
 Después del arranque frío se verificaron el catálogo real de Neon, la sesión emitida antes de suspender, el rechazo del rol paciente en administración y la reserva 30 aún cancelada. La sesión conservó su vigencia normal de 30 minutos; no se amplió su TTL. La prueba terminó a las 19:08:45 UTC. Evidencias: `.local-cloud/render-idle-observation.json`, `neon-idle-final.json` y `cold-start-test.json`. Una comprobación SQL final mantuvo 30 reservas, 16 prescripciones, 28 recetas, cinco adjuntos y stock 4, sin cantidades inválidas, constraints sin validar, triggers deshabilitados ni migraciones fallidas.
 
-## Revisión previa a activar servicios públicos
+## Publicación autorizada y comprobada
 
-La autorización vigente cubre la migración anterior, el commit/push de la preparación revisada y **un único backend Render Free**, después de comprobar que no se habiliten cargos. **No autoriza desplegar Pages, publicar una release ni habilitar OpenAI externo.** Se conservarán la release estable y el APK LAN actuales.
+La autorización vigente cubre la migración anterior, un único backend Render Free, los tres proyectos estáticos Pages gratuitos y una release Android preliminar después de aprobar las verificaciones disponibles. Todos están publicados. OpenAI externo continúa fuera de esta autorización. No se añadieron medios de pago, upgrades ni recursos de compute adicionales.
 
-| Componente que se propone publicar | Configuración preparada | Condición para activarlo |
+| Componente publicado | Configuración | Verificación |
 | --- | --- | --- |
 | Código de despliegue | Rama `deploy/medifind-cloud`; fuentes funcionales preservados; secretos, dumps y firmas excluidos | Auditado y subido con autorización |
 | Backend Render | Un servicio Docker Free en `medi's workspace`, Virginia, Java 21, 512 MiB, heap 256 MiB, pool 3/0, health `/api/health`, despliegues manuales | Desplegado; Billing, pruebas públicas y reanudación aprobados |
 | Acceso a Neon | Solo rol `medifind_app`, TLS verificado; migración ya aplicada y validada | Configurado privadamente y comprobado mediante la API pública |
 | Seguridad | JWT propio de cloud; roles y farmacia verificados; límites de autenticación; generador de documentos alterados cerrado; OpenAI sin clave | Comprobaciones públicas aprobadas, incluida la corrección de headers falsificados |
-| Landing, operador y administración Pages | Tres proyectos estáticos Free, CORS limitado a los orígenes efectivos, sin claves del backend | API HTTPS real; aprobación final de publicación y artefactos comprobados |
-| Android cloud preliminar | Identidad `.cloud`, firma independiente, versión `1.0.0-cloud.1`, versionCode 3; diseño y funcionalidades preservados | URL real de Render, compilación, firma, instalación y pruebas antes de aprobar la release |
+| Landing, operador y administración Pages | Tres proyectos estáticos Free, CORS limitado a los paneles efectivos, sin claves del backend | Suites y pruebas públicas en Chrome; permisos por rol/farmacia y QR aprobados |
+| Android cloud preliminar | Identidad `.cloud`, firma independiente, versión `1.0.0-cloud.1`, versionCode 3; diseño y funcionalidades preservados | Compilación, firma, 40 tests unitarios, instalación y flujos contra Render en emulador aprobados antes de publicar |
 
-Render ya está activado y verificado, incluida la suspensión y reanudación naturales. OpenAI queda deshabilitado y sin clave. Pages y la release Android requieren otra etapa autorizada; no se publicaron como parte del backend.
+Render está activado y verificado, incluida la suspensión y reanudación naturales. Los tres sitios Pages y el APK se publicaron en la etapa posterior autorizada; la release estable `android-v0.2.0` sigue siendo Latest. La nueva release es preliminar, no draft, y no se marcó Latest.
 
 La clave OpenAI todavía no se transfirió a Render ni se hicieron llamadas nuevas al proveedor en esta etapa. El correo cloud sigue pendiente de proveedor/remitente gratuito y verificable; las cinco farmacias siguen sin coordenadas de origen. No se declararán completos esos flujos sin resolverlos o informar su limitación.
 
@@ -133,11 +142,17 @@ Por ahora el endpoint devuelve `RECOVERY_UNAVAILABLE` sin exponer códigos ni bu
 
 ## Sitios y APK
 
-La landing existente conserva diseño y marca de `develop-web`, referencia `a9f70a17ae4beeed0db1a283f0dafd8fabd7a47c`, con la distribución local ya adaptada. `prepare-web.mjs` trabaja en copias, configura el origen API HTTPS para operador/admin y usa un enlace explícito al APK preliminar en la landing; botón y QR comparten ese valor. No se usa `releases/latest`, que sigue apuntando a la estable anterior. Los bundles finales requieren la URL real del backend y un asset verificado.
+La landing existente conserva diseño y marca de `develop-web`, referencia `a9f70a17ae4beeed0db1a283f0dafd8fabd7a47c`, con la distribución local ya adaptada. `prepare-web.mjs` trabaja en copias, configura el origen API HTTPS para operador/admin y usa el enlace explícito del APK preliminar en la landing; botón y QR comparten ese valor. Se verificó en Chrome que el sitio público no solicita `releases/latest`; ese endpoint sigue correspondiendo a la estable anterior. La captura de los píxeles del QR publicado se decodificó con ZXing en escritorio y móvil y coincidió exactamente con el enlace. La descarga anónima de GitHub tiene la misma huella que el APK firmado e instalado.
 
-La variante Android se crea con `android-cloud.init.gradle` sobre una copia de los fuentes, identidad `.cloud` y firma privada persistente separada del APK LAN. Versión propuesta `1.0.0-cloud.1`, versionCode 3. Solo cambian identidad/firma/URL HTTPS y timeouts de conectividad (30 s de conexión, 240 s de lectura por el arranque frío). No cambian pantallas, navegación, sesión, validaciones ni comparación documental. Se exige backend real accesible antes de compilar. El keystore y su clave quedan fuera de Git en `.local-cloud/signing/`; respaldarlos antes de futuras versiones.
+La variante Android se creó con `android-cloud.init.gradle` sobre una copia de los fuentes, applicationId `ar.edu.uade.medilink.android.cloud` y firma privada persistente separada del APK LAN. Versión `1.0.0-cloud.1`, versionCode 3; minSdk 26, targetSdk 35, no debuggable y sin tráfico HTTP en claro. Solo cambian identidad/firma/URL HTTPS y timeouts de conectividad (30 s de conexión, 240 s de lectura por el arranque frío). No cambian pantallas, navegación, sesión, validaciones ni comparación documental. El preflight exige la respuesta real del backend y espera hasta 240 s. El keystore y su clave quedan fuera de Git en `.local-cloud/signing/`, con copia privada en `.local-cloud/signing-backup/`; conservarlos para firmar futuras actualizaciones.
 
-Flujo posterior a la autorización: desplegar API, registrar URL devuelta, compilar/tests del APK, verificar con `apksigner`/`aapt`, instalar en emulador o teléfono disponible, probar flujos reales, preparar asset con SHA-256 y release preliminar `cloud-v1.0.0-rc.1` sin sobrescribir versiones. Subir con la CLI oficial de GitHub usando su sesión existente. Después compilar sitios con ese enlace explícito, publicar tres proyectos estáticos Pages por Wrangler y decodificar QR para comparar exactamente el asset. La release estable anterior se conserva.
+APK publicado: **13.674.787 bytes**, SHA-256 `438f15a7e450a110a45fe0fc7944ad5b3465d1cefc82f2bfc7d98108f86bd29d`; asset `.apk.sha256` adjunto. Certificado RSA de 3072 bits, firma APK v2 verificada con `apksigner`, SHA-256 del certificado `b2ce4dc41b34fd010505939e023c53d88b99deb269eed10ea37d80d0f2e161f2`. Tag `cloud-v1.0.0-rc.1` sobre el commit `14d9adbec558334c821e41f7332951d3c6e1bf2c`; no sobrescribe tags o assets estables.
+
+La instalación y los flujos reales se probaron con el APK congelado en un emulador Medium Phone API 37, sin ADB reverse: catálogo y disponibilidad de Amoxicilina desde Render, inicio de sesión real, perfil, conservación de sesión al recrear la actividad, navegación de reservas y cierre de sesión. El `base.apk` instalado se extrajo y su huella coincide con el asset publicado. Las credenciales de instrumentación fueron temporales y se retiraron del emulador; no están dentro del APK. No hay teléfono físico conectado: cámara, selección de PDF y GPS físico no se presentan como nuevas pruebas completas. El escaneo OpenAI está deliberadamente cerrado.
+
+Pages se publicó mediante Wrangler 4.168.0 y Direct Upload del directorio `dist`, sin Functions, `_worker.js` ni secretos. Proyectos: `medifind-ggian102`, `medifind-operador-ggian102`, `medifind-admin-ggian102`; rama de producción Pages `main`, independiente de la rama Git de despliegue. IDs de despliegue inicial: landing `8f5efdb1-9b64-45f8-be98-e83ad7e079b2`, operador `f2cc35dd` y administración `06946c99`. La CLI exigió `--force` exclusivamente para crear proyectos Pages frente a su nueva delegación a Workers; no se utiliza ese flag para actualizar despliegues. Las actualizaciones usan `wrangler pages deploy dist --cwd .local-cloud/web/<aplicación> --project-name <proyecto> --branch main --commit-dirty=true`, después de recompilar y auditar. Los sitios incluyen fallback SPA, `nosniff`, política de referrer y permisos de cámara/ubicación del propio origen.
+
+Las pruebas de los sitios públicos comprobaron login de operador y administrador, pantalla real de stock y reservas, administración de farmacias, rechazo de paciente en la interfaz operadora, redirección de operador desde rutas administrativas y HTTP 403 al consultar otra farmacia o administración. También se probó el rechazo de escritura hacia otra farmacia usando una presentación inexistente: la autorización devuelve 403 antes de buscar el recurso y no modifica stock. Un origen ajeno sigue devolviendo 403. Se conserva el comportamiento original de las interfaces; el control definitivo permanece en el backend.
 
 ## Pruebas realizadas y pendientes
 
@@ -152,9 +167,15 @@ Hecho antes de publicar:
 - Suites web adaptadas: operador 5, administración 17, landing 14, todas aprobadas.
 - Imagen Docker compilada; fuente local Android/backend revalidada idéntica al commit funcional. Ver `.local-cloud/runtime-tests.json`, `final-image-check.json` y `copy-review.json`.
 - Migración real a Neon: 22 tablas iguales a la copia congelada, 30 relaciones sin huérfanos, 35 triggers activos, Flyway validado por Java y rol de aplicación con TLS verificado. Base local original: 21 tablas nuevamente comparadas y preservadas.
-- Configuración Render validada contra el esquema oficial, sin aplicar cambios ni publicar servicios.
+- Configuración Render validada contra el esquema oficial y después aplicada y verificada en el servicio Free autorizado.
+- Android: 40 tests unitarios y prueba instrumentada de flujos reales en emulador; firma y APK instalado/descargado idénticos.
+- Chrome sobre sitios públicos: autorización por rol, aislamiento de farmacia, navegación real, CORS positivo y negativo; landing responsive y QR decodificado en dos tamaños.
+- Auditoría final de 238 archivos/entradas de los tres bundles y APK: cero hallazgos de secretos conocidos, patrones de claves o archivos privados/compute inesperados.
+- Verificación final de la base local a las 21:49 UTC: 21/21 tablas idénticas al respaldo; fuentes Android/backend sin diferencias contra `da344f1`; APK LAN conserva SHA-256 `91da1ba0eb568ba204716e87e677390e1db374135e8dd149b03f78ff887a3ab6`.
 
-Render: arranque, catálogo, stock, reservas, vinculación de receta, permisos por Internet y reactivación tras suspensión natural aprobados. Pendiente de otra etapa autorizada: prueba documental externa con un PDF académico y OpenAI habilitado de manera controlada; APK compilado/firma/instalación/flujos; sitios HTTPS, descarga y QR; permisos de esos sitios públicos; entrega de correo si existe proveedor compatible. No se afirma una prueba en teléfono físico: no hay uno conectado actualmente. Tampoco se presenta el health check como sustituto de estas pruebas.
+Render: arranque, catálogo, stock, reservas, vinculación de receta, permisos por Internet y reactivación tras suspensión natural aprobados. Android Cloud, sitios HTTPS, permisos de los sitios públicos, descarga y QR también aprobados con las verificaciones disponibles. Evidencias adicionales: `.local-cloud/android-build.json`, `android-ui-tests.json`, `pages-ui-tests.json`, `landing-qr-tests.json`, `release-download-check.json`, `artifact-audit.json` y `local-preservation.json`. Los informes no contienen contraseñas ni tokens. Esta etapa no restauró ni migró PostgreSQL nuevamente y sus pruebas de interfaz no crearon nuevas reservas.
+
+Pendientes: habilitación y prueba documental de OpenAI solo con una autorización posterior; entrega de correo con remitente/proveedor verificable; coordenadas verificadas para las cinco farmacias; pruebas en teléfono físico de cámara, PDF y GPS. Render Free puede tardar minutos en despertar (156 s observados); el límite de autenticación conservador puede agrupar usuarios detrás del proxy. No se usa el health check como sustituto de las pruebas de negocio.
 
 ## Actualización, respaldo y vuelta a local
 
@@ -164,6 +185,6 @@ Para cambios de código: revisar diff, ejecutar pruebas, preparar commit en la r
 
 Antes de cada migración, respaldar y restaurar para verificar. Los dumps y `.local-cloud` nunca se suben a GitHub, Pages ni artefactos públicos. Para respaldar Neon, usar el cliente PostgreSQL con credenciales privadas y TLS verificado; comprobar restauración en destino temporal aislado. Mantener keystore cloud y secretos de infraestructura en almacenamiento privado.
 
-Para seguir en local: mantener la app LAN y abrir `http://192.168.1.40:5174`; ejecutar `scripts/demo-local/Start.ps1` si hace falta. Ese arranque conserva la selección histórica. La app `.cloud` convivirá con `.lan`; no requiere ADB reverse ni IP local. Los scripts cloud rechazan `medlink-db` como destino de migración y no sincronizan datos.
+Para seguir en local: mantener la app LAN y abrir `http://192.168.1.40:5174`; ejecutar `scripts/demo-local/Start.ps1` si hace falta. Ese arranque conserva la selección histórica. La app `.cloud` tiene identidad/firma independientes y puede convivir con `.lan`; no requiere ADB reverse ni IP local. Los scripts cloud rechazan `medlink-db` como destino de migración y no sincronizan datos.
 
 Para detener cloud sin borrar datos: suspender el servicio Render y conservar Neon; no eliminar proyecto/branch, no ejecutar down -v y no borrar releases o Pages para apagar el backend. La despublicación o eliminación definitiva requiere un pedido específico. Los contenedores locales de revisión llevan la etiqueta `medifind.cloud.review=true`, usan puertos 18182/18183 solo en loopback y no son parte de producción; detenerlos no afecta a `medifind-local-*` ni `medlink-db`.
