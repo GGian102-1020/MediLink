@@ -1,5 +1,7 @@
 import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,existsSync,readdirSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 
 const git=args=>execFileSync('git',args,{encoding:'utf8',maxBuffer:64*1024*1024}).trim();
@@ -13,6 +15,11 @@ for(const file of readdirSync('.local-cloud').filter(x=>x.endsWith('.private.jso
     try{collect(JSON.parse(readFileSync(`.local-cloud/${file}`,'utf8')));}catch{}
 }
 if(existsSync('.local-cloud/signing/private.json'))collect(JSON.parse(readFileSync('.local-cloud/signing/private.json','utf8')));
+if(existsSync('.local-cloud/render-cli-config/cli.yaml')) {
+    const require=createRequire(resolve('.local-cloud/schema-tools/package.json'));
+    const cli=require('yaml').parse(readFileSync('.local-cloud/render-cli-config/cli.yaml','utf8'));
+    collect(cli.api?.key,'api_key');collect(cli.api?.refresh_token,'refresh_token');
+}
 for(const file of ['.env','backend/.env'])if(existsSync(file)) {
     for(const line of readFileSync(file,'utf8').split(/\r?\n/)) {
         const match=line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/);
@@ -22,7 +29,8 @@ for(const file of ['.env','backend/.env'])if(existsSync(file)) {
 const patterns=[/sk-(?:proj-)?[A-Za-z0-9_-]{30,}/,/npg_[A-Za-z0-9]{12,}/,/-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----/,/postgres(?:ql)?:\/\/[^\s:/]+:[^\s@]{12,}@/];
 const forbidden=/\.(?:dump|backup|p12|pfx|jks|keystore|key)$/i;
 const findings=[];
-const paths=git(['ls-files','-z']).split('\0').filter(Boolean);
+const incremental=process.argv.includes('--changed-only');
+const paths=git(incremental?['diff','--name-only','--diff-filter=ACMR','-z','origin/deploy/medifind-cloud','HEAD']:['ls-files','-z']).split('\0').filter(Boolean);
 let filesChecked=0;
 for(const file of paths) {
     if(forbidden.test(file)||/(^|\/)\.env(?:\.[^/]+)?$/.test(file)&&!/(?:example|sample|template)$/.test(file))findings.push({file,reason:'private-file-type'});
@@ -40,7 +48,7 @@ for(const line of objects) {
     const content=execFileSync('git',['cat-file','blob',id],{maxBuffer:64*1024*1024}).toString('utf8');
     if(forbidden.test(file)||patterns.some(p=>p.test(content))||[...knownSecrets].some(value=>content.includes(value)))findings.push({file,reason:'unpublished-history-sensitive-content'});
 }
-const report={at:new Date().toISOString(),commit:git(['rev-parse','HEAD']),filesChecked,unpublishedBlobsChecked,knownPrivateValuesChecked:knownSecrets.size,findings,passed:findings.length===0};
+const report={at:new Date().toISOString(),commit:git(['rev-parse','HEAD']),incremental,filesChecked,unpublishedBlobsChecked,knownPrivateValuesChecked:knownSecrets.size,findings,passed:findings.length===0};
 writeFileSync('.local-cloud/publication-audit.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 assert.ok(report.passed,'Publication audit failed; no push is allowed');

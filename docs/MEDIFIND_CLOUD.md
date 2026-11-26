@@ -1,6 +1,6 @@
 # MediFind cloud
 
-Estado al 26/11/2026: **copia anonimizada migrada y verificada en Neon Free**. El usuario autorizó subir la rama y desplegar un único backend Render Free, condicionado a comprobar previamente la facturación. Sitios Cloudflare y release Android continúan pendientes de autorización; el escaneo externo OpenAI debe permanecer deshabilitado durante esta etapa.
+Estado al 26/11/2026: **copia anonimizada migrada y backend Render Free desplegado**, con pruebas públicas funcionales y de seguridad aprobadas. La prueba de suspensión/reanudación se registra más abajo al finalizar su observación. Sitios Cloudflare y release Android continúan pendientes de autorización; el escaneo externo OpenAI permanece deshabilitado y sin clave desplegada.
 
 ## Referencia y recuperación
 
@@ -13,13 +13,13 @@ Los 94 archivos Android y los 184 archivos backend originales siguen sin cambios
 | Servicio | Verificación actual | Función |
 | --- | --- | --- |
 | Neon | Organización MediFind, plan `free` reconfirmado; proyecto existente `flat-shadow-76171117`, región `aws-sa-east-1`, PostgreSQL 18; `neondb` contiene la copia anonimizada verificada | Copia PostgreSQL |
-| Render | Espacio `medi's workspace`, cuenta de MediFind confirmado por el usuario; sin servicios existentes | Backend Java 21 / Spring Boot |
+| Render | Espacio `medi's workspace`, plan Hobby; un único servicio web Free, sin tarjeta y con límite de builds USD 0 comprobados antes de crearlo | Backend Java 21 / Spring Boot |
 | Cloudflare | OAuth oficial Wrangler completado con la cuenta MediFind; sin proyectos Pages existentes | Landing, operador y administración estáticos |
 | GitHub | Repositorio `GGian102-1020/MediLink`, acceso de escritura comprobado; release estable existente `android-v0.2.0` | Fuente y APK preliminar |
 
 Arquitectura: Android cloud y sitios Pages se conectan por HTTPS a Render; Render conecta por TLS verificado a Neon. El contenido adjunto y el estado de negocio se guardan en PostgreSQL, no en el disco efímero de Render. Las claves de OpenAI y JWT permanecen exclusivamente en el backend. No se usarán Pages Functions, Workers de pago, R2, dominios comprados ni servidores para mantener despierto Render.
 
-URLs públicas de la aplicación: **todavía no asignadas**. Los nombres propuestos son `medifind-api-ggian102` para Render y `medifind-ggian102`, `medifind-operador-ggian102`, `medifind-admin-ggian102` para Pages, sujetos a disponibilidad. Se usarán las URLs que devuelvan los proveedores; no se compila un APK con una URL adivinada.
+Backend HTTPS real: **https://medifind-api-ggian102-mey9.onrender.com**. Health: `/api/health`. Render asignó el sufijo `mey9` durante la planificación. Los sitios Pages aún no tienen URLs asignadas; los nombres propuestos son `medifind-ggian102`, `medifind-operador-ggian102` y `medifind-admin-ggian102`, sujetos a disponibilidad. No se publicó ni compiló un APK nuevo en esta etapa.
 
 ## Límites y costos
 
@@ -88,7 +88,23 @@ La clase `CloudRequestGuard` añade límites a autenticación, serializa escaneo
 
 Variables privadas necesarias: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_BASE64` (32 bytes aleatorios codificados en Base64), sin valores en Git. Render generará el secreto JWT mediante `generateValue: true`. **Etapa inicial autorizada: `MEDLINK_RECETAS_ESCANEO_ENABLED=false` y ninguna clave OpenAI desplegada**. Una futura habilitación controlada requiere nueva autorización. Variables no secretas: `OPENAI_MODEL=gpt-5.4-mini`, `MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS=60`, `MEDIFIND_SCAN_DAILY_LIMIT=20`, `MEDLINK_CORS_ALLOWED_ORIGINS`, `PORT`. El puerto lo asigna Render. CORS inicialmente no admite orígenes web, ya que Pages no se publica en esta etapa. Las variables de correo solo se añaden con un proveedor y remitente autorizado/verificado.
 
-Usar Free y despliegue manual (`autoDeployTrigger: 'off'`); previews deshabilitados; no crear Render Postgres, discos, cron ni servicios pagos. Health `/api/health`. La especificación está en `deploy/cloud/render.yaml`, con el repositorio y la rama de despliegue explícitos y nombre `medifind-api-ggian102`. Se validó con el esquema JSON oficial de Render descargado el 26/11/2026 mediante `validate-render-config.mjs`; no se aplicó ni creó recursos. La validación de esquema no sustituye la aprobación del plan ni las pruebas posteriores al despliegue.
+Usar Free y despliegue manual (`autoDeployTrigger: 'off'`); previews deshabilitados; no crear Render Postgres, discos, cron ni servicios pagos. Health `/api/health`. La especificación está en `deploy/cloud/render.yaml`, con el repositorio y la rama de despliegue explícitos y nombre `medifind-api-ggian102`. Se validó antes de aplicarla con el esquema JSON oficial de Render descargado el 26/11/2026 mediante `validate-render-config.mjs`. La validación de esquema se complementó con la aprobación del plan y las pruebas reales posteriores al despliegue.
+
+El servicio autorizado se creó después de comprobar Billing autenticado: Hobby, **sin tarjeta**, sin cargos pendientes, builds con límite mensual USD 0, 500 minutos de pipeline y 5 GB de transferencia incluidos; no se modificaron ajustes de facturación. Se aplicó la Blueprint con credenciales reales enviadas directamente por HTTPS desde un proceso local; no se imprimieron valores privados ni se creó un servicio con credenciales vacías. La CLI oficial 2.39.0 se verificó por SHA-256 y fue autorizada expresamente por el usuario. Su token queda en `.local-cloud/render-cli-config/`, ignorado por Git y excluido de la imagen.
+
+Servicio: `srv-dc47mhajnfac73bpn770`, nombre `medifind-api-ggian102-mey9`, región Virginia, un único servicio Free de 0,1 CPU/512 MiB. [Dashboard del servicio](https://dashboard.render.com/web/srv-dc47mhajnfac73bpn770). Blueprint `exs-dc47ahe7bikc738c8vtg`, `autoSync=false`; estado `paused` significa sincronización automática deshabilitada, no servicio detenido. Los pushes no despliegan automáticamente. El primer despliegue `6b9d8a9` llegó a `live`; la corrección de seguridad `7884ad0`, despliegue `dep-dc47q6tg1s2s73dj27o0`, llegó a `live` a las 18:44:08 UTC.
+
+La prueba pública detectó que la configuración heredada de headers reenviados permitía falsificar la IP usada por el limitador. Se corrigió **solo en el perfil cloud**, con `server.forward-headers-strategy=none`: esta API JSON no genera redirects ni URLs absolutas y Render termina TLS, por lo que no necesita confiar en headers `Forwarded` del cliente. El límite ahora usa el origen real de la conexión del proxy de Render: 10 solicitudes de autenticación/minuto por ese origen y 60/minuto globales, con ventanas fijas y almacenamiento acotado. Varios usuarios pueden compartir el límite del proxy; es una protección conservadora para esta instancia académica Free. Las pruebas públicas posteriores confirmaron HTTP 429 incluso al falsificar tanto `X-Forwarded-For` como `Forwarded`. No se alteró el entorno local, que conserva su configuración anterior.
+
+Verificación privada de variables: conexión y contraseña coinciden con el usuario de aplicación Neon, JWT válido generado por Render, ausencia de clave OpenAI, escaneo `false`, CORS sin orígenes web habilitados y health HTTP correcto. El endpoint health conserva su respuesta original y verifica el proceso; las consultas de negocio y las comprobaciones SQL independientes verificaron Neon, sin confundir health 200 con una prueba completa.
+
+Pruebas públicas aprobadas: inicio de sesión de los tres roles con contraseñas rotadas; catálogo de 12 medicamentos activos, cinco farmacias y disponibilidad; 401 sin token o JWT inválido; 403 de paciente/operador en administración y de operador contra otra farmacia; origen web no autorizado rechazado; generación alterada 404; escaneo externo 503 y configuración deshabilitada. Se vinculó la receta académica existente 19, vigente hasta el 21/02/2027, sin cambiar fechas ni cantidades autorizadas; se creó la reserva de prueba 30, se verificó idempotencia y visibilidad por farmacia y se canceló conservando historial.
+
+Neon después de esa prueba tiene **30 reservas** (29 migradas más la prueba cancelada), **16 prescripciones** (15 migradas más la vinculación normal de la receta), 28 recetas demo y cinco adjuntos. El stock de la presentación 9 en la farmacia 2 volvió de la operación a su valor inicial **4**; cantidad comprometida y utilizada de esa receta: 0/0. Stock no negativo, cantidades de prescripciones válidas, sin constraints inválidos, triggers deshabilitados ni migraciones fallidas. Tamaño medido en ese punto: **13.828.096 bytes (13,19 MiB)**. No se restauró nuevamente la base.
+
+Memoria observada en métricas reales de Render después de las pruebas: muestra reciente **290,6 MiB**, pico observado **348,6 MiB**, límite **512 MiB**. Son muestras del período de prueba, no una garantía de consumo máximo futuro. Evidencias: `.local-cloud/render-security-config.json`, `public-api-tests.json`, `public-readiness-tests.json`, `auth-proxy-test.json` y `neon-public-integrity.json`.
+
+Suspensión/reanudación: **en observación**. Última petición de prueba a las 18:44:41 UTC; se deja la API sin tráfico durante al menos 21 minutos, sin pings de mantenimiento, para observar suspensión de Render y Neon y luego verificar catálogo, sesión ya emitida y reserva persistida. Consultar `.local-cloud/cold-start-test.json` cuando finalice; no declarar esta prueba aprobada antes de obtener el resultado.
 
 ## Revisión previa a activar servicios públicos
 
@@ -96,14 +112,14 @@ La autorización vigente cubre la migración anterior, el commit/push de la prep
 
 | Componente que se propone publicar | Configuración preparada | Condición para activarlo |
 | --- | --- | --- |
-| Código de despliegue | Rama `deploy/medifind-cloud`; fuentes funcionales preservados; secretos, dumps y firmas excluidos | Autorizado tras auditoría de secretos e historial no publicado |
-| Backend Render | Un servicio Docker Free en `medi's workspace`, Virginia, Java 21, 512 MiB, heap 256 MiB, pool 3/0, health `/api/health`, despliegues manuales | Autorizado; falta comprobar Billing antes de crearlo |
-| Acceso a Neon | Solo rol `medifind_app`, TLS verificado; migración ya aplicada y validada | Cargar secretos privados únicamente en el backend autorizado |
-| Seguridad | JWT propio de cloud; roles y farmacia verificados localmente; límites de autenticación e IA; generador de documentos alterados cerrado | Repetir comprobaciones contra la URL real después del despliegue |
+| Código de despliegue | Rama `deploy/medifind-cloud`; fuentes funcionales preservados; secretos, dumps y firmas excluidos | Auditado y subido con autorización |
+| Backend Render | Un servicio Docker Free en `medi's workspace`, Virginia, Java 21, 512 MiB, heap 256 MiB, pool 3/0, health `/api/health`, despliegues manuales | Desplegado con Billing comprobado y pruebas públicas aprobadas; reanudación en observación |
+| Acceso a Neon | Solo rol `medifind_app`, TLS verificado; migración ya aplicada y validada | Configurado privadamente y comprobado mediante la API pública |
+| Seguridad | JWT propio de cloud; roles y farmacia verificados; límites de autenticación; generador de documentos alterados cerrado; OpenAI sin clave | Comprobaciones públicas aprobadas, incluida la corrección de headers falsificados |
 | Landing, operador y administración Pages | Tres proyectos estáticos Free, CORS limitado a los orígenes efectivos, sin claves del backend | API HTTPS real; aprobación final de publicación y artefactos comprobados |
 | Android cloud preliminar | Identidad `.cloud`, firma independiente, versión `1.0.0-cloud.1`, versionCode 3; diseño y funcionalidades preservados | URL real de Render, compilación, firma, instalación y pruebas antes de aprobar la release |
 
-Para activar Render falta: comprobar si la cuenta tiene un medio de pago y revisar sus límites de facturación, sin añadir tarjetas ni aceptar consumo pago; subir la rama aprobada; suministrar DB mediante el canal privado y generar JWT en Render; crear el servicio Free con health HTTP y comprobar arranque, conexión, operaciones, permisos y reanudación tras inactividad. No alcanza con un health 200. La conexión de GitHub en Render se comprobará al preparar el plan; si requiere OAuth se solicitará esa autorización sin pedir claves. OpenAI queda deshabilitado y sin clave.
+Render ya está activado con los controles y resultados anteriores. Queda finalizar la observación real de suspensión/reanudación. OpenAI queda deshabilitado y sin clave. Pages y la release Android requieren otra etapa autorizada; no se publicaron como parte del backend.
 
 La clave OpenAI todavía no se transfirió a Render ni se hicieron llamadas nuevas al proveedor en esta etapa. El correo cloud sigue pendiente de proveedor/remitente gratuito y verificable; las cinco farmacias siguen sin coordenadas de origen. No se declararán completos esos flujos sin resolverlos o informar su limitación.
 
@@ -136,7 +152,7 @@ Hecho antes de publicar:
 - Migración real a Neon: 22 tablas iguales a la copia congelada, 30 relaciones sin huérfanos, 35 triggers activos, Flyway validado por Java y rol de aplicación con TLS verificado. Base local original: 21 tablas nuevamente comparadas y preservadas.
 - Configuración Render validada contra el esquema oficial, sin aplicar cambios ni publicar servicios.
 
-Pendiente después de la aprobación final: arranque y reactivación reales de Render; catálogo, stock, reservas y recetas por Internet; prueba documental cloud real limitada a un PDF académico; APK compilado/firma/instalación/flujos; sitios HTTPS, descarga y QR; permisos en URLs públicas; entrega de correo si existe proveedor compatible. No se afirma una prueba en teléfono físico: no hay uno conectado actualmente. Tampoco se presenta el health check como sustituto de estas pruebas.
+Render: arranque, catálogo, stock, reservas, vinculación de receta y permisos por Internet aprobados; reactivación en observación hasta finalizar la espera real. Pendiente de otra etapa autorizada: prueba documental externa con un PDF académico y OpenAI habilitado de manera controlada; APK compilado/firma/instalación/flujos; sitios HTTPS, descarga y QR; permisos de esos sitios públicos; entrega de correo si existe proveedor compatible. No se afirma una prueba en teléfono físico: no hay uno conectado actualmente. Tampoco se presenta el health check como sustituto de estas pruebas.
 
 ## Actualización, respaldo y vuelta a local
 
