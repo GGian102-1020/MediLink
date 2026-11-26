@@ -1,4 +1,4 @@
-// Only connectivity, build identity and signing; no Android UI/source changes.
+// Cloud identity/signing; optional rc2 source adaptations run only in the isolated staging copy.
 gradle.beforeProject { p ->
     p.plugins.withId('com.android.application') {
       p.extensions.getByName('androidComponents').finalizeDsl { android ->
@@ -21,12 +21,12 @@ gradle.beforeProject { p ->
             initWith(android.buildTypes.getByName('release'))
             signingConfig = signing
             applicationIdSuffix = '.cloud'
-            versionNameSuffix = '-cloud.1'
+            versionNameSuffix = System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc2' ? '-cloud.2' : '-cloud.1'
             buildConfigField 'String','BASE_URL','"'+url+'"'
             resValue 'string','app_name','MediFind Cloud'
             matchingFallbacks = ['release']
         }
-        android.defaultConfig.versionCode = 3
+        android.defaultConfig.versionCode = System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc2' ? 4 : 3
         android.defaultConfig.versionName = '1.0.0'
         android.testBuildType = 'cloud'
       }

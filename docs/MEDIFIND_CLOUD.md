@@ -2,6 +2,8 @@
 
 Estado al 26/11/2026: **Neon verificado, backend Render Free y tres sitios Cloudflare Pages publicados; Android Cloud firmado y publicado como prerelease `cloud-v1.0.0-rc.1`**. El APK superó pruebas unitarias e instalación/navegación/autenticación en emulador contra Render y Neon. El QR público, el botón y la descarga anónima corresponden al mismo APK comprobado. OpenAI permanece deshabilitado y sin clave desplegada. La base local, los fuentes originales, el APK LAN y la release estable se conservaron.
 
+Actualización posterior: **las cinco farmacias ya tienen coordenadas verificadas en Neon**, con respaldo previo y conservación de los demás datos. La APK publicada rc.1 muestra el marcador real de San Martín sin recompilarse. El usuario confirmó instalación y uso por datos móviles, login, catálogo, reservas/cancelación y sesión persistente en su teléfono. La investigación y candidata privada para captura local con IA desactivada se registran en [Mapa y captura local](MEDIFIND_CLOUD_MAPA_CAPTURA.md); no se publicó otra release. Las verificaciones específicas del Samsung se pospusieron por pedido del usuario.
+
 ## Referencia y recuperación
 
 Rama de despliegue: `deploy/medifind-cloud`, creada desde `codex/medifind-v1-local`, HEAD original `da344f1643af3111404e42703dac6053c333aaa1`. El estado local probado, incluidos landing, administración, scripts y cambios pendientes, se respaldó antes de editar en `.local-demo/backups/cloud-preparation-20261126-131141/`. Incluye diff binario, inventario Git, HEAD y tar de archivos no versionados; SHA-256 del tar `5211a4db5d07d6ba693cd37fc9c44fff17d755b3cf674b515062d78b356fb1eb`.
@@ -55,7 +57,7 @@ Para anonimizar notas históricas se suspendieron temporalmente, **solo en la co
 
 Cloud añade únicamente `V14__cloud_scan_budget.sql`, en una ubicación Flyway exclusiva del perfil cloud. V1 es el baseline histórico; V2–V13 conservan sus checksums. La copia congelada tiene 22 tablas, incluida la de presupuesto cloud, y V1–V14. Su dump anonimizado volvió a restaurarse y pasó integridad, triggers activos y rechazo de contraseñas conocidas. Evidencia: `.local-cloud/copy-review.json`.
 
-Las cinco farmacias tienen dirección, pero **ninguna tiene coordenadas** en el origen recuperado. La migración preserva ese estado. No se prometen marcadores de farmacia ni se inventan ubicaciones; se necesitan coordenadas verificadas para esa prueba.
+Las cinco farmacias tenían dirección pero ninguna coordenada en el origen recuperado; la migración preservó ese estado. En una etapa posterior autorizada se geocodificaron sus direcciones con Georef, se respaldó Neon y se actualizaron únicamente latitud y longitud. La base local conserva su estado original. Ver [resultado y fuentes por dirección](MEDIFIND_CLOUD_MAPA_CAPTURA.md).
 
 ## Migración a Neon
 
@@ -132,7 +134,7 @@ La autorización vigente cubre la migración anterior, un único backend Render 
 
 Render está activado y verificado, incluida la suspensión y reanudación naturales. Los tres sitios Pages y el APK se publicaron en la etapa posterior autorizada; la release estable `android-v0.2.0` sigue siendo Latest. La nueva release es preliminar, no draft, y no se marcó Latest.
 
-La clave OpenAI todavía no se transfirió a Render ni se hicieron llamadas nuevas al proveedor en esta etapa. El correo cloud sigue pendiente de proveedor/remitente gratuito y verificable; las cinco farmacias siguen sin coordenadas de origen. No se declararán completos esos flujos sin resolverlos o informar su limitación.
+La clave OpenAI todavía no se transfirió a Render ni se hicieron llamadas nuevas al proveedor en esta etapa. El correo cloud sigue pendiente de proveedor/remitente gratuito y verificable. Las coordenadas faltaban en el origen y se añadieron después, solo en Neon, según la actualización documentada.
 
 ## Correo de recuperación
 
@@ -175,7 +177,7 @@ Hecho antes de publicar:
 
 Render: arranque, catálogo, stock, reservas, vinculación de receta, permisos por Internet y reactivación tras suspensión natural aprobados. Android Cloud, sitios HTTPS, permisos de los sitios públicos, descarga y QR también aprobados con las verificaciones disponibles. Evidencias adicionales: `.local-cloud/android-build.json`, `android-ui-tests.json`, `pages-ui-tests.json`, `landing-qr-tests.json`, `release-download-check.json`, `artifact-audit.json` y `local-preservation.json`. Los informes no contienen contraseñas ni tokens. Esta etapa no restauró ni migró PostgreSQL nuevamente y sus pruebas de interfaz no crearon nuevas reservas.
 
-Pendientes: habilitación y prueba documental de OpenAI solo con una autorización posterior; entrega de correo con remitente/proveedor verificable; coordenadas verificadas para las cinco farmacias; pruebas en teléfono físico de cámara, PDF y GPS. Render Free puede tardar minutos en despertar (156 s observados); el límite de autenticación conservador puede agrupar usuarios detrás del proxy. No se usa el health check como sustituto de las pruebas de negocio.
+Pendientes: habilitación y prueba documental de OpenAI solo con una autorización posterior; entrega de correo con remitente/proveedor verificable; pruebas en teléfono físico de cámara, PDF y GPS (pospuestas por el usuario). Las coordenadas ya se completaron en Neon y los marcadores se comprobaron en la APK rc.1. Render Free puede tardar minutos en despertar (156 s observados); el límite de autenticación conservador puede agrupar usuarios detrás del proxy. No se usa el health check como sustituto de las pruebas de negocio.
 
 ## Actualización, respaldo y vuelta a local
 
