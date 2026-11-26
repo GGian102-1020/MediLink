@@ -1,13 +1,16 @@
+previews:
+  generation: 'off'
 services:
   - type: web
-    name: medifind-api
+    name: medifind-api-ggian102
     runtime: docker
     plan: free
     region: virginia
+    repo: https://github.com/GGian102-1020/MediLink
     branch: deploy/medifind-cloud
     dockerfilePath: ./deploy/cloud/Dockerfile
     dockerContext: .
-    autoDeployTrigger: off
+    autoDeployTrigger: 'off'
     healthCheckPath: /api/health
     envVars:
       - key: DB_URL
