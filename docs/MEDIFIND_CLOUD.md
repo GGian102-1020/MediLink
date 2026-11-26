@@ -58,6 +58,8 @@ Para Spring JDBC usar TLS con `sslmode=verify-full` y `sslfactory=org.postgresql
 
 Migración efectiva: **pendiente**. Tamaño en Neon y comparación de filas remotas: **pendientes**, no inferidos a partir del dump local.
 
+La conexión directa al destino se comprobó con el cliente PostgreSQL: **TLS 1.3, verify-full**, y cero tablas de usuario. Esa comprobación fue solo lectura. La configuración privada temporal utilizada para comunicar el cliente con las herramientas se eliminó después de leerla; no se incluyó en Git ni se mostró en el informe. El indicador interno `pg_stat_ssl` del servidor detrás del proxy no se utiliza para inferir el cifrado del cliente: la verificación se hizo con `psql \\conninfo`.
+
 ## Backend Render
 
 Dockerfile: `deploy/cloud/Dockerfile`, Java 21, build Maven reproducible desde los fuentes funcionales más adiciones cloud; runtime sin root. El perfil cloud usa `PORT` de Render, Hikari 3/0, Hibernate validate y Flyway sin baseline automático. La imagen acota heap a 256 MiB, metaspace a 128 MiB y code cache a 32 MiB; usa SerialGC y un procesador visible. No elimina módulos del sistema.
