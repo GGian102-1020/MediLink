@@ -18,8 +18,8 @@ try {
     const env=Object.fromEntries(raw.map(x=>[x.envVar.key,x.envVar.value]));
     assert.equal(env.DB_URL,app.jdbc);assert.equal(env.DB_USER,app.user);assert.equal(env.DB_PASSWORD,app.password);
     assert.ok(Buffer.from(env.JWT_SECRET_BASE64,'base64').length>=32);
-    assert.equal(env.MEDLINK_RECETAS_ESCANEO_ENABLED,'false');assert.ok(!env.OPENAI_API_KEY);assert.equal(env.MEDLINK_CORS_ALLOWED_ORIGINS,'');
-    const report={at:new Date().toISOString(),serviceId:id,url:service.serviceDetails.url,plan:'free',instances:1,healthCheck:'/api/health',neonApplicationCredentialsMatch:true,privateJwtConfigured:true,externalAiDisabled:true,openAiKeyAbsent:true,browserOriginsClosed:true,success:true};
+    assert.equal(env.MEDLINK_RECETAS_ESCANEO_ENABLED,'false');assert.ok(!env.OPENAI_API_KEY);assert.equal(env.MEDLINK_CORS_ALLOWED_ORIGINS,'https://medifind-operador-ggian102.pages.dev,https://medifind-admin-ggian102.pages.dev');
+    const report={at:new Date().toISOString(),serviceId:id,url:service.serviceDetails.url,plan:'free',instances:1,healthCheck:'/api/health',neonApplicationCredentialsMatch:true,privateJwtConfigured:true,externalAiDisabled:true,openAiKeyAbsent:true,browserOriginsLimitedToPublishedPanels:true,success:true};
     writeFileSync('.local-cloud/render-security-config.json',JSON.stringify(report,null,2));
     if(existsSync('.local-cloud/render-runtime.private.env'))unlinkSync('.local-cloud/render-runtime.private.env');
     console.log(JSON.stringify(report,null,2));

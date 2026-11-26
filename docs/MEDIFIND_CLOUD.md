@@ -1,6 +1,6 @@
 # MediFind cloud
 
-Estado al 26/11/2026: **copia anonimizada migrada y backend Render Free desplegado**, con pruebas públicas funcionales, de seguridad y de suspensión/reanudación aprobadas. Sitios Cloudflare y release Android continúan pendientes de autorización; el escaneo externo OpenAI permanece deshabilitado y sin clave desplegada.
+Estado al 26/11/2026: **copia anonimizada migrada y backend Render Free desplegado**. El usuario autorizó también Android Cloud, su release preliminar verificada y los tres sitios Pages gratuitos. Los dos paneles están publicados y probados; Android superó compilación, firma, auditoría e instalación/navegación en emulador. Se registrarán a continuación la publicación efectiva del APK, la landing y el QR. OpenAI permanece deshabilitado y sin clave desplegada.
 
 ## Referencia y recuperación
 
@@ -14,12 +14,12 @@ Los 94 archivos Android y los 184 archivos backend originales siguen sin cambios
 | --- | --- | --- |
 | Neon | Organización MediFind, plan `free` reconfirmado; proyecto existente `flat-shadow-76171117`, región `aws-sa-east-1`, PostgreSQL 18; `neondb` contiene la copia anonimizada verificada | Copia PostgreSQL |
 | Render | Espacio `medi's workspace`, plan Hobby; un único servicio web Free, sin tarjeta y con límite de builds USD 0 comprobados antes de crearlo | Backend Java 21 / Spring Boot |
-| Cloudflare | OAuth oficial Wrangler completado con la cuenta MediFind; sin proyectos Pages existentes | Landing, operador y administración estáticos |
+| Cloudflare | Cuenta MediFind autorizada; tres proyectos Pages Direct Upload gratuitos creados, sin Functions ni Workers | Landing, operador y administración estáticos |
 | GitHub | Repositorio `GGian102-1020/MediLink`, acceso de escritura comprobado; release estable existente `android-v0.2.0` | Fuente y APK preliminar |
 
 Arquitectura: Android cloud y sitios Pages se conectan por HTTPS a Render; Render conecta por TLS verificado a Neon. El contenido adjunto y el estado de negocio se guardan en PostgreSQL, no en el disco efímero de Render. Las claves de OpenAI y JWT permanecen exclusivamente en el backend. No se usarán Pages Functions, Workers de pago, R2, dominios comprados ni servidores para mantener despierto Render.
 
-Backend HTTPS real: **https://medifind-api-ggian102-mey9.onrender.com**. Health: `/api/health`. Render asignó el sufijo `mey9` durante la planificación. Los sitios Pages aún no tienen URLs asignadas; los nombres propuestos son `medifind-ggian102`, `medifind-operador-ggian102` y `medifind-admin-ggian102`, sujetos a disponibilidad. No se publicó ni compiló un APK nuevo en esta etapa.
+Backend HTTPS real: **https://medifind-api-ggian102-mey9.onrender.com**. Health: `/api/health`. Panel operador: **https://medifind-operador-ggian102.pages.dev**. Administración: **https://medifind-admin-ggian102.pages.dev**. Proyecto de landing: **https://medifind-ggian102.pages.dev**, pendiente en este punto del enlace final al APK verificado.
 
 ## Límites y costos
 

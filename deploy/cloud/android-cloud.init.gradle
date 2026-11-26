@@ -28,6 +28,7 @@ gradle.beforeProject { p ->
         }
         android.defaultConfig.versionCode = 3
         android.defaultConfig.versionName = '1.0.0'
+        android.testBuildType = 'cloud'
       }
     }
 }

@@ -22,7 +22,7 @@ services:
       - key: JWT_SECRET_BASE64
         generateValue: true
       - key: MEDLINK_CORS_ALLOWED_ORIGINS
-        value: ''
+        value: 'https://medifind-operador-ggian102.pages.dev,https://medifind-admin-ggian102.pages.dev'
       - key: MEDLINK_RECETAS_ESCANEO_ENABLED
         value: 'false'
       - key: OPENAI_MODEL
