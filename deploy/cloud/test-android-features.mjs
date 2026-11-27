@@ -11,6 +11,8 @@ assert.equal(run(['shell','getprop','ro.kernel.qemu']).trim(),'1','Only the disp
 const build=JSON.parse(readFileSync(mode==='map-rc1'?'.local-cloud/android-build.json':'.local-cloud/android-build-rc2.json','utf8'));
 assert.equal(build.applicationId,'ar.edu.uade.medilink.android.cloud');
 assert.equal(createHash('sha256').update(readFileSync(build.path)).digest('hex'),build.sha256);
+const health=await fetch(new URL('api/health',build.url),{signal:AbortSignal.timeout(240000)});
+assert.equal(health.status,200);assert.equal(await health.text(),'MediLink API funcionando','Wait for the actual application after a free-tier cold start');
 const account=JSON.parse(readFileSync('.local-cloud/credentials.private.json','utf8')).find(x=>x.rol==='USUARIO');
 const input=resolve('.local-cloud/android-features.private.json');
 const remote='/sdcard/Android/data/ar.edu.uade.medilink.android.cloud/files/cloud-test.private.json';
@@ -46,6 +48,7 @@ try{
         if(passed&&(test.name==='map'||test.name==='capture')){
             const image=test.name==='map'?'cloud-map-verified.png':'cloud-capture-preview.png';
             run(['pull','/sdcard/Android/data/'+build.applicationId+'/files/'+image,resolve('.local-cloud/'+image)]);
+            if(test.name==='capture')run(['pull','/sdcard/Android/data/'+build.applicationId+'/files/cloud-capture-network.json',resolve('.local-cloud/cloud-capture-network.json')]);
         }
     }
     assert.ok(report.cases.every(x=>x.passed),'Feature instrumentation did not pass; inspect the private case logs');

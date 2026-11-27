@@ -5,12 +5,14 @@ const origin=process.env.MEDIFIND_CLOUD_API_URL?.replace(/\/$/,'');
 const apk=process.env.MEDIFIND_CLOUD_APK_URL;
 const validate=process.argv.includes('--validate-only');
 const panelsOnly=process.argv.includes('--panels-only');
+const landingOnly=process.argv.includes('--landing-only');
+if(panelsOnly&&landingOnly)throw Error('Choose panels-only or landing-only');
 if(!validate){
  const u=new URL(origin||'');if(u.protocol!=='https:'||!u.hostname.endsWith('.onrender.com')||u.username||u.password||u.pathname!=='/')throw Error('A verified Render origin is required');
  if(!panelsOnly){const a=new URL(apk||'');if(a.origin!=='https://github.com'||!/^\/GGian102-1020\/MediLink\/releases\/download\/[^/]+\/[^/]+\.apk$/.test(a.pathname))throw Error('An explicit, verified release asset is required');}
 }
 const run=(cwd,args,env={})=>{const r=spawnSync(process.platform==='win32'?'npm.cmd':'npm',args,{cwd,env:{...process.env,...env},stdio:'inherit',shell:process.platform==='win32'});if(r.status)throw Error(`Web check failed in ${cwd}`);};
-for(const app of (panelsOnly?['frontend','admin-web']:['frontend','admin-web','landing'])){
+for(const app of (landingOnly?['landing']:panelsOnly?['frontend','admin-web']:['frontend','admin-web','landing'])){
  const out=resolve(`.local-cloud/web/${app}`);mkdirSync(out,{recursive:true});
  for(const path of ['src','public','tests','index.html','package.json','package-lock.json','tsconfig.json','vite.config.ts','vite-env.d.ts'])if(existsSync(`${app}/${path}`))cpSync(`${app}/${path}`,`${out}/${path}`,{recursive:true});
  if(!existsSync(`${out}/node_modules`))symlinkSync(resolve(`${app}/node_modules`),`${out}/node_modules`,'junction');

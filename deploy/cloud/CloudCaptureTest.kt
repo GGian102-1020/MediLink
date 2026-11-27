@@ -42,6 +42,7 @@ class CloudCaptureTest {
         page.canvas.drawColor(Color.WHITE);document.finishPage(page)
         pdf.outputStream().use(document::writeTo);document.close()
         val pdfUri=archivos.uriCaptura(pdf)
+        var probe:CloudRequestProbe?=null
         var cameraCalls=0;var documentCalls=0;var cancelNext=false;var step="login"
         val monitor=object:Instrumentation.ActivityMonitor(){
             @Suppress("DEPRECATION")
@@ -67,6 +68,7 @@ class CloudCaptureTest {
         instrumentation.addMonitor(monitor)
         try{
             waitText("Iniciar sesión")
+            ui.runOnUiThread{probe=CloudRequestProbe(ui.activity)}
             val credentials=JSONObject(input.readText())
             ui.onAllNodes(hasSetTextAction())[0].performTextInput(credentials.getString("email"))
             ui.onAllNodes(hasSetTextAction())[1].performTextInput(credentials.getString("password"))
@@ -112,9 +114,11 @@ class CloudCaptureTest {
             step="logout";ui.runOnUiThread{ui.activity.onBackPressedDispatcher.onBackPressed()}
             waitText("Cuenta");ui.onNodeWithText("Cuenta").performClick();waitText("Mi cuenta")
             ui.onNodeWithText("Cerrar sesión",substring=true).performScrollTo().performClick();waitText("Iniciar sesión")
+            val traffic=requireNotNull(probe).verifyAndReport()
+            File(context.getExternalFilesDir(null),"cloud-capture-network.json").writeText(traffic.toString(2))
         }catch(failure:Throwable){
             throw AssertionError("Cloud capture test failed at step: $step (${failure.javaClass.simpleName})"+
                 if(step=="login") "" else ": "+failure.message.orEmpty().take(600))
-        }finally{instrumentation.removeMonitor(monitor);pdf.delete()}
+        }finally{probe?.close();instrumentation.removeMonitor(monitor);pdf.delete()}
     }
 }

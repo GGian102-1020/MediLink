@@ -15,7 +15,7 @@ let code=readFileSync(repository,'utf8');if(!code.includes('.readTimeout(20, Tim
 code=code.replace('.connectTimeout(15, TimeUnit.SECONDS)','.connectTimeout(30, TimeUnit.SECONDS)').replace('.readTimeout(20, TimeUnit.SECONDS)','.readTimeout(240, TimeUnit.SECONDS)');writeFileSync(repository,code);
 if(candidate){
  applyCapturePreview(stage);
- for(const name of ['CloudSmokeTest.kt','CloudMapTest.kt','CloudCaptureTest.kt','CloudLocationTest.kt'])cpSync(`deploy/cloud/${name}`,`${stage}/app/src/androidTest/java/ar/edu/uade/medilink/android/${name}`);
+ for(const name of ['CloudSmokeTest.kt','CloudMapTest.kt','CloudCaptureTest.kt','CloudLocationTest.kt','CloudRequestProbe.kt','CloudUpgradeTest.kt'])cpSync(`deploy/cloud/${name}`,`${stage}/app/src/androidTest/java/ar/edu/uade/medilink/android/${name}`);
 }
 mkdirSync('.local-cloud/signing',{recursive:true});const keyFile=resolve('.local-cloud/signing/medifind-cloud.p12'),secretFile='.local-cloud/signing/private.json';
 let password;if(existsSync(secretFile)){password=JSON.parse(readFileSync(secretFile,'utf8')).password;}else{password=randomBytes(32).toString('base64url');writeFileSync(secretFile,JSON.stringify({password}),{flag:'wx'});}
