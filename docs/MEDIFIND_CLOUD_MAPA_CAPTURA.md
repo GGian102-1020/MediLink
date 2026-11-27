@@ -2,6 +2,8 @@
 
 Actualización del 26/11/2026 sobre `deploy/medifind-cloud`. No se migró ni restauró Neon nuevamente. OpenAI sigue deshabilitado, sin clave en Render; no se cambiaron planes ni facturación.
 
+Publicación posterior autorizada: esta candidata se publicó como **`cloud-v1.0.0-rc.2`**, conservando rc.1 y la estable. La landing y el QR ya apuntan a rc.2. Ver [verificación final e instalación](MEDIFIND_CLOUD_RC2.md). Los párrafos de preparación siguientes registran el estado previo a esa autorización.
+
 ## Diagnóstico del mapa y actualización de datos
 
 Android llama a `GET /api/presentaciones/{id}/disponibilidad`. `DisponibilidadDto` interpreta `latitud` y `longitud` como `Double?`; el JSON del backend ya contiene ambos campos y `distanciaKm`. No hay intercambio latitud/longitud. `MapasScreen` convierte los valores válidos a `PuntoGeo` y omite los registros sin coordenadas. El geocodificador Android es para una dirección elegida como origen por el usuario, no completa automáticamente las coordenadas de las farmacias.

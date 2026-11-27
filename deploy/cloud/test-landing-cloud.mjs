@@ -54,5 +54,5 @@ try {
     assert.equal(latestRequests.length,0);assert.deepEqual(pageErrors,[]);
     report.checks.push({name:'Desktop and mobile rendering, mobile QR decoding, no releases/latest requests or page errors',passed:true});
     report.success=true;
-} catch(error) {report.failedStage=stage;report.errorType=error.name;process.exitCode=1;}
+} catch(error) {report.failedStage=stage;report.errorType=error.name;report.errorMessage=error.message?.slice(0,800);process.exitCode=1;}
 finally {await browser.close();writeFileSync('.local-cloud/landing-qr-tests.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));}
