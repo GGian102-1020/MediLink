@@ -100,7 +100,12 @@ class CloudCaptureTest {
             ui.onNodeWithText("Buscar").performClick();waitText("Amoxicilina")
             ui.onAllNodesWithText("Amoxicilina",substring=true).onFirst().performClick()
             ui.waitUntil(60_000){runCatching{ui.onAllNodesWithContentDescription("Consultar disponibilidad").fetchSemanticsNodes().isNotEmpty()}.getOrDefault(false)}
-            ui.onAllNodesWithContentDescription("Consultar disponibilidad").onFirst().performClick()
+            @Suppress("DEPRECATION") val version=context.packageManager.getPackageInfo(context.packageName,0).versionCode
+            if(version>=5) {
+                ui.onNodeWithText("250 mg/5 ml",substring=true).performClick()
+                waitText("Farmacia San Martín");ui.onNodeWithText("Elegir",substring=true).performScrollTo().performClick()
+                waitText("Adjuntar receta");ui.onNodeWithText("Adjuntar receta").performScrollTo().performClick()
+            } else ui.onAllNodesWithContentDescription("Consultar disponibilidad").onFirst().performClick()
             waitText("El análisis automático está desactivado")
             ui.onNodeWithText("Escanear").performScrollTo().assertIsEnabled().performClick()
             waitText("captura.jpg");assertEquals(2,cameraCalls)

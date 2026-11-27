@@ -29,7 +29,7 @@ class CloudUpgradeBeforeTest {
     @Test fun prepareRc1AuthenticatedSession(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         @Suppress("DEPRECATION") val version=context.packageManager.getPackageInfo(context.packageName,0).versionCode
-        assertEquals(3,version)
+        assertEquals(InstrumentationRegistry.getArguments().getString("fromVersionCode")?.toInt()?:3,version)
         waitText("Iniciar sesión")
         val input=JSONObject(File(context.getExternalFilesDir(null),"cloud-test.private.json").readText())
         ui.onAllNodes(hasSetTextAction())[0].performTextInput(input.getString("email"))
@@ -47,7 +47,7 @@ class CloudUpgradeAfterTest {
     @Test fun rc2RetainsExactlyTheSameSessionWithoutLogin(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         @Suppress("DEPRECATION") val version=context.packageManager.getPackageInfo(context.packageName,0).versionCode
-        assertEquals(4,version)
+        assertEquals(InstrumentationRegistry.getArguments().getString("toVersionCode")?.toInt()?:4,version)
         val proof=File(context.filesDir,"cloud-upgrade-proof.json")
         val expected=JSONObject(proof.readText()).getString("tokenSha256")
         waitText("Cuenta");var after="";ui.runOnUiThread{after=tokenHash(ui.activity)}
@@ -60,7 +60,7 @@ class CloudUpgradeAfterTest {
         val repository=ViewModelProvider(ui.activity)[MediLinkAppVm::class.java].repository
         runBlocking{repository.miPerfil()} // Real authenticated Render request using the retained token.
         File(context.getExternalFilesDir(null),"cloud-upgrade-result.json").writeText(JSONObject()
-            .put("fromVersionCode",3).put("toVersionCode",4).put("sameTokenAfterUpgrade",true)
+            .put("fromVersionCode",InstrumentationRegistry.getArguments().getString("fromVersionCode")?.toInt()?:3).put("toVersionCode",version).put("sameTokenAfterUpgrade",true)
             .put("retainedAfterActivityRecreation",true).put("authenticatedProfileVisible",true)
             .put("authenticatedBackendRequest",true).toString(2))
         ui.onNodeWithText("Cerrar sesión",substring=true).performScrollTo().performClick();waitText("Iniciar sesión")

@@ -21,12 +21,12 @@ gradle.beforeProject { p ->
             initWith(android.buildTypes.getByName('release'))
             signingConfig = signing
             applicationIdSuffix = '.cloud'
-            versionNameSuffix = System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc2' ? '-cloud.2' : '-cloud.1'
+            versionNameSuffix = System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc3' ? '-cloud.3' : System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc2' ? '-cloud.2' : '-cloud.1'
             buildConfigField 'String','BASE_URL','"'+url+'"'
             resValue 'string','app_name','MediFind Cloud'
             matchingFallbacks = ['release']
         }
-        android.defaultConfig.versionCode = System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc2' ? 4 : 3
+        android.defaultConfig.versionCode = System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc3' ? 5 : System.getenv('MEDIFIND_CLOUD_CANDIDATE') == 'rc2' ? 4 : 3
         android.defaultConfig.versionName = '1.0.0'
         android.testBuildType = 'cloud'
       }

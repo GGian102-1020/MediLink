@@ -30,4 +30,6 @@ services:
       - key: MEDLINK_RECETAS_ESCANEO_TIMEOUT_SECONDS
         value: '60'
       - key: MEDIFIND_SCAN_DAILY_LIMIT
-        value: '20'
+        value: '2'
+      - key: MEDIFIND_SCAN_ALLOWED_ACCOUNT_IDS
+        sync: false
