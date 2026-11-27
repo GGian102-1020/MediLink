@@ -18,6 +18,7 @@ jobs:
       - name: Test unchanged backend plus cloud additions
         run: |
           cp -R backend "$RUNNER_TEMP/medifind-backend"
+          cp -R database "$RUNNER_TEMP/database"
           cp -R deploy/cloud/backend/. "$RUNNER_TEMP/medifind-backend/src/"
           cd "$RUNNER_TEMP/medifind-backend"
           chmod +x mvnw
