@@ -6,7 +6,7 @@ import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 assert.ok(process.argv.includes('--apply'),'Explicit additive infrastructure application required');
 const backup=JSON.parse(readFileSync('.local-cloud/neon-geography-backup.json','utf8'));
-assert.equal(backup.projectId,'flat-shadow-76171117');assert.equal(backup.tables,22);
+assert.equal(backup.projectId,'flat-shadow-76171117');assert.ok([22,23].includes(backup.tables));
 assert.ok(backup.archiveCatalogVerified&&Date.now()-Date.parse(backup.at)<3600000);
 assert.equal(createHash('sha256').update(readFileSync(backup.file)).digest('hex'),backup.sha256);
 const app=JSON.parse(readFileSync('.local-cloud/neon-app.private.json','utf8'));

@@ -17,6 +17,8 @@ const account=JSON.parse(readFileSync('.local-cloud/credentials.private.json','u
 const input=resolve('.local-cloud/rc3-input.private.json');
 const remote='/sdcard/Android/data/'+build.applicationId+'/files/cloud-test.private.json';
 const report={at:new Date().toISOString(),apkSha256:build.sha256,emulator:true,physicalPhone:false,published:false,reservationRequests:0,documentUploads:0,passed:false,cases:[]};
+const only=process.argv.find(x=>x.startsWith('--only='))?.slice(7);
+const reportPath='.local-cloud/android-rc3-tests'+(only?'-'+only:'')+'.json';
 function credentials() {
     if(existsSync(input))unlinkSync(input);
     writeFileSync(input,JSON.stringify({email:account.email,password:account.password}),{flag:'wx',mode:0o600});
@@ -27,12 +29,11 @@ function instrument(name,classes,count) {
     writeFileSync('.local-cloud/android-rc3-'+name+'.log',raw.replaceAll(account.email,'[academic account]').replaceAll(account.password,'[redacted]'));
     const evidence={name,tests:count,passed:raw.includes(`OK (${count} ${count===1?'test':'tests'})`)};
     report.cases.push(evidence);console.log(JSON.stringify(evidence));
-    writeFileSync('.local-cloud/android-rc3-tests.json',JSON.stringify(report,null,2));
+    writeFileSync(reportPath,JSON.stringify(report,null,2));
     assert.ok(evidence.passed,'Private rc.3 instrumentation log requires review');
 }
 try {
     run(['install','-r',resolve('.local-cloud/android/app/build/outputs/apk/androidTest/cloud/app-cloud-androidTest.apk')]);
-    const only=process.argv.find(x=>x.startsWith('--only='))?.slice(7);
     if(!only||only==='upgrade') {
         // Disposable emulator only: create a clean rc.2 fixture even if a previous test installed rc.3.
         try{run(['uninstall',build.applicationId]);}catch{}
@@ -44,6 +45,7 @@ try {
     }
     const cases=[
         ['prescription','CloudAvailabilityFirstTest#prescriptionAvailabilityAndMapComeBeforeValidationButReservationRemainsLocked',1],
+        ['validated-selection','CloudAvailabilityFirstTest#selectedPharmacySurvivesSyntheticValidationWithoutSendingAnyBusinessWrite',1],
         ['otc','CloudAvailabilityFirstTest#overTheCounterReservationActionIsUnchangedAndNotSubmitted',1],
         ['capture','CloudCaptureTest',1],['location','CloudLocationTest',1],['smoke','CloudSmokeTest',1],
     ];
@@ -65,5 +67,5 @@ try {
 finally {
     if(existsSync(input))unlinkSync(input);try{run(['shell','rm','-f',remote]);}catch{}
     for(const args of [['shell','appops','set',build.applicationId,'android:mock_location','default'],['shell','pm','revoke',build.applicationId,'android.permission.ACCESS_FINE_LOCATION'],['shell','pm','revoke',build.applicationId,'android.permission.ACCESS_COARSE_LOCATION']])try{run(args);}catch{}
-    writeFileSync('.local-cloud/android-rc3-tests'+(process.argv.find(x=>x.startsWith('--only='))?'-'+process.argv.find(x=>x.startsWith('--only=')).slice(7):'')+'.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+    writeFileSync(reportPath,JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }

@@ -26,7 +26,17 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class CloudCaptureTest {
     @get:Rule val ui=createAndroidComposeRule<MainActivity>()
-    private fun waitText(text:String){ui.waitUntil(240_000){runCatching{ui.onAllNodesWithText(text,substring=true).fetchSemanticsNodes().isNotEmpty()}.getOrDefault(false)}}
+    private fun waitText(text:String){ui.waitUntil(240_000){
+        val root=InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
+        if(root?.packageName.toString().contains("permissioncontroller")) {
+            fun deny(n:android.view.accessibility.AccessibilityNodeInfo):Boolean {
+                val t=n.text?.toString()?.replace('’','\'')?.lowercase()
+                if(t=="don't allow"||t=="no permitir")return n.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+                return (0 until n.childCount).any{n.getChild(it)?.let(::deny)==true}
+            };root?.let(::deny)
+        }
+        runCatching{ui.onAllNodesWithText(text,substring=true).fetchSemanticsNodes().isNotEmpty()}.getOrDefault(false)
+    }}
     private fun removeAttachment(){
         ui.waitUntil(10_000){runCatching{ui.onNodeWithText("Quitar adjunto").assertIsEnabled();true}.getOrDefault(false)}
         ui.onNodeWithText("Quitar adjunto").performClick()

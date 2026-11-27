@@ -4,8 +4,20 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.lifecycle.ViewModelProvider
 import ar.edu.uade.medilink.android.MainActivity
+import ar.edu.uade.medilink.android.MediLinkAppVm
 import java.io.File
+import java.lang.reflect.Proxy
+import java.util.IdentityHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import okhttp3.Call
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.Retrofit
 import org.json.JSONObject
 import org.junit.Rule
 import org.junit.Test
@@ -62,5 +74,48 @@ class CloudAvailabilityFirstTest {
             waitText("Confirmar reserva");ui.onNode(hasText("Confirmar reserva") and hasClickAction()).assertExists()
             ui.onAllNodesWithText("Adjuntar receta").assertCountEquals(0)
         } catch(_:Throwable) {throw AssertionError("Cloud OTC navigation failed; private inputs omitted")}
+    }
+    @Test fun selectedPharmacySurvivesSyntheticValidationWithoutSendingAnyBusinessWrite() {
+        val originals=IdentityHashMap<Retrofit,Call.Factory>();val simulated=AtomicInteger()
+        try {
+            waitText("Iniciar sesión")
+            // Simulate the validation response in this test process. Every other business POST is blocked.
+            ui.runOnUiThread {
+                val repository=ViewModelProvider(ui.activity)[MediLinkAppVm::class.java].repository
+                for(name in listOf("api","parity","recetas","escaneo")) {
+                    val service=repository.javaClass.getDeclaredField(name).apply{isAccessible=true}.get(repository)
+                    val handler=Proxy.getInvocationHandler(service)
+                    val retrofit=handler.javaClass.declaredFields.first{it.type==Retrofit::class.java}.apply{isAccessible=true}.get(handler) as Retrofit
+                    if(originals.containsKey(retrofit))continue
+                    val original=retrofit.callFactory();originals[retrofit]=original
+                    val client=(original as OkHttpClient).newBuilder().addInterceptor { chain ->
+                        val request=chain.request();val path=request.url.encodedPath
+                        if(path=="/api/me/recetas-demo/vinculacion"&&request.method=="POST") {
+                            val buffer=okio.Buffer();request.body!!.writeTo(buffer);val selection=JSONObject(buffer.readUtf8())
+                            check(selection.getLong("presentacionId")==7L&&selection.getInt("cantidad")==1)
+                            check(selection.getString("codigoReceta")=="MLD-SYNTHETIC-TEST")
+                            simulated.incrementAndGet()
+                            val json="""{"nueva":false,"codigo":"RECETA_VERIFICADA","prescripcion":{"id":999999,"codigoExterno":"MLD-SYNTHETIC-TEST","usuarioId":999999,"fechaEmision":"2026-11-23","fechaVencimiento":"2027-02-21","estado":"ACTIVA","items":[{"id":999999,"presentacionId":7,"descripcionPresentacion":"Amoxicilina sintética","cantidadAutorizada":1,"cantidadComprometida":0,"cantidadUtilizada":0,"cantidadDisponible":1}]}}"""
+                            Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("Synthetic validation")
+                                .body(json.toResponseBody("application/json".toMediaType())).build()
+                        } else {
+                            check(request.method=="GET"||path in setOf("/api/auth/login","/api/auth/logout")){"Business writes are forbidden in this fixture"}
+                            chain.proceed(request)
+                        }
+                    }.build()
+                    Retrofit::class.java.getDeclaredField("callFactory").apply{isAccessible=true}.set(retrofit,client)
+                }
+            }
+            login();step="selection before synthetic validation";chooseMedicine("Amoxicilina","250 mg/5 ml")
+            click("Ver en mapa");waitText("Farmacia San Martín");click("Reservar acá");click("Adjuntar receta")
+            step="synthetic validation";waitText("Paso 1 de 2");click("Tengo un código de receta electrónica")
+            ui.onAllNodes(hasSetTextAction()).onLast().performTextInput("MLD-SYNTHETIC-TEST")
+            click("Verificar y continuar");waitText("Receta verificada")
+            ui.onNodeWithText("Elegida").assertExists()
+            ui.onNode(hasText("Confirmar reserva") and hasClickAction()).assertIsEnabled()
+            check(simulated.get()==1){"The synthetic validation must be intercepted exactly once"}
+            // Deliberately DO NOT press Confirmar reserva.
+        } catch(failure:Throwable) {throw AssertionError("Cloud synthetic validation failed at $step (${failure.javaClass.simpleName}); private inputs omitted")}
+        finally {ui.runOnUiThread {for((retrofit,factory) in originals)Retrofit::class.java.getDeclaredField("callFactory").apply{isAccessible=true}.set(retrofit,factory)}}
     }
 }
